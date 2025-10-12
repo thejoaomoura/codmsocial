@@ -1,12 +1,20 @@
-// types.tsx
+export interface PostComment {
+  authorId: string;
+  authorName: string;
+  authorAvatar: string;
+  text: string;
+  createdAt: any;
+}
+
 export interface Post {
   id: string;
   authorName: string;
   authorId: string;
   authorAvatar: string;
   text: string;
-  createdAt: any; // serverTimestamp
+  createdAt: any; 
   reactions: string[];
+  comments: PostComment[];
 }
 
 export interface ChatOverview {

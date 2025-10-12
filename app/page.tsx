@@ -13,9 +13,9 @@ import {
 } from "@heroui/navbar";
 
 import { Dropdown, DropdownTrigger, DropdownMenu, DropdownItem } from "@heroui/dropdown";
-import { Avatar } from "@heroui/avatar";  
+import { Avatar } from "@heroui/avatar";
 import { Button } from "@heroui/button";
-import { HiOutlineLogout, HiOutlineMenu, HiOutlinePencil, HiOutlineSave, HiOutlineX } from "react-icons/hi";
+import { HiOutlineInbox, HiOutlineLogout, HiOutlineMenu, HiOutlineNewspaper, HiOutlinePencil, HiOutlineSave, HiOutlineTicket, HiOutlineX } from "react-icons/hi";
 import { initializeApp } from "firebase/app";
 import {
   getFirestore,
@@ -31,6 +31,8 @@ import {
   setDoc,
   where,
   getDocs,
+  arrayUnion,
+  arrayRemove,
 } from "firebase/firestore";
 
 import {
@@ -51,9 +53,9 @@ import {
   ModalFooter,
 } from "@heroui/modal";
 
-import {addToast, ToastProvider} from "@heroui/toast";
-import {Code} from "@heroui/code";
-import {Input} from "@heroui/input";
+import { addToast, ToastProvider } from "@heroui/toast";
+import { Code } from "@heroui/code";
+import { Input } from "@heroui/input";
 
 const firebaseConfig = {
   apiKey: "AIzaSyBZl9_FYc-wndFiFSrzN8RNJHrlR6VV5MY",
@@ -69,7 +71,10 @@ const db = getFirestore(app);
 const auth = getAuth(app);
 const provider = new GoogleAuthProvider();
 
-const navigation = ["Feed", "Conversas"];
+const navigation = [
+  { label: "Feed", icon: <HiOutlineNewspaper className="w-5 h-5" /> },
+  { label: "Conversas", icon: <HiOutlineInbox className="w-5 h-5" /> },
+];
 
 export default function Home() {
   const [user, setUser] = useState<User | null>(null);
@@ -97,26 +102,26 @@ export default function Home() {
     return () => window.removeEventListener("goToConversas", listener);
   }, []);
 
-useEffect(() => {
-  const unsub = onAuthStateChanged(auth, async (u) => {
-    setUser(u);
-    if (u) {
-      // Pega os dados do Firestore
-      const userDocRef = doc(db, "Users", u.uid);
-      const userDocSnap = await getDoc(userDocRef);
-      if (userDocSnap.exists()) {
-        const userData = userDocSnap.data();
-        setProfileName(userData.displayName || "");
-        setProfilePhoto(userData.photoURL || "");
-      } else {
-        // fallback caso não exista no Firestore
-        setProfileName(u.displayName || "");
-        setProfilePhoto(u.photoURL || "");
+  useEffect(() => {
+    const unsub = onAuthStateChanged(auth, async (u) => {
+      setUser(u);
+      if (u) {
+        // Pega os dados do Firestore
+        const userDocRef = doc(db, "Users", u.uid);
+        const userDocSnap = await getDoc(userDocRef);
+        if (userDocSnap.exists()) {
+          const userData = userDocSnap.data();
+          setProfileName(userData.displayName || "");
+          setProfilePhoto(userData.photoURL || "");
+        } else {
+          // fallback caso não exista no Firestore
+          setProfileName(u.displayName || "");
+          setProfilePhoto(u.photoURL || "");
+        }
       }
-    }
-  });
-  return () => unsub();
-}, []);
+    });
+    return () => unsub();
+  }, []);
 
   // Posts
   useEffect(() => {
@@ -161,12 +166,28 @@ useEffect(() => {
     const result = await signInWithPopup(auth, provider);
     const user = result.user;
 
-    await setDoc(doc(db, "Users", user.uid), {
-      displayName: user.displayName,
-      email: user.email,
-      photoURL: user.photoURL,
-    }, { merge: true });
+    const userRef = doc(db, "Users", user.uid);
+    const userSnap = await getDoc(userRef);
+
+    if (!userSnap.exists()) {
+      // Novo usuário: salva createdAt
+      await setDoc(userRef, {
+        displayName: user.displayName,
+        email: user.email,
+        photoURL: user.photoURL,
+        createdAt: serverTimestamp(), // <-- timestamp para 24h
+      });
+    } else {
+      // Usuário já existe: atualiza dados sem alterar createdAt
+      await updateDoc(userRef, {
+        displayName: user.displayName,
+        email: user.email,
+        photoURL: user.photoURL,
+      });
+    }
   };
+
+
   const handleLogout = async () => await signOut(auth);
 
   const handlePost = async () => {
@@ -187,6 +208,52 @@ useEffect(() => {
 
     setText("");
   };
+
+const handleComment = async (postId: string, commentText: string) => {
+  if (!user || !commentText.trim()) return;
+
+  const postRef = doc(db, "Posts", postId);
+
+  const newComment = {
+    authorId: user.uid,
+    authorName: profileName || user.displayName || user.email?.split("@")[0] || "Anonymous",
+    authorAvatar: profilePhoto || user.photoURL || "",
+    text: commentText.trim(),
+    createdAt: new Date(), // usa Date() aqui em vez de serverTimestamp()
+  };
+
+  try {
+    await updateDoc(postRef, {
+      comments: arrayUnion(newComment),
+    });
+    console.log("Comentário adicionado no post:", postId);
+  } catch (error) {
+    console.error("Erro ao adicionar comentário:", error);
+  }
+};
+
+// Função para deletar comentário
+const handleDeleteComment = async (postId: string, comment: any) => {
+  if (!user) return;
+
+  // Só permite deletar se for o autor do comentário
+  if (comment.authorId !== user.uid) {
+    alert("Você só pode deletar seus próprios comentários.");
+    return;
+  }
+
+  const postRef = doc(db, "Posts", postId);
+
+  try {
+    await updateDoc(postRef, {
+      comments: arrayRemove(comment), // remove exatamente o objeto do array
+    });
+    console.log("Comentário deletado:", comment);
+  } catch (err) {
+    console.error("Erro ao deletar comentário:", err);
+  }
+};
+
 
   const toggleReaction = async (post: Post) => {
     if (!user || !post.id) return;
@@ -261,83 +328,83 @@ useEffect(() => {
     setChatText("");
   };
 
-const handleProfileSave = async (newName: string) => {
-  if (!user) return;
+  const handleProfileSave = async (newName: string) => {
+    if (!user) return;
 
-  const usersRef = collection(db, "Users");
-  const q = query(usersRef);
-  const snap = await getDocs(q);
+    const usersRef = collection(db, "Users");
+    const q = query(usersRef);
+    const snap = await getDocs(q);
 
-  // Verifica se o nome já existe
-  const nameExists = snap.docs.some(
-    (docSnap) => docSnap.data().displayName?.toLowerCase() === newName.toLowerCase()
-  );
-
-  if (nameExists) {
-    alert("Esse nome já está em uso, escolha outro.");
-    return;
-  }
-
-  try {
-    // Atualiza o Firestore
-    await setDoc(
-      doc(db, "Users", user.uid),
-      { displayName: newName, photoURL: profilePhoto || "" },
-      { merge: true }
+    // Verifica se o nome já existe
+    const nameExists = snap.docs.some(
+      (docSnap) => docSnap.data().displayName?.toLowerCase() === newName.toLowerCase()
     );
 
-    // Atualiza o estado local
-    setProfileName(newName);
+    if (nameExists) {
+      alert("Esse nome já está em uso, escolha outro.");
+      return;
+    }
 
-    alert("Perfil atualizado com sucesso!");
-  } catch (err) {
-    console.error("Erro ao atualizar perfil:", err);
-    alert("Erro ao atualizar perfil.");
-  }
-};
+    try {
+      // Atualiza o Firestore
+      await setDoc(
+        doc(db, "Users", user.uid),
+        { displayName: newName, photoURL: profilePhoto || "" },
+        { merge: true }
+      );
+
+      // Atualiza o estado local
+      setProfileName(newName);
+
+      alert("Perfil atualizado com sucesso!");
+    } catch (err) {
+      console.error("Erro ao atualizar perfil:", err);
+      alert("Erro ao atualizar perfil.");
+    }
+  };
 
 
- 
-const handleEditName = () => {
-  setNewName(profileName);
-  setShowNameModal(true);
-};
 
-const handleSubmitName = async () => {
-  if (!newName.trim()) {
-    return addToast({
-      title: "Erro",
-      description: "Nome não pode ser vazio",
-      color: "danger",
+  const handleEditName = () => {
+    setNewName(profileName);
+    setShowNameModal(true);
+  };
+
+  const handleSubmitName = async () => {
+    if (!newName.trim()) {
+      return addToast({
+        title: "Erro",
+        description: "Nome não pode ser vazio",
+        color: "danger",
+      });
+    }
+
+    const q = query(collection(db, "Users"), where("displayName", "==", newName.trim()));
+    const snap = await getDocs(q);
+
+    if (!snap.empty) {
+      return addToast({
+        title: "Erro",
+        description: "Este nome já está em uso.",
+        color: "danger",
+      });
+    }
+
+    const userRef = doc(db, "Users", user!.uid);
+    await updateDoc(userRef, { displayName: newName.trim() });
+
+    // Atualiza também no Firebase Auth
+    await updateProfile(user!, { displayName: newName.trim() });
+
+    setProfileName(newName.trim());
+    setShowNameModal(false);
+
+    addToast({
+      title: "Sucesso",
+      description: "Nome atualizado com sucesso!",
+      color: "success",
     });
-  }
-
-  const q = query(collection(db, "Users"), where("displayName", "==", newName.trim()));
-  const snap = await getDocs(q);
-
-  if (!snap.empty) {
-    return addToast({
-      title: "Erro",
-      description: "Este nome já está em uso.",
-      color: "danger",
-    });
-  }
-
-  const userRef = doc(db, "Users", user!.uid);
-  await updateDoc(userRef, { displayName: newName.trim() });
-
-  // Atualiza também no Firebase Auth
-  await updateProfile(user!, { displayName: newName.trim() });
-
-  setProfileName(newName.trim());
-  setShowNameModal(false);
-
-  addToast({
-    title: "Sucesso",
-    description: "Nome atualizado com sucesso!",
-    color: "success",
-  });
-};
+  };
 
   if (!user) return <Login handleGoogleLogin={handleGoogleLogin} />;
 
@@ -349,10 +416,10 @@ const handleSubmitName = async () => {
         <NavbarContent justify="start">
           <div className="hidden sm:flex gap-2">
             {navigation.map((n) => (
-              <NavbarItem key={n} isActive={activeTab === n}>
-                <Button onPress={() => setActiveTab(n as "Feed" | "Conversas")}>
-                  {n}
-                  {n === "Conversas" && conversas.some((c) => c.unread) && (
+              <NavbarItem key={n.label} isActive={activeTab === n.label}>
+                <Button onPress={() => setActiveTab(n.label as "Feed" | "Conversas")}>
+                  {n.icon}
+                  {n.label === "Conversas" && conversas.some((c) => c.unread) && (
                     <span
                       style={{
                         display: "inline-block",
@@ -369,33 +436,44 @@ const handleSubmitName = async () => {
             ))}
           </div>
 
-           {/* Menu Mobile */}
-  <div className="flex sm:hidden">
-    <Dropdown>
-      <DropdownTrigger>
-        <Button><HiOutlineMenu className="w-5 h-5"/></Button>
-      </DropdownTrigger>
-      <DropdownMenu>
-        {navigation.map((n) => (
-          <DropdownItem key={n} onPress={() => setActiveTab(n as "Feed" | "Conversas")}>
-            {n}
-            {n === "Conversas" && conversas.some((c) => c.unread) && (
-              <span
-                style={{
-                  display: "inline-block",
-                  width: 8,
-                  height: 8,
-                  borderRadius: "50%",
-                  background: "red",
-                  marginLeft: 4,
-                }}
-              />
-            )}
-          </DropdownItem>
-        ))}
-      </DropdownMenu>
-    </Dropdown>
-  </div>
+          {/* Menu Mobile */}
+          <div className="flex sm:hidden">
+            <Dropdown>
+              <DropdownTrigger>
+                <Button>
+                  <HiOutlineMenu className="w-5 h-5" />
+                </Button>
+              </DropdownTrigger>
+              <DropdownMenu>
+                {navigation.map((n) => (
+                  <DropdownItem
+                    key={n.label}
+                    onPress={() => setActiveTab(n.label as "Feed" | "Conversas")}
+                    className="flex items-center justify-between w-full"
+                  >
+                    {/* Ícone + Texto lado a lado */}
+                    <div className="flex items-center gap-2">
+                      {n.icon}
+                      <span>{n.label}</span>
+                    </div>
+
+                    {/* Badge vermelho para Conversas */}
+                    {n.label === "Conversas" && conversas.some((c) => c.unread) && (
+                      <span
+                        style={{
+                          display: "inline-block",
+                          width: 8,
+                          height: 8,
+                          borderRadius: "50%",
+                          background: "red",
+                        }}
+                      />
+                    )}
+                  </DropdownItem>
+                ))}
+              </DropdownMenu>
+            </Dropdown>
+          </div>
         </NavbarContent>
 
         {/* Navbar direita */}
@@ -424,58 +502,58 @@ const handleSubmitName = async () => {
             </DropdownMenu>
           </Dropdown>
 
-      <input
-  ref={inputRef}
-  type="file"
-  accept="image/*"
-  style={{ display: "none" }}
-  onChange={async (e) => {
-    if (!e.target.files || e.target.files.length === 0) return;
-    const file = e.target.files[0];
-    const formData = new FormData();
-    formData.append("image", file);
+          <input
+            ref={inputRef}
+            type="file"
+            accept="image/*"
+            style={{ display: "none" }}
+            onChange={async (e) => {
+              if (!e.target.files || e.target.files.length === 0) return;
+              const file = e.target.files[0];
+              const formData = new FormData();
+              formData.append("image", file);
 
-    try {
-      const res = await fetch(
-        `https://api.imgbb.com/1/upload?key=b1356253eee00f53fbcbe77dad8acae8`,
-        { method: "POST", body: formData }
-      );
-      const data = await res.json();
+              try {
+                const res = await fetch(
+                  `https://api.imgbb.com/1/upload?key=b1356253eee00f53fbcbe77dad8acae8`,
+                  { method: "POST", body: formData }
+                );
+                const data = await res.json();
 
-      if (data.success) {
-        const newPhotoURL = data.data.url;
-        setProfilePhoto(newPhotoURL);
+                if (data.success) {
+                  const newPhotoURL = data.data.url;
+                  setProfilePhoto(newPhotoURL);
 
-        if (user) {
-          // Atualiza Auth
-          await updateProfile(user, { photoURL: newPhotoURL });
+                  if (user) {
+                    // Atualiza Auth
+                    await updateProfile(user, { photoURL: newPhotoURL });
 
-          // Atualiza Firestore
-          const userDocRef = doc(db, "Users", user.uid);
-          await updateDoc(userDocRef, { photoURL: newPhotoURL });
-        }
+                    // Atualiza Firestore
+                    const userDocRef = doc(db, "Users", user.uid);
+                    await updateDoc(userDocRef, { photoURL: newPhotoURL });
+                  }
 
-        addToast({
-          title: "Sucesso",
-          description: "Foto atualizada com sucesso!",
-          color: "success",
-        });
-      } else {
-        addToast({
-          title: "Erro",
-          description: "Erro ao enviar imagem.",
-          color: "danger",
-        });
-      }
-    } catch {
-      addToast({
-        title: "Erro",
-        description: "Erro ao enviar imagem.",
-        color: "danger",
-      });
-    }
-  }}
-/>
+                  addToast({
+                    title: "Sucesso",
+                    description: "Foto atualizada com sucesso!",
+                    color: "success",
+                  });
+                } else {
+                  addToast({
+                    title: "Erro",
+                    description: "Erro ao enviar imagem.",
+                    color: "danger",
+                  });
+                }
+              } catch {
+                addToast({
+                  title: "Erro",
+                  description: "Erro ao enviar imagem.",
+                  color: "danger",
+                });
+              }
+            }}
+          />
 
           {/* Modal para editar nome */}
           <Modal isOpen={showNameModal} onOpenChange={setShowNameModal}>
@@ -483,21 +561,21 @@ const handleSubmitName = async () => {
               <ModalHeader>Editar Nome</ModalHeader>
               <ModalBody className="flex flex-col gap-2">
                 <div>
-                  <Code color="primary"   className="mb-2">Seu nome atual</Code>
+                  <Code color="primary" className="mb-2">Seu nome atual</Code>
                   <Input
                     type="text"
                     value={profileName}
                     disabled
-                    
+
                   />
                 </div>
                 <div>
-      <Code color="primary" className="mb-2">Seu novo nome</Code>
+                  <Code color="primary" className="mb-2">Seu novo nome</Code>
                   <Input
                     type="text"
-       
+
                     onChange={(e) => setNewName(e.target.value)}
-   
+
                   />
                 </div>
               </ModalBody>
@@ -510,7 +588,7 @@ const handleSubmitName = async () => {
         </NavbarContent>
       </Navbar>
 
-       {/* Conteúdo */}
+      {/* Conteúdo */}
       <div style={{ maxWidth: 800, margin: "0 auto", padding: 24 }}>
         {activeTab === "Feed" && (
           <FeedWithChat
@@ -542,6 +620,8 @@ const handleSubmitName = async () => {
             setChatText={setChatText}
             currentUserId={user.uid}
             openChatFromConversa={openChatFromConversa}
+             handleComment={handleComment} 
+                   handleDeleteComment={handleDeleteComment} 
           />
         )}
 
@@ -555,7 +635,7 @@ const handleSubmitName = async () => {
             } : null}
             // @ts-expect-error: Type mismatch due to different ChatOverview imports, but runtime shape is compatible
             setShowChatWith={showChatWith}
-             conversas={conversas.map(c => ({
+            conversas={conversas.map(c => ({
               ...c,
               lastMessage: c.lastMessage ?? "",
               unread: c.unread ?? false,
