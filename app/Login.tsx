@@ -23,13 +23,6 @@ const Login: React.FC<LoginProps> = ({ handleGoogleLogin }) => {
           <Button
             onPress={handleGoogleLogin}
             size="lg"
-            iconBefore={
-              <img
-                src="https://www.svgrepo.com/show/355037/google.svg"
-                alt="Google"
-                className="h-5 w-5"
-              />
-            }
           >
             <SiGoogle className="w-5 h-5 mr-2" />
           </Button>

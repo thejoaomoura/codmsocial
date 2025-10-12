@@ -195,7 +195,7 @@ const confirmDelete = async () => {
       )}
 
       {/* Drawer lateral do Chat */}
-      <Drawer open={showChatDrawer} placement="right" onClose={() => setShowChatDrawer(false)}>
+     <Drawer isOpen={showChatDrawer} placement="right" onClose={() => setShowChatDrawer(false)}>
         <DrawerContent>
           <DrawerHeader className="flex justify-between items-center">
             <h2 className="font-bold text-white">Conversas</h2>
@@ -206,6 +206,7 @@ const confirmDelete = async () => {
 
           <DrawerBody>
             <Chat
+              userId={user.id} 
               showChatWith={showChatWith}
               setShowChatWith={setShowChatWith}
               chatMessages={chatMessages}

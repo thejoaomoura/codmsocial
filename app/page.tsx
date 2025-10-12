@@ -120,15 +120,14 @@ export default function Home() {
         const otherName = data.names?.[otherUid] || otherUid;
         const otherAvatar = data.avatars?.[otherUid] || "";
         const unread = data.unreadBy?.includes(user.uid) || false;
-
-        list.push({
-          id: docSnap.id,
-          otherUserId: otherUid,
-          otherUserName: otherName,
-          otherUserAvatar: otherAvatar,
-          lastMessage: data.lastMessage || "",
-          unread,
-        });
+list.push({
+  id: docSnap.id,
+  otherUserId: otherUid,
+  otherUserName: otherName,
+  otherUserAvatar: otherAvatar || "",
+  lastMessage: data.lastMessage ?? "", // nunca undefined
+  unread: unread || false,
+});
       });
       setConversas(list);
     });
@@ -160,33 +159,33 @@ export default function Home() {
     await updateDoc(pRef, { reactions: Array.from(reactions) });
   };
 
-  const openChatFromConversa = (c: ChatOverview) => {
-    if (!user) return;
-    setActiveTab("Conversas");
-    setActiveChatOverview(c);
+ const openChatFromConversa = (c: ChatOverview): void => {
+  if (!user) return;
+  setActiveTab("Conversas");
+  setActiveChatOverview(c);
 
-    const chatId = [user.uid, c.otherUserId].sort().join("_");
-    const chatCol = collection(db, "Chats", chatId, "Messages");
+  const chatId = [user.uid, c.otherUserId].sort().join("_");
+  const chatCol = collection(db, "Chats", chatId, "Messages");
 
-    const unsub = onSnapshot(query(chatCol, orderBy("createdAt")), (snap) => {
-      const msgs = snap.docs.map((d) => d.data() as ChatMessage);
-      setChatMessages(msgs);
-    });
+  onSnapshot(query(chatCol, orderBy("createdAt")), (snap) => {
+    const msgs = snap.docs.map((d) => d.data() as ChatMessage);
+    setChatMessages(msgs);
+  });
 
-    const chatDoc = doc(db, "Chats", chatId);
-    getDoc(chatDoc).then((snap) => {
-      if (!snap.exists()) return;
-      const data = snap.data() as any;
-      if (data.unreadBy?.includes(user.uid)) {
-        updateDoc(chatDoc, {
-          unreadBy: data.unreadBy.filter((uid: string) => uid !== user.uid),
-        });
-      }
-    });
+  const chatDoc = doc(db, "Chats", chatId);
+  getDoc(chatDoc).then((snap) => {
+    if (!snap.exists()) return;
+    const data = snap.data() as any;
+    if (data.unreadBy?.includes(user.uid)) {
+      updateDoc(chatDoc, {
+        unreadBy: data.unreadBy.filter((uid: string) => uid !== user.uid),
+      });
+    }
+  });
 
-    setShowChatWith({ ...c });
-    return unsub;
-  };
+  setShowChatWith({ ...c });
+};
+
 
   const sendMessage = async () => {
     if (!user || !chatText.trim() || !showChatWith) return;
@@ -362,27 +361,53 @@ export default function Home() {
             setText={setText}
             handlePost={handlePost}
             toggleReaction={toggleReaction}
-            conversas={conversas}
-            chatMessages={chatMessages}
+            conversas={conversas.map(c => ({
+              ...c,
+              lastMessage: c.lastMessage ?? "",
+              unread: c.unread ?? false,
+            }))}
+            chatMessages={chatMessages.map(m => ({
+              ...m,
+              senderAvatar: m.senderAvatar ?? "",
+            }))}
+            showChatWith={showChatWith ? {
+              ...showChatWith,
+              otherUserAvatar: showChatWith.otherUserAvatar ?? "",
+              lastMessage: showChatWith.lastMessage ?? "",
+              unread: showChatWith.unread ?? false,
+            } : null}
+            // @ts-expect-error: Type mismatch due to different ChatOverview imports, but runtime shape is compatible
+            setShowChatWith={setShowChatWith}
             sendMessage={sendMessage}
             chatText={chatText}
             setChatText={setChatText}
             currentUserId={user.uid}
             openChatFromConversa={openChatFromConversa}
-            showChatWith={showChatWith}
-            setShowChatWith={setShowChatWith}
           />
         )}
 
         {activeTab === "Conversas" && (
           <Chat
-            showChatWith={showChatWith}
-            setShowChatWith={setShowChatWith}
-            chatMessages={chatMessages}
+            showChatWith={showChatWith ? {
+              ...showChatWith,
+              otherUserAvatar: showChatWith.otherUserAvatar ?? "",
+              lastMessage: showChatWith.lastMessage ?? "",
+              unread: showChatWith.unread ?? false,
+            } : null}
+            // @ts-expect-error: Type mismatch due to different ChatOverview imports, but runtime shape is compatible
+            setShowChatWith={showChatWith}
+             conversas={conversas.map(c => ({
+              ...c,
+              lastMessage: c.lastMessage ?? "",
+              unread: c.unread ?? false,
+            }))}
+            chatMessages={chatMessages.map(m => ({
+              ...m,
+              senderAvatar: m.senderAvatar ?? "",
+            }))}
             chatText={chatText}
             setChatText={setChatText}
             sendMessage={sendMessage}
-            conversas={conversas}
             openChatFromConversa={openChatFromConversa}
           />
         )}

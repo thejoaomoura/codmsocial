@@ -126,7 +126,7 @@ const Chat: React.FC<ChatProps> = ({
                   onClick={() => openChatFromConversa(c)}
                   style={{ cursor: "pointer" }}
                 >
-                  {(columnKey) => <TableCell>{renderCell(c, columnKey)}</TableCell>}
+                {(columnKey) => <TableCell>{renderCell(c, columnKey as string)}</TableCell>}
                 </TableRow>
               )}
             </TableBody>
