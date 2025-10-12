@@ -19,7 +19,7 @@ import {
 import { Dropdown, DropdownTrigger, DropdownMenu, DropdownItem } from "@heroui/dropdown";
 import { Avatar } from "@heroui/avatar";  
 import { Button } from "@heroui/button";
-import { HiOutlineLogout, HiOutlinePencil } from "react-icons/hi";
+import { HiOutlineLogout, HiOutlineMenu, HiOutlinePencil } from "react-icons/hi";
 import { initializeApp } from "firebase/app";
 import {
   getFirestore,
@@ -275,7 +275,7 @@ list.push({
   <div className="flex sm:hidden">
     <Dropdown>
       <DropdownTrigger>
-        <Button>Menu</Button>
+        <Button><HiOutlineMenu className="w-5 h-5"/></Button>
       </DropdownTrigger>
       <DropdownMenu>
         {navigation.map((n) => (

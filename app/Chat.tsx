@@ -80,7 +80,6 @@ const Chat: React.FC<ChatProps> = ({
           return (
             <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
               <Avatar src={c.otherUserAvatar} alt={c.otherUserName} />
-              <span>{c.otherUserName}</span>
             </div>
           );
         case "lastMessage":

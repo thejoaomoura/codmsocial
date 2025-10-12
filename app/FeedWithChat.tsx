@@ -154,9 +154,6 @@ const confirmDelete = async () => {
 </div>
                     <div className="flex items-center gap-2">
   
-             <Button     onClick={() => openChatFromFeed(p)}  size="sm">
-                   <HiOutlineChat className="w-4 h-4" />
-                        </Button>
                       {isOwner && (
                       <Button
   onClick={() => handleDeleteClick(p.id, p.authorId)}
@@ -177,6 +174,8 @@ const confirmDelete = async () => {
   <p className="text-gray-200 italic whitespace-pre-wrap ml-1">{p.text}</p>
 </CardBody>
               <CardFooter>
+
+                
             <Button
   onPress={() => toggleReaction(p)}
   size="sm"
@@ -188,6 +187,9 @@ const confirmDelete = async () => {
   </span>
 
 </Button>
+  <Button     onClick={() => openChatFromFeed(p)}  size="sm" className="ml-2" >
+                   <HiOutlineChat className="w-4 h-4" />
+                        </Button>
               </CardFooter>
             </Card>
           );
