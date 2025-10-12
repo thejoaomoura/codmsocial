@@ -368,6 +368,34 @@ const handleSubmitName = async () => {
               </NavbarItem>
             ))}
           </div>
+
+           {/* Menu Mobile */}
+  <div className="flex sm:hidden">
+    <Dropdown>
+      <DropdownTrigger>
+        <Button><HiOutlineMenu className="w-5 h-5"/></Button>
+      </DropdownTrigger>
+      <DropdownMenu>
+        {navigation.map((n) => (
+          <DropdownItem key={n} onPress={() => setActiveTab(n as "Feed" | "Conversas")}>
+            {n}
+            {n === "Conversas" && conversas.some((c) => c.unread) && (
+              <span
+                style={{
+                  display: "inline-block",
+                  width: 8,
+                  height: 8,
+                  borderRadius: "50%",
+                  background: "red",
+                  marginLeft: 4,
+                }}
+              />
+            )}
+          </DropdownItem>
+        ))}
+      </DropdownMenu>
+    </Dropdown>
+  </div>
         </NavbarContent>
 
         {/* Navbar direita */}
