@@ -125,7 +125,7 @@ const confirmDelete = async () => {
 
       {/* Lista de Posts */}
       {localPosts.length === 0 ? (
-        <div>Carregando...</div>
+        <div></div>
       ) : (
         localPosts.map((p) => {
           const liked = p.reactions?.includes(user.uid);
