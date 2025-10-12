@@ -132,16 +132,11 @@ const Chat: React.FC<ChatProps> = ({
           </Table>
         </CardBody>
       </Card>
-<Drawer
-  isOpen={isOpen}
-  onOpenChange={(open) => {
-    setIsOpen(open);
-    if (!open) {
-      setShowChatWith(null); // Reseta a conversa quando fechar
-    }
-  }}
-  placement="right"
->
+   <Drawer
+      isOpen={isOpen}
+      onOpenChange={(open) => setIsOpen(open)} // chamado ao clicar no X ou fora do drawer
+      placement="right"
+    >
   <DrawerContent>
     <DrawerHeader style={{ display: "flex", alignItems: "center", gap: 8 }}>
       <Avatar src={showChatWith?.otherUserAvatar} alt={showChatWith?.otherUserName} />

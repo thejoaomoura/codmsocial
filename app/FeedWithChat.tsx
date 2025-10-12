@@ -1,15 +1,18 @@
 import React, { useState, useEffect } from "react";
 import Chat, { ChatOverview, ChatMessage } from "./Chat";
 import { Post } from "./types";
-import { doc, deleteDoc } from "firebase/firestore";
+import { doc, deleteDoc, getDoc } from "firebase/firestore";
 import { db } from "./firebase";
 import { Button } from "@heroui/button";
 import { Avatar } from "@heroui/avatar";
 import { Card, CardHeader, CardBody, CardFooter } from "@heroui/card";
 import { Drawer, DrawerContent, DrawerHeader, DrawerBody, DrawerFooter } from "@heroui/drawer";
-import { HiOutlineArrowRight, HiOutlineChat, HiOutlineTrash, HiOutlineX } from "react-icons/hi";
+import { HiHeart, HiOutlineArrowRight, HiOutlineChat, HiOutlineHeart, HiOutlineTrash, HiOutlineUsers, HiOutlineX } from "react-icons/hi";
 import {Tooltip} from "@heroui/tooltip";
 import {  Modal,  ModalContent,  ModalHeader,  ModalBody,  ModalFooter} from "@heroui/modal";
+import {  Listbox,  ListboxSection,  ListboxItem} from "@heroui/listbox";
+import { Input } from "@heroui/input";
+
 
 interface FeedProps {
   posts: Post[];
@@ -55,6 +58,14 @@ const FeedWithChat: React.FC<FeedProps> = ({
     setLocalPosts(posts);
   }, [posts]);
 
+
+  useEffect(() => {
+  // Reseta conversa aberta ao trocar de usuário
+  setShowChatWith(null);
+  setShowChatDrawer(false);
+}, [currentUserId]);
+
+
   const openChatFromFeed = (p: Post) => {
     const convo: ChatOverview = {
       id: p.id,
@@ -70,6 +81,43 @@ const FeedWithChat: React.FC<FeedProps> = ({
 
 const [showDeleteModal, setShowDeleteModal] = useState(false);
 const [postToDeleteId, setPostToDeleteId] = useState<string | null>(null);
+// Adicione no começo do componente FeedWithChat
+const [showLikesModal, setShowLikesModal] = useState(false);
+const [likesUsers, setLikesUsers] = useState<
+  { uid: string; name: string; avatar: string }[]
+>([]);
+
+const fetchUserInfo = async (uid: string) => {
+  try {
+    const docRef = doc(db, "Users", uid); // ou "usuarios", se sua coleção tiver outro nome
+    const snap = await getDoc(docRef);
+    if (!snap.exists()) {
+      return { uid, name: "Usuário desconhecido", avatar: "/default-avatar.png" };
+    }
+    const data = snap.data();
+    return {
+      uid,
+      name: data.displayName || "Sem nome",
+      avatar: data.photoURL || "/default-avatar.png",
+    };
+  } catch (error) {
+    console.error("Erro ao buscar usuário:", error);
+    return { uid, name: "Erro ao carregar", avatar: "/default-avatar.png" };
+  }
+};
+
+const openLikesModal = async (p: Post) => {
+  if (!p.reactions || p.reactions.length === 0) {
+    setLikesUsers([]);
+    setShowLikesModal(true);
+    return;
+  }
+
+  // Busca todos os usuários que deram like
+  const users = await Promise.all(p.reactions.map((uid) => fetchUserInfo(uid)));
+  setLikesUsers(users);
+  setShowLikesModal(true);
+};
 
 const handleDeleteClick = (postId: string, authorId: string) => {
   if (authorId !== currentUserId) {
@@ -100,11 +148,10 @@ const confirmDelete = async () => {
       <section className="mb-6">
         <Card>
           <CardBody>
-            <textarea
+            <Input
               placeholder="O que você está pensando?"
               value={text}
               onChange={(e) => setText(e.target.value)}
-              rows={3}
             />
             <div className="flex justify-between mt-3">
 <Button onClick={handlePost} size="sm" color="primary">
@@ -132,16 +179,24 @@ const confirmDelete = async () => {
           const isOwner = p.authorId === currentUserId;
 
           return (
-            <Card key={p.id}>
+            <Card key={p.id}  className="mb-5">
               <CardHeader className="flex items-center gap-3">
-            <Tooltip content="Enviar mensagem" placement="top">
+       {p.authorId !== user.uid ? (
+  <Tooltip content="Enviar mensagem" placement="top">
+    <Avatar
+      src={p.authorAvatar || "/default-avatar.png"}
+      alt={p.authorName}
+      className="h-10 w-10 cursor-pointer"
+      onClick={() => openChatFromFeed(p)}
+    />
+  </Tooltip>
+) : (
   <Avatar
     src={p.authorAvatar || "/default-avatar.png"}
     alt={p.authorName}
-    className="h-10 w-10 cursor-pointer"
-    onClick={() => openChatFromFeed(p)}
+    className="h-10 w-10"
   />
-</Tooltip>
+)}
                 <div className="flex-1">
                   <div className="flex items-center justify-between">
                   <div className="flex flex-col">
@@ -176,20 +231,23 @@ const confirmDelete = async () => {
               <CardFooter>
 
                 
-            <Button
+          <Button
   onPress={() => toggleReaction(p)}
   size="sm"
-  className="flex items-center gap-1"
+  className={`flex items-center justify-center ${
+    p.reactions?.includes(user?.uid || "") ? "bg-red-500 text-white" : ""
+  }`}
 >
-      <span className="text-sm">{p.reactions?.length || 0} - </span>
-  <span className={`transition-transform ${liked ? "text-red-500 scale-110" : "text-gray-400"}`}>
-    ❤️
-  </span>
-
+<HiHeart className="w-4 h-4 mr-1" />
 </Button>
-  <Button     onClick={() => openChatFromFeed(p)}  size="sm" className="ml-2" >
-                   <HiOutlineChat className="w-4 h-4" />
-                        </Button>
+<Button size="sm" className="ml-2" onPress={() => openLikesModal(p)}>
+  <HiOutlineUsers className="w-4 h-4 mr-1" />
+</Button>
+{p.authorId !== user.uid && (
+  <Button onClick={() => openChatFromFeed(p)} size="sm" className="ml-2">
+    <HiOutlineChat className="w-4 h-4" />
+  </Button>
+)}
               </CardFooter>
             </Card>
           );
@@ -232,6 +290,45 @@ const confirmDelete = async () => {
           </DrawerFooter>
         </DrawerContent>
       </Drawer>
+
+<Modal isOpen={showLikesModal} onOpenChange={setShowLikesModal}>
+  <ModalContent>
+    <ModalHeader className="flex items-center gap-2">
+        <HiHeart className="w-6 h-6 mr-1" />
+                   {likesUsers.length} {likesUsers.length === 1 ? "" : ""}
+        </ModalHeader>
+        <ModalBody>
+          {likesUsers.length === 0 ? (
+        <p>Ninguém deu amei ainda.</p>
+      ) : (
+     <Listbox
+  aria-label="Lista de usuários que curtiram"
+  classNames={{
+    base: "w-full max-w-[280px]",
+    list: "max-h-[300px] overflow-y-auto",
+  }}
+>
+  {likesUsers.map((u) => (
+    <ListboxItem key={u.uid} textValue={u.name}>
+      <div className="flex items-center gap-2">
+        <Avatar
+          src={u.avatar || "/default-avatar.png"}
+          alt={u.name}
+          size="sm"
+          className="shrink-0"
+        />
+        <span className="text-sm">{u.name}</span>
+      </div>
+    </ListboxItem>
+  ))}
+</Listbox>
+      )}
+    </ModalBody>
+    <ModalFooter>
+      <Button onPress={() => setShowLikesModal(false)}>Fechar</Button>
+    </ModalFooter>
+  </ModalContent>
+</Modal>
 
 <Modal isOpen={showDeleteModal} onOpenChange={setShowDeleteModal}>
   <ModalContent>
