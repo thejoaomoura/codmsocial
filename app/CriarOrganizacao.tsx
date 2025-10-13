@@ -17,8 +17,13 @@ import { useAuthState } from "react-firebase-hooks/auth";
 import { auth } from "./firebase";
 import { Input } from "@heroui/input";
 import { Button } from "@heroui/button";
-import { HiOutlineSave, HiOutlineCheck, HiOutlineX, HiOutlineUserRemove } from "react-icons/hi";
+import { HiOutlineSave, HiOutlineCheck, HiOutlineX, HiOutlineUserRemove, HiOutlineUserAdd, HiOutlineUsers } from "react-icons/hi";
 import { addToast } from "@heroui/toast";
+import { Card } from "@heroui/card";
+import { Table, TableHeader, TableBody, TableColumn, TableRow, TableCell } from "@heroui/table";
+import { Avatar } from "@heroui/avatar";
+import { Code } from "@heroui/code";
+
 
 interface Organizacao {
   id: string;
@@ -32,6 +37,7 @@ interface Organizacao {
 
 interface User {
   uid: string;
+  photoURL: string;
   displayName?: string;
   email?: string;
   tag?: string;
@@ -189,57 +195,114 @@ export default function CriarOuGerenciarOrganizacao() {
     }
   };
 
+  // Carrega membros automaticamente assim que myOrg mudar
+useEffect(() => {
+  if (!myOrg) return;
+
+  const loadMembers = async () => {
+    try {
+      const membersDocs = await Promise.all(
+        myOrg.members.map((uid) => getDoc(doc(db, "Users", uid)))
+      );
+      const users: User[] = membersDocs.map((d) => ({ uid: d.id, ...d.data() } as User));
+
+      // Criador sempre primeiro
+      users.sort((a, b) => (a.uid === myOrg.creatorId ? -1 : b.uid === myOrg.creatorId ? 1 : 0));
+      setMembersData(users);
+    } catch (err) {
+      console.error(err);
+      addToast({ title: "Erro", description: "Falha ao carregar membros", color: "danger" });
+    }
+  };
+
+  loadMembers();
+}, [myOrg]);
+
  // Render
 if (myOrg) {
   if (user?.uid === myOrg.creatorId) {
     // Criador vê o painel completo
     return (
-      <div className="max-w-2xl mx-auto p-4">
-        <h2 className="text-lg font-semibold mb-4">Gerenciar Organização: {myOrg.nome}</h2>
+      <Card className="max-w-2xl mx-auto p-4">
+        <h2 className="text-lg font-semibold mb-4">{myOrg.nome}</h2>
 
-        {/* Solicitações */}
-        {pendingUsers.length ? (
-          <div className="flex flex-col gap-2 mb-4">
-            <div className="font-semibold text-sm">Solicitações de participação:</div>
-            {pendingUsers.map((u) => (
-              <div key={u.uid} className="flex items-center justify-between">
-                <span>{u.displayName || u.email || u.uid}</span>
-                <div className="flex gap-1">
-                  <Button color="success" size="sm" onPress={() => handleApprove(u.uid)}>
-                    <HiOutlineCheck className="w-4 h-4" />
-                  </Button>
-                  <Button color="danger" size="sm" onPress={() => handleReject(u.uid)}>
-                    <HiOutlineX className="w-4 h-4" />
-                  </Button>
+    <div className="w-max mb-2">
+                    <Code color="primary" className="flex items-center">
+                        <HiOutlineUserAdd className="mr-2" /> Solicitações
+                    </Code>
                 </div>
-              </div>
-            ))}
-          </div>
-        ) : (
-          <div className="mb-4">Nenhuma solicitação pendente.</div>
-        )}
+  {/* Solicitações */}
+          {pendingUsers.length ? (
+            <Table className="mb-4">
+              <TableHeader>
+                <TableColumn>Avatar</TableColumn>
+                <TableColumn>Nome</TableColumn>
+                <TableColumn>Email</TableColumn>
+                <TableColumn>Ações</TableColumn>
+              </TableHeader>
+              <TableBody>
+                {pendingUsers.map((u) => (
+                  <TableRow key={u.uid}>
+                    <TableCell>
+                      <Avatar src={u.photoURL || "/default-avatar.png"} alt={u.displayName || u.email || "Usuário"} />
+                    </TableCell>
+                    <TableCell>{u.displayName || u.uid}</TableCell>
+                    <TableCell>{u.email || "-"}</TableCell>
+                    <TableCell>
+                      <div className="flex gap-1">
+                        <Button color="success" size="sm" onPress={() => handleApprove(u.uid)}>
+                          <HiOutlineCheck className="w-4 h-4" />
+                        </Button>
+                        <Button color="danger" size="sm" onPress={() => handleReject(u.uid)}>
+                          <HiOutlineX className="w-4 h-4" />
+                        </Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          ) : (
+            <div className="mb-4">Nenhuma solicitação pendente.</div>
+          )}
 
-        <Button color="secondary" onPress={loadMembers} className="mb-2">
-          Ver Membros
-        </Button>
-
-        {membersData.length > 0 && (
-          <ul className="list-disc pl-5 flex flex-col gap-1">
-            {membersData.map((m) => (
-              <li key={m.uid} className="flex items-center justify-between">
-                <span>
-                  {m.displayName || m.email || m.uid} {m.uid === myOrg.creatorId && "(Criador)"}
-                </span>
-                {m.uid !== myOrg.creatorId && (
-                  <Button color="danger" size="sm" onPress={() => handleRemoveMember(m.uid)}>
-                    <HiOutlineUserRemove className="w-4 h-4" />
-                  </Button>
-                )}
-              </li>
-            ))}
-          </ul>
-        )}
-      </div>
+              <div className="w-max mb-2">
+                    <Code color="danger" className="flex items-center">
+                        <HiOutlineUsers className="mr-2" /> Membros
+                    </Code>
+                </div>
+   {membersData.length > 0 && (
+  <Table className="mt-2">
+    <TableHeader>
+      <TableColumn>Avatar</TableColumn>
+      <TableColumn>Nome</TableColumn>
+      <TableColumn>Email</TableColumn>
+      <TableColumn>Ações</TableColumn>
+    </TableHeader>
+    <TableBody>
+      {membersData.map((m) => (
+        <TableRow key={m.uid}>
+          <TableCell>
+            <Avatar src={m.photoURL || "/default-avatar.png"} alt={m.displayName || m.email || "Usuário"} />
+          </TableCell>
+          <TableCell>
+            {m.displayName} {m.uid === myOrg?.creatorId && <strong>(Criador)</strong>}
+          </TableCell>
+          <TableCell>{m.email || "-"}</TableCell>
+          <TableCell>
+            {m.uid !== myOrg?.creatorId && (
+              <Button color="danger" size="sm" onPress={() => handleRemoveMember(m.uid)}>
+                <HiOutlineUserRemove className="w-4 h-4" />
+              </Button>
+            )}
+          </TableCell>
+        </TableRow>
+      ))}
+    </TableBody>
+  </Table>
+)}
+   
+      </Card>
     );
   } else {
     // Membro comum vê apenas mensagem
@@ -255,7 +318,7 @@ if (myOrg) {
 
 // Caso contrário, criar organização
 return (
-  <div className="max-w-md mx-auto p-4">
+  <Card className="max-w-md mx-auto p-4">
     <h2 className="text-lg font-semibold mb-4">Criar Organização</h2>
 
     <Input
@@ -277,6 +340,6 @@ return (
     <Button color="primary" onPress={handleCreate}>
       <HiOutlineSave className="w-4 h-4 mr-1" /> Criar
     </Button>
-  </div>
+  </Card>
 );
 }

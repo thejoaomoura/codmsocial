@@ -7,6 +7,10 @@ import { useAuthState } from "react-firebase-hooks/auth";
 import { auth } from "./firebase";
 import { Button } from "@heroui/button";
 import { addToast } from "@heroui/toast";
+import { Accordion, AccordionItem } from "@heroui/accordion";
+import { Avatar } from "@heroui/avatar";
+import { Code } from "@heroui/code";
+import { Card } from "@heroui/card";
 
 interface Organizacao {
   id: string;
@@ -21,6 +25,7 @@ interface Organizacao {
 interface User {
   uid: string;
   displayName?: string;
+  photoURL?: string;
   email?: string;
   tag?: string;
 }
@@ -28,39 +33,36 @@ interface User {
 export default function Organizacoes() {
   const [user] = useAuthState(auth);
   const [orgs, setOrgs] = useState<Organizacao[]>([]);
-  const [selectedOrg, setSelectedOrg] = useState<Organizacao | null>(null);
-  const [membersData, setMembersData] = useState<User[]>([]);
-  const [myPendingRequest, setMyPendingRequest] = useState<string | null>(null); // uid da org onde estou pendente
+  const [membersData, setMembersData] = useState<Record<string, User[]>>({});
+  const [myPendingRequest, setMyPendingRequest] = useState<string | null>(null);
 
-  // Carrega organizações e verifica se o usuário já solicitou alguma
+  // Carrega organizações e membros de todas de uma vez
   useEffect(() => {
-    const unsub = onSnapshot(collection(db, "Organizacoes"), (snap) => {
-      const list = snap.docs.map((d) => ({ id: d.id, ...d.data() } as Organizacao));
+    const unsub = onSnapshot(collection(db, "Organizacoes"), async (snap) => {
+      const list: Organizacao[] = snap.docs.map((d) => ({ id: d.id, ...d.data() } as Organizacao));
       setOrgs(list);
 
-      // Checa se há alguma solicitação pendente do usuário
+      // Verifica se há solicitação pendente
       const pendingOrg = list.find((o) => o.pendingRequests?.includes(user?.uid || ""));
       setMyPendingRequest(pendingOrg?.id || null);
+
+      // Pré-carrega membros de todas organizações
+      const allMembers: Record<string, User[]> = {};
+      await Promise.all(
+        list.map(async (org) => {
+          const docs = await Promise.all(org.members.map((uid) => getDoc(doc(db, "Users", uid))));
+          const users: User[] = docs.map((d) => ({ uid: d.id, ...d.data() } as User));
+
+          // Criador sempre primeiro
+          users.sort((a, b) => (a.uid === org.creatorId ? -1 : b.uid === org.creatorId ? 1 : 0));
+          allMembers[org.id] = users;
+        })
+      );
+      setMembersData(allMembers);
     });
+
     return () => unsub();
   }, [user]);
-
-  // Seleciona organização e carrega membros
-  const handleSelectOrg = async (org: Organizacao) => {
-    setSelectedOrg(org);
-    try {
-      const membersDocs = await Promise.all(
-        org.members.map((uid) => getDoc(doc(db, "Users", uid)))
-      );
-
-      const users: User[] = membersDocs.map((d) => ({ uid: d.id, ...d.data() } as User));
-      users.sort((a, b) => (a.uid === org.creatorId ? -1 : b.uid === org.creatorId ? 1 : 0));
-      setMembersData(users);
-    } catch (err) {
-      console.error(err);
-      addToast({ title: "Erro", description: "Falha ao carregar membros", color: "danger" });
-    }
-  };
 
   // Solicitar participação
   const handleRequestToJoin = async (org: Organizacao) => {
@@ -89,60 +91,57 @@ export default function Organizacoes() {
   };
 
   return (
-    <div className="max-w-2xl mx-auto p-4">
+          <Card className="max-w-2xl mx-auto p-4">
+
+
       <h2 className="text-lg font-semibold mb-4">Organizações</h2>
 
-      {!selectedOrg && (
-        <div className="flex flex-col gap-3">
-          {orgs.map((org) => (
-            <div
-              key={org.id}
-              className="border p-3 rounded flex items-center justify-between cursor-pointer hover:bg-gray-50"
-            >
-          <button
-  onClick={() => handleSelectOrg(org)}
-  className="text-left w-full font-semibold hover:bg-gray-50 rounded p-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
->
-  <div>{org.nome}</div>
-  <div className="text-xs text-gray-500">
-    Membros: {org.members.length}/{org.maxMembros}
-  </div>
-</button>
+      <Accordion variant="bordered">
+        {orgs.map((org) => (
+          <AccordionItem
+            key={org.id}
+            aria-label={`org-${org.nome}`}
+            title={
+              <div className="flex items-center justify-between w-full">
+                <div>
+                  <div className="font-semibold">{org.nome}</div>
+                  <div className="text-xs text-gray-500">
+                    Membros: {org.members.length}/{org.maxMembros}
+                  </div>
+                </div>
+        
+              </div>
+            }
+          >
+           <ul className="list-none pl-0 flex flex-col gap-2 mt-2">
+            
+  {membersData[org.id]?.map((m) => (
+    
+    <li key={m.uid} className="flex items-center gap-2 mb-2 -mt-3">
+      
+      <Avatar src={m.photoURL || "/default-avatar.png"} alt={m.displayName || m.email || "Usuário"} />
+      <span>
+            <Code color="danger">{m.tag}</Code> {m.displayName || m.email || m.uid}{" "}
+        {m.uid === org.creatorId && <strong>(Criador)</strong>}
+      </span>
+    </li>
+  ))}
+    {user && !org.members.includes(user.uid) && (
+                  <Button
+                    color="primary"
+                    size="sm"
+                    onPress={() => handleRequestToJoin(org)}
+                    disabled={!!myPendingRequest}
+                  >
+                    {myPendingRequest === org.id ? "Pendente" : "Solicitar Entrada"}
+                  </Button>
+                )}
+</ul>
+          </AccordionItem>
+        ))}
+      </Accordion>
+      
 
-              {user && !org.members.includes(user.uid) && (
-                <Button
-                  color="primary"
-                  size="sm"
-                  onPress={() => handleRequestToJoin(org)}
-                  disabled={!!myPendingRequest}
-                >
-                  {myPendingRequest === org.id ? "Pendente" : "Solicitar Entrada"}
-                </Button>
-              )}
-            </div>
-          ))}
-        </div>
-      )}
-
-      {selectedOrg && (
-        <div className="mt-4">
-          <Button color="secondary" onPress={() => setSelectedOrg(null)}>
-            Voltar
-          </Button>
-
-          <h3 className="text-lg font-semibold mt-4 mb-2">
-            Membros de {selectedOrg.nome}
-          </h3>
-
-          <ul className="list-disc pl-5 flex flex-col gap-1">
-            {membersData.map((m) => (
-              <li key={m.uid}>
-                {m.displayName || m.email || m.uid} {m.uid === selectedOrg.creatorId && "(Criador)"}
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
-    </div>
+    </Card>
   );
 }
