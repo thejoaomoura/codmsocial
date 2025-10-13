@@ -1,5 +1,6 @@
 export interface PostComment {
   authorId: string;
+  authorTag: string;
   authorName: string;
   authorAvatar: string;
   text: string;
@@ -9,12 +10,21 @@ export interface PostComment {
 export interface Post {
   id: string;
   authorName: string;
+  authorTag: string;
   authorId: string;
   authorAvatar: string;
   text: string;
   createdAt: any; 
   reactions: string[];
   comments: PostComment[];
+}
+
+export interface User {
+  uid: string;
+  name: string;
+  tag: string;
+  avatar: string;
+  createdAt?: Date;
 }
 
 export interface ChatOverview {
@@ -33,3 +43,4 @@ export interface ChatMessage {
   text: string;
   createdAt: any; // serverTimestamp
 }
+

@@ -15,7 +15,7 @@ import {
 import { Dropdown, DropdownTrigger, DropdownMenu, DropdownItem } from "@heroui/dropdown";
 import { Avatar } from "@heroui/avatar";
 import { Button } from "@heroui/button";
-import { HiOutlineInbox, HiOutlineLogout, HiOutlineMenu, HiOutlineNewspaper, HiOutlinePencil, HiOutlineSave, HiOutlineTicket, HiOutlineX } from "react-icons/hi";
+import { HiOutlineHome, HiOutlineInbox, HiOutlineLogout, HiOutlineMenu, HiOutlineNewspaper, HiOutlinePencil, HiOutlineSave, HiOutlineTicket, HiOutlineUserGroup, HiOutlineViewList, HiOutlineX } from "react-icons/hi";
 import { initializeApp } from "firebase/app";
 import {
   getFirestore,
@@ -56,6 +56,9 @@ import {
 import { addToast, ToastProvider } from "@heroui/toast";
 import { Code } from "@heroui/code";
 import { Input } from "@heroui/input";
+import { Tooltip } from "@heroui/tooltip";
+import CriarOrganizacao from "./CriarOrganizacao";
+import Organizacoes from "./Organizacoes";
 
 const firebaseConfig = {
   apiKey: "AIzaSyBZl9_FYc-wndFiFSrzN8RNJHrlR6VV5MY",
@@ -74,11 +77,13 @@ const provider = new GoogleAuthProvider();
 const navigation = [
   { label: "Feed", icon: <HiOutlineNewspaper className="w-5 h-5" /> },
   { label: "Conversas", icon: <HiOutlineInbox className="w-5 h-5" /> },
+    { label: "Criar Organizacão", icon: <HiOutlineHome className="w-5 h-5" /> },
+        { label: "Organizacões", icon: <HiOutlineUserGroup className="w-5 h-5" /> },
 ];
 
 export default function Home() {
   const [user, setUser] = useState<User | null>(null);
-  const [activeTab, setActiveTab] = useState<"Feed" | "Conversas">("Feed");
+const [activeTab, setActiveTab] = useState<"Feed" | "Conversas" | "Criar Organizacão" | "Organizacões">("Feed");
   const [posts, setPosts] = useState<Post[]>([]);
   const [text, setText] = useState("");
   const [conversas, setConversas] = useState<ChatOverview[]>([]);
@@ -102,26 +107,28 @@ export default function Home() {
     return () => window.removeEventListener("goToConversas", listener);
   }, []);
 
-  useEffect(() => {
-    const unsub = onAuthStateChanged(auth, async (u) => {
-      setUser(u);
-      if (u) {
-        // Pega os dados do Firestore
-        const userDocRef = doc(db, "Users", u.uid);
-        const userDocSnap = await getDoc(userDocRef);
-        if (userDocSnap.exists()) {
-          const userData = userDocSnap.data();
-          setProfileName(userData.displayName || "");
-          setProfilePhoto(userData.photoURL || "");
-        } else {
-          // fallback caso não exista no Firestore
-          setProfileName(u.displayName || "");
-          setProfilePhoto(u.photoURL || "");
-        }
+  const [profileNameTag, setProfileNameTag] = useState(""); 
+
+useEffect(() => {
+  const unsub = onAuthStateChanged(auth, async (u) => {
+    setUser(u);
+    if (u) {
+      const userDocRef = doc(db, "Users", u.uid);
+      const userDocSnap = await getDoc(userDocRef);
+      if (userDocSnap.exists()) {
+        const userData = userDocSnap.data();
+        setProfileName(userData.displayName || "");
+        setProfileNameTag(userData.tag || ""); // nova state para a tag
+        setProfilePhoto(userData.photoURL || "");
+      } else {
+        setProfileName(u.displayName || "");
+        setProfileNameTag(""); // sem tag
+        setProfilePhoto(u.photoURL || "");
       }
-    });
-    return () => unsub();
-  }, []);
+    }
+  });
+  return () => unsub();
+}, []);
 
   // Posts
   useEffect(() => {
@@ -190,36 +197,51 @@ export default function Home() {
 
   const handleLogout = async () => await signOut(auth);
 
-  const handlePost = async () => {
-    if (!user || !text.trim()) return;
-    const userDocRef = doc(db, "Users", user.uid);
-    const userDocSnap = await getDoc(userDocRef);
-    const userData = userDocSnap.exists() ? userDocSnap.data() : {};
+const handlePost = async () => {
+  if (!user || !text.trim()) return;
 
-    await addDoc(collection(db, "Posts"), {
-      authorName:
-        userData.displayName || user.displayName || user.email?.split("@")[0],
-      authorId: user.uid,
-      authorAvatar: userData.photoURL || user.photoURL || "",
-      text: text.trim(),
-      createdAt: serverTimestamp(),
-      reactions: [],
-    });
+  const userDocRef = doc(db, "Users", user.uid);
+  const userDocSnap = await getDoc(userDocRef);
+  const userData = userDocSnap.exists() ? userDocSnap.data() : {};
 
-    setText("");
-  };
+  await addDoc(collection(db, "Posts"), {
+    authorName: userData.displayName || user.displayName || user.email?.split("@")[0],
+    authorTag: userData.tag || null, // envia tag separada se existir
+    authorId: user.uid,
+    authorAvatar: userData.photoURL || user.photoURL || "",
+    text: text.trim(),
+    createdAt: serverTimestamp(),
+    reactions: [],
+  });
+
+  setText("");
+};
+
 
 const handleComment = async (postId: string, commentText: string) => {
   if (!user || !commentText.trim()) return;
 
   const postRef = doc(db, "Posts", postId);
 
+  // Carrega a tag do usuário (se existir)
+  let userTag = "";
+  try {
+    const userRef = doc(db, "Users", user.uid);
+    const userSnap = await getDoc(userRef);
+    if (userSnap.exists()) {
+      userTag = userSnap.data().tag || "";
+    }
+  } catch (error) {
+    console.error("Erro ao buscar tag do usuário:", error);
+  }
+
   const newComment = {
     authorId: user.uid,
     authorName: profileName || user.displayName || user.email?.split("@")[0] || "Anonymous",
     authorAvatar: profilePhoto || user.photoURL || "",
+    authorTag: userTag || "", // ✅ adiciona tag se existir
     text: commentText.trim(),
-    createdAt: new Date(), // usa Date() aqui em vez de serverTimestamp()
+    createdAt: new Date(),
   };
 
   try {
@@ -231,6 +253,7 @@ const handleComment = async (postId: string, commentText: string) => {
     console.error("Erro ao adicionar comentário:", error);
   }
 };
+
 
 // Função para deletar comentário
 const handleDeleteComment = async (postId: string, comment: any) => {
@@ -414,27 +437,31 @@ const handleDeleteComment = async (postId: string, comment: any) => {
       <Navbar>
         {/* Navbar esquerda */}
         <NavbarContent justify="start">
-          <div className="hidden sm:flex gap-2">
-            {navigation.map((n) => (
-              <NavbarItem key={n.label} isActive={activeTab === n.label}>
-                <Button onPress={() => setActiveTab(n.label as "Feed" | "Conversas")}>
-                  {n.icon}
-                  {n.label === "Conversas" && conversas.some((c) => c.unread) && (
-                    <span
-                      style={{
-                        display: "inline-block",
-                        width: 8,
-                        height: 8,
-                        borderRadius: "50%",
-                        background: "red",
-                        marginLeft: 4,
-                      }}
-                    />
-                  )}
-                </Button>
-              </NavbarItem>
-            ))}
-          </div>
+        <div className="hidden sm:flex gap-2">
+  {navigation.map((n) => (
+    <NavbarItem key={n.label} isActive={activeTab === n.label}>
+      <Tooltip content={n.label} placement="bottom">
+<Button onPress={() => setActiveTab(n.label as "Feed" | "Conversas" | "Criar Organizacão" | "Organizacões")}>
+          {n.icon}
+          {/* Badge vermelho para Conversas */}
+          {n.label === "Conversas" && conversas.some((c) => c.unread) && (
+            <span
+              style={{
+                display: "inline-block",
+                width: 8,
+                height: 8,
+                borderRadius: "50%",
+                background: "red",
+                marginLeft: 4,
+              }}
+            />
+          )}
+        </Button>
+      </Tooltip>
+    </NavbarItem>
+  ))}
+</div>
+
 
           {/* Menu Mobile */}
           <div className="flex sm:hidden">
@@ -446,11 +473,11 @@ const handleDeleteComment = async (postId: string, comment: any) => {
               </DropdownTrigger>
               <DropdownMenu>
                 {navigation.map((n) => (
-                  <DropdownItem
-                    key={n.label}
-                    onPress={() => setActiveTab(n.label as "Feed" | "Conversas")}
-                    className="flex items-center justify-between w-full"
-                  >
+                <DropdownItem
+  key={n.label}
+  onPress={() => setActiveTab(n.label as "Feed" | "Conversas" | "Criar Organizacão" | "Organizacões")}
+  className="flex items-center justify-between w-full"
+>
                     {/* Ícone + Texto lado a lado */}
                     <div className="flex items-center gap-2">
                       {n.icon}
@@ -561,13 +588,27 @@ const handleDeleteComment = async (postId: string, comment: any) => {
               <ModalHeader>Editar Nome</ModalHeader>
               <ModalBody className="flex flex-col gap-2">
                 <div>
-                  <Code color="primary" className="mb-2">Seu nome atual</Code>
-                  <Input
-                    type="text"
-                    value={profileName}
-                    disabled
+                              <Code color="primary" className="mb-2">Seu nome atual</Code>
+               <div className="flex items-center gap-2">
+                
+  {/* Tag em Code, alinhada à altura do input */}
+  {profileNameTag && (
+    <Code
+      color="danger"
+      className="flex items-center px-2 h-[38px] text-sm rounded" // h igual à altura do input
+    >
+      {profileNameTag}
+    </Code>
+  )}
 
-                  />
+  {/* Input com apenas o nome */}
+  <Input
+    type="text"
+    value={profileName}
+    disabled
+    className="h-[38px]" // mesma altura que o Code
+  />
+</div>
                 </div>
                 <div>
                   <Code color="primary" className="mb-2">Seu novo nome</Code>
@@ -625,6 +666,8 @@ const handleDeleteComment = async (postId: string, comment: any) => {
           />
         )}
 
+        
+
         {activeTab === "Conversas" && (
           <Chat
             showChatWith={showChatWith ? {
@@ -650,6 +693,20 @@ const handleDeleteComment = async (postId: string, comment: any) => {
             openChatFromConversa={openChatFromConversa}
           />
         )}
+
+          {activeTab === "Criar Organizacão" && (
+    <div>
+      <CriarOrganizacao />
+    </div>
+  )}
+
+  {activeTab === "Organizacões" && (
+    <div>
+      <Organizacoes />
+    </div>
+  )}
+
+        
       </div>
     </div>
   );

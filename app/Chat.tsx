@@ -107,7 +107,7 @@ const Chat: React.FC<ChatProps> = ({
       <Card style={{ marginBottom: 16 }}>
         <CardBody>
           <Input
-            placeholder="Buscar usuário..."
+            placeholder="Buscar usuário nas conversas..."
             value={filterValue}
             onValueChange={setFilterValue}
             isClearable

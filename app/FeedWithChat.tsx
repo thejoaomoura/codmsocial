@@ -7,14 +7,14 @@ import { Button } from "@heroui/button";
 import { Avatar } from "@heroui/avatar";
 import { Card, CardHeader, CardBody, CardFooter } from "@heroui/card";
 import { Drawer, DrawerContent, DrawerHeader, DrawerBody, DrawerFooter } from "@heroui/drawer";
-import { HiHeart, HiOutlineArrowRight, HiOutlineChat, HiOutlineHeart, HiOutlineTrash, HiOutlineUsers, HiOutlineX } from "react-icons/hi";
+import { HiHeart, HiOutlineArrowRight, HiOutlineChat, HiOutlineHeart, HiOutlineTrash, HiOutlineUser, HiOutlineUsers, HiOutlineX } from "react-icons/hi";
 import { Tooltip } from "@heroui/tooltip";
 import { Modal, ModalContent, ModalHeader, ModalBody, ModalFooter } from "@heroui/modal";
 import { Listbox, ListboxSection, ListboxItem } from "@heroui/listbox";
 import { Input } from "@heroui/input";
 import { Code } from "@heroui/code";
 import AnimatedHeart from "./AnimatedHeart";
-
+import { Dropdown, DropdownTrigger, DropdownMenu, DropdownItem } from "@heroui/dropdown";
 
 interface FeedProps {
     posts: Post[];
@@ -34,7 +34,15 @@ interface FeedProps {
     setShowChatWith: React.Dispatch<React.SetStateAction<ChatOverview | null>>;
     deleteConversa: (id: string) => void; // função local
     handleComment: (postId: string, text: string) => Promise<void>;
-    handleDeleteComment: (postId: string, comment: any) => void; 
+    handleDeleteComment: (postId: string, comment: any) => void;
+}
+
+interface User {
+    uid: string;
+    name: string;
+    tag: string;
+    avatar: string;
+    createdAt?: Date;
 }
 
 const FeedWithChat: React.FC<FeedProps> = ({
@@ -59,7 +67,7 @@ const FeedWithChat: React.FC<FeedProps> = ({
 }) => {
     const [showChatDrawer, setShowChatDrawer] = useState(false);
     const [localPosts, setLocalPosts] = useState<(Post & { commentInput?: string })[]>(posts);
-    const [users, setUsers] = useState<{ uid: string; avatar: string; name: string; createdAt?: Date; }[]>([]);
+    const [users, setUsers] = useState<{ uid: string; avatar: string; name: string; tag: string; createdAt?: Date; }[]>([]);
 
     useEffect(() => {
         setLocalPosts(posts);
@@ -86,32 +94,48 @@ const FeedWithChat: React.FC<FeedProps> = ({
         setShowChatDrawer(true);
     };
 
+    const handleOpenChat = (u: User) => {
+        const chatOverview: ChatOverview = {
+            id: u.uid,
+            otherUserId: u.uid,
+            otherUserName: u.name,
+            otherUserAvatar: u.avatar,
+            lastMessage: "",
+            unread: false,
+        };
+        openChatFromConversa(chatOverview);
+    };
+
     const [showDeleteModal, setShowDeleteModal] = useState(false);
     const [postToDeleteId, setPostToDeleteId] = useState<string | null>(null);
     // Adicione no começo do componente FeedWithChat
     const [showLikesModal, setShowLikesModal] = useState(false);
     const [likesUsers, setLikesUsers] = useState<
-        { uid: string; name: string; avatar: string }[]
+        { uid: string; name: string; tag: string; avatar: string }[]
     >([]);
 
-    const fetchUserInfo = async (uid: string) => {
-        try {
-            const docRef = doc(db, "Users", uid); // ou "usuarios", se sua coleção tiver outro nome
-            const snap = await getDoc(docRef);
-            if (!snap.exists()) {
-                return { uid, name: "Usuário desconhecido", avatar: "/default-avatar.png" };
-            }
-            const data = snap.data();
-            return {
-                uid,
-                name: data.displayName || "Sem nome",
-                avatar: data.photoURL || "/default-avatar.png",
-            };
-        } catch (error) {
-            console.error("Erro ao buscar usuário:", error);
-            return { uid, name: "Erro ao carregar", avatar: "/default-avatar.png" };
-        }
+   const fetchUserInfo = async (uid: string) => {
+  const userRef = doc(db, "Users", uid);
+  const userSnap = await getDoc(userRef);
+
+  if (!userSnap.exists()) {
+    return {
+      uid,
+      name: "Usuário desconhecido",
+      tag: "", 
+      avatar: "/default-avatar.png",
     };
+  }
+
+  const data = userSnap.data();
+  return {
+    uid,
+    name: data.displayName || "Sem nome",
+    tag: data.tag ?? "", 
+    avatar: data.photoURL || "/default-avatar.png",
+  };
+};
+
 
     const openLikesModal = async (p: Post) => {
         if (!p.reactions || p.reactions.length === 0) {
@@ -149,21 +173,22 @@ const FeedWithChat: React.FC<FeedProps> = ({
         }
     };
 
-    useEffect(() => {
-        const unsub = onSnapshot(collection(db, "Users"), (snap) => {
-            const usersList = snap.docs.map((doc) => {
-                const data = doc.data();
-                return {
-                    uid: doc.id,
-                    name: data.displayName || "Sem nome",
-                    avatar: data.photoURL || "/default-avatar.png",
-                    createdAt: data.createdAt?.toDate?.() || new Date(0), // converte Firestore Timestamp para Date
-                };
-            });
-            setUsers(usersList);
-        });
-        return () => unsub();
-    }, []);
+   useEffect(() => {
+  const unsub = onSnapshot(collection(db, "Users"), (snap) => {
+    const usersList = snap.docs.map((doc) => {
+      const data = doc.data();
+      return {
+        uid: doc.id,
+        name: data.displayName || "Sem nome",
+        avatar: data.photoURL || "/default-avatar.png",
+        tag: data.tag ?? "", // ✅ garante string, mesmo se não existir
+        createdAt: data.createdAt?.toDate?.() || new Date(0),
+      };
+    });
+    setUsers(usersList);
+  });
+  return () => unsub();
+}, []);
 
     return (
         <>
@@ -177,21 +202,58 @@ const FeedWithChat: React.FC<FeedProps> = ({
                 <CardBody className="p-0">
                     <div className="flex gap-4 overflow-x-auto" style={{ padding: "8px" }}>
                         {users
-
                             .filter((u) => {
                                 const now = new Date();
                                 return u.createdAt && now.getTime() - u.createdAt.getTime() < 24 * 60 * 60 * 1000;
                             })
-                            .map((u) => (
-                                <Tooltip key={u.uid} content={u.name} placement="top">
+                            .map((u) =>
+                                u.uid === currentUserId ? (
+                                    // Usuário logado: apenas avatar sem dropdown
                                     <Avatar
+                                        key={u.uid}
                                         isBordered
                                         src={u.avatar}
-                                        className="flex-shrink-0 cursor-pointer"
+                                        className="flex-shrink-0 cursor-default opacity-80"
                                         style={{ width: 45, height: 45 }}
                                     />
-                                </Tooltip>
-                            ))}
+                                ) : (
+                                    // Outros usuários: avatar com dropdown
+                                    <Dropdown key={u.uid}>
+                                        <DropdownTrigger>
+                                            <Avatar
+                                                isBordered
+                                                src={u.avatar}
+                                                className="flex-shrink-0 cursor-pointer"
+                                                style={{ width: 45, height: 45 }}
+                                            />
+                                        </DropdownTrigger>
+
+                                        <DropdownMenu className="p-0 min-w-[140px]">
+                                            <DropdownItem
+                                                key={`${u.uid}-name`}
+                                                isDisabled
+                                                className="flex items-center px-3 py-2 cursor-default text-sm font-semibold"
+                                            >
+                                                <div className="flex items-center gap-2">
+                                                    <HiOutlineUser className="w-4 h-4" />
+                                                    <span>{u.name}</span>
+                                                </div>
+                                            </DropdownItem>
+
+                                            <DropdownItem
+                                                key={`${u.uid}-conversar`}
+                                                onPress={() => handleOpenChat(u)}
+                                                className="flex items-center px-3 py-2"
+                                            >
+                                                <div className="flex items-center gap-2">
+                                                    <HiOutlineChat className="w-4 h-4" />
+                                                    <span>Conversar</span>
+                                                </div>
+                                            </DropdownItem>
+                                        </DropdownMenu>
+                                    </Dropdown>
+                                )
+                            )}
                     </div>
                 </CardBody>
             </Card>
@@ -200,24 +262,22 @@ const FeedWithChat: React.FC<FeedProps> = ({
 
                 <Card>
                     <CardBody>
-                        <Input
-                            placeholder="O que você está pensando?"
-                            value={text}
-                            onChange={(e) => setText(e.target.value)}
-                        />
-                        <div className="flex justify-between mt-3">
-                            <Button onClick={handlePost} size="sm" color="primary">
-                                <HiOutlineArrowRight className="w-4 h-4" />
-                            </Button>
-
-
-                            <Button
-                                onClick={() => window.dispatchEvent(new CustomEvent("goToConversas"))}
-                                size="sm"
-                            >
-                                <HiOutlineChat className="w-4 h-4" />
-                            </Button>
-                        </div>
+                     <div className="flex gap-2">
+  <Input
+    placeholder="O que você está pensando?"
+    value={text}
+    onChange={(e) => setText(e.target.value)}
+    className="flex-1"
+  />
+  <Button
+    onClick={handlePost}
+    size="sm"
+    color="primary"
+ className="h-10 flex items-center justify-center" // mesma altura do input
+  >
+    <HiOutlineArrowRight className="w-4 h-4" />
+  </Button>
+</div>
                     </CardBody>
                 </Card>
             </section>
@@ -252,7 +312,14 @@ const FeedWithChat: React.FC<FeedProps> = ({
                                 <div className="flex-1">
                                     <div className="flex items-center justify-between">
                                         <div className="flex flex-col">
-                                            <span className="font-medium">{p.authorName}</span>
+           <span className="font-medium flex items-center gap-1">
+  {p.authorTag && (
+    <Code color="danger">
+      {p.authorTag}
+    </Code>
+  )}
+  {p.authorName}
+</span>
                                             <span className="text-xs text-gray-400">
                                                 {p.createdAt?.toDate
                                                     ? new Date(p.createdAt.toDate()).toLocaleString()
@@ -288,8 +355,8 @@ const FeedWithChat: React.FC<FeedProps> = ({
                                             onPress={() => toggleReaction(p)}
                                             size="sm"
                                             className={`flex items-center justify-center ${p.reactions?.includes(user?.uid || "")
-                                                    ? "bg-red-500 text-white"
-                                                    : ""
+                                                ? "bg-red-500 text-white"
+                                                : ""
                                                 }`}
                                         >
                                             <HiHeart className="w-4 h-4 mr-1" />
@@ -362,43 +429,44 @@ const FeedWithChat: React.FC<FeedProps> = ({
                                                             />
                                                             <div className="flex flex-col">
                                                                 <span className="text-[13px] text-gray-200 -mt-0">
-                                                                    {c.authorName}
+                                                                    <Code color="danger">{c.authorTag}</Code>  {c.authorName}
+                                                                    <span className="text-[8px] text-gray-500 italic ml-1">
+                                                                        {c.createdAt?.toDate
+                                                                            ? (() => {
+                                                                                const commentDate = new Date(c.createdAt.toDate());
+                                                                                const today = new Date();
+
+                                                                                // Zera horas/minutos/segundos para comparar só a data
+                                                                                const todayZero = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+                                                                                const commentZero = new Date(commentDate.getFullYear(), commentDate.getMonth(), commentDate.getDate());
+
+                                                                                const diffTime = todayZero.getTime() - commentZero.getTime();
+                                                                                const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+
+                                                                                if (diffDays === 0) return "Hoje";
+                                                                                if (diffDays === 1) return "1 d";
+                                                                                return `${diffDays} d`;
+                                                                            })()
+                                                                            : ""}
+
+                                                                    </span>
                                                                 </span>
-                                                                <span className="text-[8px] text-gray-500 italic -mt-5 ml-12">
-                                                                    {c.createdAt?.toDate
-                                                                        ? (() => {
-                                                                            const commentDate = new Date(c.createdAt.toDate());
-                                                                            const today = new Date();
 
-                                                                            // Zera horas/minutos/segundos para comparar só a data
-                                                                            const todayZero = new Date(today.getFullYear(), today.getMonth(), today.getDate());
-                                                                            const commentZero = new Date(commentDate.getFullYear(), commentDate.getMonth(), commentDate.getDate());
-
-                                                                            const diffTime = todayZero.getTime() - commentZero.getTime();
-                                                                            const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
-
-                                                                            if (diffDays === 0) return "Hoje";
-                                                                            if (diffDays === 1) return "1 d";
-                                                                            return `${diffDays} d`;
-                                                                        })()
-                                                                        : ""}
-
-                                                                </span>
-                                                                <span className="text-xs text-gray-400 italic mt-3">
+                                                                <span className="text-xs text-gray-400 italic mt-1">
                                                                     {c.text}
                                                                 </span>
                                                             </div>
 
-                                                              {c.authorId === user.uid && (
-        <Button
-          color="danger"
-          className="ml-auto"
-              size="sm"
-          onClick={() => handleDeleteComment(p.id, c)}
-        >
-   <HiOutlineTrash className="w-4 h-4" />
-        </Button>
-      )}
+                                                            {c.authorId === user.uid && (
+                                                                <Button
+                                                                    color="danger"
+                                                                    className="ml-auto"
+                                                                    size="sm"
+                                                                    onClick={() => handleDeleteComment(p.id, c)}
+                                                                >
+                                                                    <HiOutlineTrash className="w-4 h-4" />
+                                                                </Button>
+                                                            )}
                                                         </div>
 
                                                     </div>
@@ -482,7 +550,15 @@ const FeedWithChat: React.FC<FeedProps> = ({
                                                 size="sm"
                                                 className="shrink-0"
                                             />
-                                            <span className="text-sm">{u.name}</span>
+                                            <span className="font-medium flex items-center gap-1">
+  {u.tag && (
+    <Code color="danger">
+      {u.tag}
+    </Code>
+  )}
+  {u.name}
+</span>
+              
                                         </div>
                                     </ListboxItem>
                                 ))}
