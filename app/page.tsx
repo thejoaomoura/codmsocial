@@ -87,6 +87,13 @@ const [activeTab, setActiveTab] = useState<"Feed" | "Conversas" | "Minhas Organi
   const [showChatWith, setShowChatWith] = useState<ChatOverview | null>(null);
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
   const [chatText, setChatText] = useState("");
+  
+  // Estados para typing indicator
+  const [isTyping, setIsTyping] = useState<{[chatId: string]: {userId: string, userName: string, timestamp: number}}>({});
+  const [typingTimeout, setTypingTimeout] = useState<NodeJS.Timeout | null>(null);
+  
+  // Ref para armazenar o unsubscribe do listener de mensagens atual
+  const messagesUnsubscribeRef = useRef<(() => void) | null>(null);
 
   const [profileName, setProfileName] = useState("");
   const [profilePhoto, setProfilePhoto] = useState<string | null>(null);
@@ -95,6 +102,15 @@ const [activeTab, setActiveTab] = useState<"Feed" | "Conversas" | "Minhas Organi
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [showNameModal, setShowNameModal] = useState(false);
   const [newName, setNewName] = useState("");
+
+  // Cleanup dos listeners ao desmontar o componente
+  useEffect(() => {
+    return () => {
+      if (messagesUnsubscribeRef.current) {
+        messagesUnsubscribeRef.current();
+      }
+    };
+  }, []);
 
   // Evento externo para abrir conversas
   useEffect(() => {
@@ -120,28 +136,25 @@ const [activeTab, setActiveTab] = useState<"Feed" | "Conversas" | "Minhas Organi
   const { userOrganizations: publicOrganizations, loading: publicOrgsLoading } = useOrganizations();
   const { getRoleName, getRoleEmoji } = useRoleManagement();
 
-  // Pegar a primeira organização do usuário 
-  const userOrg = userOrganizations?.[0] || null;
+  // Estado para organização selecionada no painel
+  const [selectedOrgId, setSelectedOrgId] = useState<string | undefined>(undefined);
+
+  // Pegar a organização selecionada ou a primeira disponível
+  const userOrg = selectedOrgId 
+    ? userOrganizations?.find(org => org.id === selectedOrgId) || null
+    : userOrganizations?.[0] || null;
+    
   const { membership: userMembership, loading: membershipLoading } = useUserMembership(
     userOrg?.id || null, 
     user?.uid || null
   );
 
-  // Debug: Verificar valores dos hooks
-  console.log('Page.tsx Debug:', {
-    user: user ? `logged in as ${user.uid}` : 'undefined',
-    userOrganizations: userOrganizations?.length || 0,
-    userOrg: userOrg ? `found: ${userOrg.id}` : 'undefined',
-    userMembership: userMembership ? `found: ${userMembership.role}` : 'undefined',
-    userOrgsLoading,
-    membershipLoading
-  });
-
-  // Debug adicional: Verificar se o usuário tem organizações mas não está sendo detectado
-  if (user && userOrganizations && userOrganizations.length > 0) {
-    console.log('Page.tsx - User has organizations:', userOrganizations);
-    console.log('Page.tsx - First organization:', userOrganizations[0]);
-  }
+  // Atualizar organização selecionada quando as organizações carregarem
+  useEffect(() => {
+    if (userOrganizations && userOrganizations.length > 0 && !selectedOrgId) {
+      setSelectedOrgId(userOrganizations[0].id);
+    }
+  }, [userOrganizations, selectedOrgId]);
 
 useEffect(() => {
   console.log('Setting up auth listener...');
@@ -179,27 +192,44 @@ useEffect(() => {
   // Conversas
   useEffect(() => {
     if (!user) return;
+    
     const unsub = onSnapshot(collection(db, "Chats"), (snap) => {
       const list: ChatOverview[] = [];
+      const seenIds = new Set<string>(); // Prevenir duplicatas
+      
       snap.forEach((docSnap) => {
         const data = docSnap.data() as any;
         if (!data.participants?.includes(user.uid)) return;
 
         const otherUid = data.participants.find((uid: string) => uid !== user.uid);
+        if (!otherUid || seenIds.has(docSnap.id)) return; // Evitar duplicatas
+        
+        seenIds.add(docSnap.id);
+        
         const otherName = data.names?.[otherUid] || otherUid;
         const otherAvatar = data.avatars?.[otherUid] || "";
         const unread = data.unreadBy?.includes(user.uid) || false;
+        
         list.push({
           id: docSnap.id,
           otherUserId: otherUid,
           otherUserName: otherName,
           otherUserAvatar: otherAvatar || "",
           lastMessage: data.lastMessage ?? "",
-          unread: unread || false,
+          unread: unread,
         });
       });
+      
+      // Ordenar por última mensagem (mais recentes primeiro)
+      list.sort((a, b) => {
+        if (a.unread && !b.unread) return -1;
+        if (!a.unread && b.unread) return 1;
+        return 0;
+      });
+      
       setConversas(list);
     });
+    
     return () => unsub();
   }, [user]);
 
@@ -344,23 +374,83 @@ const handleDeleteComment = async (postId: string, comment: any) => {
     await updateDoc(pRef, { reactions: Array.from(reactions) });
   };
 
+  // Função para atualizar status de digitação
+  const updateTypingStatus = async (isTypingNow: boolean) => {
+    if (!user || !showChatWith) return;
+
+    const chatId = [user.uid, showChatWith.otherUserId].sort().join("_");
+    const typingDoc = doc(db, "Chats", chatId, "Typing", user.uid);
+
+    try {
+      if (isTypingNow) {
+        await setDoc(typingDoc, {
+          userId: user.uid,
+          userName: user.displayName || user.email?.split("@")[0],
+          timestamp: serverTimestamp(),
+          isTyping: true,
+        });
+      } else {
+        await updateDoc(typingDoc, {
+          isTyping: false,
+        });
+      }
+    } catch (error) {
+      console.error('Erro ao atualizar status de digitação:', error);
+    }
+  };
+
+  // Função para lidar com mudanças no texto do chat
+  const handleChatTextChange = (newText: string) => {
+    setChatText(newText);
+
+    if (!user || !showChatWith) return;
+
+    // Limpar timeout anterior
+    if (typingTimeout) {
+      clearTimeout(typingTimeout);
+    }
+
+    if (newText.trim()) {
+      // Usuário está digitando
+      updateTypingStatus(true);
+
+      // Definir timeout para parar de mostrar "digitando" após 2 minutos
+      const timeout = setTimeout(() => {
+        updateTypingStatus(false);
+      }, 120000); // 2 minutos
+
+      setTypingTimeout(timeout);
+    } else {
+      // Campo vazio, parar de mostrar "digitando"
+      updateTypingStatus(false);
+    }
+  };
+
   const openChatFromConversa = (c: ChatOverview): void => {
     if (!user) return;
+    
+    // Limpar listener anterior se existir
+    if (messagesUnsubscribeRef.current) {
+      messagesUnsubscribeRef.current();
+      messagesUnsubscribeRef.current = null;
+    }
+    
     setActiveTab("Conversas");
     setActiveChatOverview(c);
 
     const chatId = [user.uid, c.otherUserId].sort().join("_");
     const chatCol = collection(db, "Chats", chatId, "Messages");
+    const typingCol = collection(db, "Chats", chatId, "Typing");
 
     // Configurar listener em tempo real para mensagens com ordenação correta
-    const unsubscribe = onSnapshot(
+    const messagesUnsubscribe = onSnapshot(
       query(chatCol, orderBy("createdAt", "asc")), 
       (snap) => {
         console.log('Mensagens recebidas:', snap.docs.length);
         const msgs = snap.docs.map((d) => {
           const data = d.data() as ChatMessage;
           console.log('Mensagem:', data);
-          return data;
+          return { ...data, id: d.id }; // Adicionar ID do documento
         });
         setChatMessages(msgs);
       },
@@ -369,7 +459,48 @@ const handleDeleteComment = async (postId: string, comment: any) => {
       }
     );
 
-    // Marcar mensagens como lidas
+    // Configurar listener para status de digitação
+    const typingUnsubscribe = onSnapshot(typingCol, (snap) => {
+      const typingData: {[userId: string]: {userId: string, userName: string, timestamp: number}} = {};
+      
+      snap.forEach((doc) => {
+        const data = doc.data();
+        if (data.isTyping && data.userId !== user.uid) {
+          // Verificar se o timestamp não é muito antigo (mais de 2 minutos)
+          const now = Date.now();
+          const typingTime = data.timestamp?.toDate?.()?.getTime() || 0;
+          
+          if (now - typingTime < 120000) { // 2 minutos
+            typingData[data.userId] = {
+              userId: data.userId,
+              userName: data.userName,
+              timestamp: typingTime,
+            };
+          }
+        }
+      });
+      
+      setIsTyping(prev => {
+        const newState = { ...prev };
+        if (Object.keys(typingData).length > 0) {
+          newState[chatId] = Object.values(typingData)[0];
+        } else {
+          delete newState[chatId];
+        }
+        return newState;
+      });
+    });
+    
+    // Combinar os unsubscribes
+    const combinedUnsubscribe = () => {
+      messagesUnsubscribe();
+      typingUnsubscribe();
+    };
+    
+    // Armazenar o unsubscribe para limpeza posterior
+    messagesUnsubscribeRef.current = combinedUnsubscribe;
+
+    // Marcar mensagens como lidas imediatamente
     const chatDoc = doc(db, "Chats", chatId);
     getDoc(chatDoc).then((snap) => {
       if (!snap.exists()) return;
@@ -377,11 +508,16 @@ const handleDeleteComment = async (postId: string, comment: any) => {
       if (data.unreadBy?.includes(user.uid)) {
         updateDoc(chatDoc, {
           unreadBy: data.unreadBy.filter((uid: string) => uid !== user.uid),
+        }).then(() => {
+          // Atualizar o estado local imediatamente para feedback visual
+          setConversas(prev => prev.map(conv => 
+            conv.id === c.id ? { ...conv, unread: false } : conv
+          ));
         });
       }
     });
 
-    setShowChatWith({ ...c });
+    setShowChatWith({ ...c, unread: false }); // Marcar como lida localmente
   };
 
   const sendMessage = async () => {
@@ -393,6 +529,15 @@ const handleDeleteComment = async (postId: string, comment: any) => {
 
     try {
       console.log('Enviando mensagem para chatId:', chatId);
+      
+      // Parar de mostrar "digitando" antes de enviar
+      updateTypingStatus(false);
+      
+      // Limpar timeout se existir
+      if (typingTimeout) {
+        clearTimeout(typingTimeout);
+        setTypingTimeout(null);
+      }
       
       // Adicionar mensagem à subcoleção
       await addDoc(chatCol, {
@@ -756,6 +901,7 @@ const handleDeleteComment = async (postId: string, comment: any) => {
 
         {activeTab === "Conversas" && (
           <Chat
+            userId={user?.uid || ""}
             showChatWith={showChatWith ? {
               ...showChatWith,
               otherUserAvatar: showChatWith.otherUserAvatar ?? "",
@@ -763,7 +909,7 @@ const handleDeleteComment = async (postId: string, comment: any) => {
               unread: showChatWith.unread ?? false,
             } : null}
             // @ts-expect-error: Type mismatch due to different ChatOverview imports, but runtime shape is compatible
-            setShowChatWith={showChatWith}
+            setShowChatWith={setShowChatWith}
             conversas={conversas.map(c => ({
               ...c,
               lastMessage: c.lastMessage ?? "",
@@ -777,6 +923,12 @@ const handleDeleteComment = async (postId: string, comment: any) => {
             setChatText={setChatText}
             sendMessage={sendMessage}
             openChatFromConversa={openChatFromConversa}
+            deleteConversa={(id: string) => {
+              // Implementar lógica de deletar conversa se necessário
+              console.log('Deletar conversa:', id);
+            }}
+            isTyping={showChatWith ? isTyping[`${user?.uid}_${showChatWith.otherUserId}`.split('_').sort().join('_')] || undefined : undefined}
+            onChatTextChange={handleChatTextChange}
           />
         )}
 
@@ -785,6 +937,8 @@ const handleDeleteComment = async (postId: string, comment: any) => {
             user={user}
             userOrganizations={userOrganizations}
             loading={userOrgsLoading}
+            selectedOrgId={selectedOrgId}
+            onSelectOrganization={setSelectedOrgId}
           />
         )}
 
@@ -808,6 +962,9 @@ const handleDeleteComment = async (postId: string, comment: any) => {
             userOrg={userOrg}
             userMembership={userMembership}
             loading={userOrgsLoading || membershipLoading}
+            userOrganizations={userOrganizations}
+            selectedOrgId={selectedOrgId}
+            onSelectOrganization={setSelectedOrgId}
           />
         )}
 

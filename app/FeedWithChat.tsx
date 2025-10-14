@@ -65,9 +65,21 @@ const FeedWithChat: React.FC<FeedProps> = ({
     handleComment,
     handleDeleteComment,
 }) => {
+    // Lista de reações do Feed
+    const feedReactions = [
+        { name: "Curtir", emoji: "👍" },
+        { name: "Amei", emoji: "❤️" },
+        { name: "Haha", emoji: "😂" },
+        { name: "Uau", emoji: "😮" },
+        { name: "Triste", emoji: "😢" },
+        { name: "Grr", emoji: "😡" }
+    ];
+
     const [showChatDrawer, setShowChatDrawer] = useState(false);
     const [localPosts, setLocalPosts] = useState<(Post & { commentInput?: string })[]>(posts);
     const [users, setUsers] = useState<{ uid: string; avatar: string; name: string; tag: string; createdAt?: Date; }[]>([]);
+    const [showReactionPicker, setShowReactionPicker] = useState<string | null>(null);
+    const [reactionTimeout, setReactionTimeout] = useState<NodeJS.Timeout | null>(null);
 
     useEffect(() => {
         setLocalPosts(posts);
@@ -114,27 +126,27 @@ const FeedWithChat: React.FC<FeedProps> = ({
         { uid: string; name: string; tag: string; avatar: string }[]
     >([]);
 
-   const fetchUserInfo = async (uid: string) => {
-  const userRef = doc(db, "Users", uid);
-  const userSnap = await getDoc(userRef);
+    const fetchUserInfo = async (uid: string) => {
+        const userRef = doc(db, "Users", uid);
+        const userSnap = await getDoc(userRef);
 
-  if (!userSnap.exists()) {
-    return {
-      uid,
-      name: "Usuário desconhecido",
-      tag: "", 
-      avatar: "/default-avatar.png",
+        if (!userSnap.exists()) {
+            return {
+                uid,
+                name: "Usuário desconhecido",
+                tag: "",
+                avatar: "/default-avatar.png",
+            };
+        }
+
+        const data = userSnap.data();
+        return {
+            uid,
+            name: data.displayName || "Sem nome",
+            tag: data.tag ?? "",
+            avatar: data.photoURL || "/default-avatar.png",
+        };
     };
-  }
-
-  const data = userSnap.data();
-  return {
-    uid,
-    name: data.displayName || "Sem nome",
-    tag: data.tag ?? "", 
-    avatar: data.photoURL || "/default-avatar.png",
-  };
-};
 
 
     const openLikesModal = async (p: Post) => {
@@ -148,6 +160,99 @@ const FeedWithChat: React.FC<FeedProps> = ({
         const users = await Promise.all(p.reactions.map((uid) => fetchUserInfo(uid)));
         setLikesUsers(users);
         setShowLikesModal(true);
+    };
+
+    // Funções para o sistema de reações
+    const handleReactionHover = (postId: string) => {
+        // Limpar timeout anterior se existir
+        if (reactionTimeout) {
+            clearTimeout(reactionTimeout);
+            setReactionTimeout(null);
+        }
+        
+        const timeout = setTimeout(() => {
+            setShowReactionPicker(postId);
+        }, 300); 
+        setReactionTimeout(timeout);
+    };
+
+    const handleReactionLeave = () => {
+        if (reactionTimeout) {
+            clearTimeout(reactionTimeout);
+            setReactionTimeout(null);
+        }
+        
+        // Delay menor para fechar o picker
+        const timeout = setTimeout(() => {
+            setShowReactionPicker(null);
+        }, 150);
+        setReactionTimeout(timeout);
+    };
+
+    const handleReactionSelect = (post: Post, reaction: { name: string; emoji: string }) => {
+        if (!user?.uid) return;
+        
+        const newReaction = {
+            userId: user.uid,
+            emoji: reaction.emoji,
+            name: reaction.name,
+            createdAt: new Date()
+        };
+
+        // Atualizar o post localmente
+        setLocalPosts(prevPosts => 
+            prevPosts.map(p => {
+                if (p.id === post.id) {
+                    const detailedReactions = p.detailedReactions || [];
+                    const existingReactionIndex = detailedReactions.findIndex(r => r.userId === user.uid);
+                    
+                    let updatedDetailedReactions;
+                    if (existingReactionIndex >= 0) {
+                        // Substituir reação existente
+                        updatedDetailedReactions = [...detailedReactions];
+                        updatedDetailedReactions[existingReactionIndex] = newReaction;
+                    } else {
+                        // Adicionar nova reação
+                        updatedDetailedReactions = [...detailedReactions, newReaction];
+                    }
+
+                    const reactions = p.reactions || [];
+                    const hasOldReaction = reactions.includes(user.uid);
+                    const updatedReactions = hasOldReaction ? reactions : [...reactions, user.uid];
+
+                    return {
+                        ...p,
+                        reactions: updatedReactions,
+                        detailedReactions: updatedDetailedReactions
+                    };
+                }
+                return p;
+            })
+        );
+
+        setShowReactionPicker(null);
+    };
+
+    const getUserReaction = (post: Post) => {
+        if (!user?.uid) return null;
+        
+        // Verificar primeiro no sistema novo de reações detalhadas
+        if (post.detailedReactions) {
+            const userReaction = post.detailedReactions.find(r => r.userId === user.uid);
+            if (userReaction) {
+                return {
+                    name: userReaction.name,
+                    emoji: userReaction.emoji
+                };
+            }
+        }
+        
+        // Fallback - retorna "Amei" se o usuário reagiu
+        if (post.reactions?.includes(user.uid)) {
+            return feedReactions[1]; // "Amei" ❤️
+        }
+        
+        return null;
     };
 
     const handleDeleteClick = (postId: string, authorId: string) => {
@@ -173,22 +278,22 @@ const FeedWithChat: React.FC<FeedProps> = ({
         }
     };
 
-   useEffect(() => {
-  const unsub = onSnapshot(collection(db, "Users"), (snap) => {
-    const usersList = snap.docs.map((doc) => {
-      const data = doc.data();
-      return {
-        uid: doc.id,
-        name: data.displayName || "Sem nome",
-        avatar: data.photoURL || "/default-avatar.png",
-        tag: data.tag ?? "", // ✅ garante string, mesmo se não existir
-        createdAt: data.createdAt?.toDate?.() || new Date(0),
-      };
-    });
-    setUsers(usersList);
-  });
-  return () => unsub();
-}, []);
+    useEffect(() => {
+        const unsub = onSnapshot(collection(db, "Users"), (snap) => {
+            const usersList = snap.docs.map((doc) => {
+                const data = doc.data();
+                return {
+                    uid: doc.id,
+                    name: data.displayName || "Sem nome",
+                    avatar: data.photoURL || "/default-avatar.png",
+                    tag: data.tag ?? "", // ✅ garante string, mesmo se não existir
+                    createdAt: data.createdAt?.toDate?.() || new Date(0),
+                };
+            });
+            setUsers(usersList);
+        });
+        return () => unsub();
+    }, []);
 
     return (
         <>
@@ -262,22 +367,22 @@ const FeedWithChat: React.FC<FeedProps> = ({
 
                 <Card>
                     <CardBody>
-                     <div className="flex gap-2">
-  <Input
-    placeholder="O que você está pensando?"
-    value={text}
-    onChange={(e) => setText(e.target.value)}
-    className="flex-1"
-  />
-  <Button
-    onClick={handlePost}
-    size="sm"
-    color="primary"
- className="h-10 flex items-center justify-center" // mesma altura do input
-  >
-    <HiOutlineArrowRight className="w-4 h-4" />
-  </Button>
-</div>
+                        <div className="flex gap-2">
+                            <Input
+                                placeholder="O que você está pensando?"
+                                value={text}
+                                onChange={(e) => setText(e.target.value)}
+                                className="flex-1"
+                            />
+                            <Button
+                                onClick={handlePost}
+                                size="sm"
+                                color="primary"
+                                className="h-10 flex items-center justify-center" // mesma altura do input
+                            >
+                                <HiOutlineArrowRight className="w-4 h-4" />
+                            </Button>
+                        </div>
                     </CardBody>
                 </Card>
             </section>
@@ -312,14 +417,14 @@ const FeedWithChat: React.FC<FeedProps> = ({
                                 <div className="flex-1">
                                     <div className="flex items-center justify-between">
                                         <div className="flex flex-col">
-           <span className="font-medium flex items-center gap-1">
-  {p.authorTag && (
-    <Code color="danger">
-      {p.authorTag}
-    </Code>
-  )}
-  {p.authorName}
-</span>
+                                            <span className="font-medium flex items-center gap-1">
+                                                {p.authorTag && (
+                                                    <Code color="danger">
+                                                        {p.authorTag}
+                                                    </Code>
+                                                )}
+                                                {p.authorName}
+                                            </span>
                                             <span className="text-xs text-gray-400">
                                                 {p.createdAt?.toDate
                                                     ? new Date(p.createdAt.toDate()).toLocaleString()
@@ -347,23 +452,87 @@ const FeedWithChat: React.FC<FeedProps> = ({
                             <CardBody>
                                 <p className="text-gray-200 italic whitespace-pre-wrap ml-1">{p.text}</p>
                             </CardBody>
-                            <CardFooter>
-                                <div className="flex flex-col w-full mt-0">
+                            <CardFooter className="overflow-visible">
+                                <div className="flex flex-col w-full mt-0 overflow-visible">
                                     {/* Botões de reação */}
-                                    <div className="flex items-center">
-                                        <Button
-                                            onPress={() => toggleReaction(p)}
-                                            size="sm"
-                                            className={`flex items-center justify-center ${p.reactions?.includes(user?.uid || "")
-                                                ? "bg-red-500 text-white"
-                                                : ""
-                                                }`}
+                                    <div className="flex items-center relative overflow-visible">
+                                        {/* Botão principal de reação com hover */}
+                                        <div 
+                                            className="relative overflow-visible"
+                                            onMouseEnter={() => handleReactionHover(p.id)}
+                                            onMouseLeave={handleReactionLeave}
                                         >
-                                            <HiHeart className="w-4 h-4 mr-1" />
-                                        </Button>
+                                            <Button
+                                                onPress={() => toggleReaction(p)}
+                                                size="sm"
+                                                className={`flex items-center justify-center transition-all duration-200 ${
+                                                    getUserReaction(p)
+                                                        ? "bg-red-500 text-white scale-105"
+                                                        : "hover:scale-105"
+                                                }`}
+                                            >
+                                                {getUserReaction(p) ? (
+                                                    <span className="text-lg mr-1">{getUserReaction(p)?.emoji}</span>
+                                                ) : (
+                                                    <HiHeart className="w-4 h-4 mr-1" />
+                                                )}
+                                                <span className="text-xs">
+                                                    {getUserReaction(p) ? getUserReaction(p)?.name : "Curtir"}
+                                                </span>
+                                            </Button>
+
+                                            {/* Picker de reações (aparece no hover) */}
+                                            {showReactionPicker === p.id && (
+                                                <div 
+                                                    className="fixed bg-gray-900/95 backdrop-blur-sm rounded-full px-4 py-3 shadow-2xl border border-gray-600/50 flex gap-2 z-[9999] animate-in fade-in-0 zoom-in-95 slide-in-from-bottom-2 duration-300"
+                                                    style={{
+                                                        transform: 'translateY(-110%)',
+                                                        marginTop: '-4px',
+                                                        left: '0px',
+                                                        marginLeft: '0px'
+                                                    }}
+                                                    onMouseEnter={() => {
+                                                        if (reactionTimeout) {
+                                                            clearTimeout(reactionTimeout);
+                                                            setReactionTimeout(null);
+                                                        }
+                                                        setShowReactionPicker(p.id);
+                                                    }}
+                                                    onMouseLeave={() => {
+                                                        const timeout = setTimeout(() => {
+                                                            setShowReactionPicker(null);
+                                                        }, 200);
+                                                        setReactionTimeout(timeout);
+                                                    }}
+                                                >
+                                                    {feedReactions.map((reaction, index) => (
+                                                        <button
+                                                            key={index}
+                                                            onClick={(e) => {
+                                                                e.preventDefault();
+                                                                e.stopPropagation();
+                                                                handleReactionSelect(p, reaction);
+                                                            }}
+                                                            onMouseDown={(e) => {
+                                                                e.preventDefault();
+                                                                e.stopPropagation();
+                                                            }}
+                                                            className="text-3xl hover:scale-150 transition-all duration-200 p-2 rounded-full hover:bg-gray-700/50 transform hover:-translate-y-1 cursor-pointer"
+                                                            title={reaction.name}
+                                                            style={{
+                                                                filter: 'drop-shadow(0 4px 8px rgba(0,0,0,0.3))'
+                                                            }}
+                                                        >
+                                                            {reaction.emoji}
+                                                        </button>
+                                                    ))}
+                                                </div>
+                                            )}
+                                        </div>
 
                                         <Button size="sm" className="ml-2" onPress={() => openLikesModal(p)}>
                                             <HiOutlineUsers className="w-4 h-4 mr-1" />
+                                            {p.reactions?.length || 0}
                                         </Button>
 
                                         {p.authorId !== user.uid && (
@@ -511,6 +680,8 @@ const FeedWithChat: React.FC<FeedProps> = ({
                                 setShowChatDrawer(true);
                             }}
                             deleteConversa={deleteConversa}
+                            isTyping={undefined}
+                            onChatTextChange={undefined}
                         />
                     </DrawerBody>
 
@@ -551,14 +722,14 @@ const FeedWithChat: React.FC<FeedProps> = ({
                                                 className="shrink-0"
                                             />
                                             <span className="font-medium flex items-center gap-1">
-  {u.tag && (
-    <Code color="danger">
-      {u.tag}
-    </Code>
-  )}
-  {u.name}
-</span>
-              
+                                                {u.tag && (
+                                                    <Code color="danger">
+                                                        {u.tag}
+                                                    </Code>
+                                                )}
+                                                {u.name}
+                                            </span>
+
                                         </div>
                                     </ListboxItem>
                                 ))}

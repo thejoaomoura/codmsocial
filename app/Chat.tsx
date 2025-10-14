@@ -9,6 +9,7 @@ import { Drawer, DrawerContent, DrawerHeader, DrawerBody, DrawerFooter } from "@
 import { Table, TableHeader, TableBody, TableColumn, TableRow, TableCell } from "@heroui/table";
 import { Input } from "@heroui/input";
 import { HiArrowRight, HiOutlineSearch } from "react-icons/hi";
+import TypingIndicator from "./components/TypingIndicator";
 
 export interface ChatMessage {
   id?: string;
@@ -39,6 +40,8 @@ interface ChatProps {
   conversas?: ChatOverview[];
   openChatFromConversa: (c: ChatOverview) => void;
   deleteConversa: (id: string) => void; // deletar apenas para este usuário
+  isTyping?: {userId: string, userName: string, timestamp: number};
+  onChatTextChange?: (text: string) => void;
 }
 
 const Chat: React.FC<ChatProps> = ({
@@ -52,6 +55,8 @@ const Chat: React.FC<ChatProps> = ({
   conversas = [],
   openChatFromConversa,
   deleteConversa,
+  isTyping,
+  onChatTextChange
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [filterValue, setFilterValue] = useState("");
@@ -80,13 +85,18 @@ const Chat: React.FC<ChatProps> = ({
           return (
             <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
               <Avatar src={c.otherUserAvatar} alt={c.otherUserName} aria-label={`Avatar de ${c.otherUserName}`} />
+              <span>{c.otherUserName}</span>
             </div>
           );
         case "lastMessage":
-          return c.lastMessage || "—";
+          return (
+            <div style={{ maxWidth: "200px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+              {c.lastMessage || "—"}
+            </div>
+          );
         case "unread":
           return c.unread ? (
-         <span
+            <span
               style={{
                 width: 12,
                 height: 12,
@@ -96,9 +106,11 @@ const Chat: React.FC<ChatProps> = ({
               }}
             />
           ) : null;
+        default:
+          return null;
       }
     },
-    [deleteConversa, openChatFromConversa]
+    []
   );
 
   return (
@@ -154,11 +166,11 @@ const Chat: React.FC<ChatProps> = ({
       }}
     >
       {chatMessages.length === 0 && <div>Nenhuma mensagem ainda...</div>}
-      {chatMessages.map((m) => {
+      {chatMessages.map((m, index) => {
         const isSender = m.senderId !== showChatWith?.otherUserId;
         return (
           <div
-            key={m.id || Math.random()}
+            key={m.id || `msg-${index}-${m.createdAt?.seconds || Date.now()}`}
             style={{ display: "flex", justifyContent: isSender ? "flex-end" : "flex-start" }}
           >
             <div
@@ -178,14 +190,44 @@ const Chat: React.FC<ChatProps> = ({
           </div>
         );
       })}
+      
+      {/* Indicador de digitação */}
+      {isTyping && isTyping.userId !== userId && (
+        <div style={{ display: "flex", justifyContent: "flex-start" }}>
+          <div
+            style={{
+              padding: 8,
+              borderRadius: 12,
+              maxWidth: "70%",
+              background: "hsl(var(--heroui-default-100))",
+              border: "1px solid hsl(var(--heroui-default-200))",
+            }}
+          >
+            <div style={{ fontSize: 12, color: "hsl(var(--heroui-default-600))", marginBottom: 4 }}>
+              {showChatWith?.otherUserName} está digitando...
+            </div>
+            <TypingIndicator
+              isVisible={!!isTyping && isTyping.userId !== userId}
+            />
+          </div>
+        </div>
+      )}
     </DrawerBody>
 
     <DrawerFooter style={{ display: "flex", gap: 8 }}>
       <input
         value={chatText}
-        onChange={(e) => setChatText(e.target.value)}
+        onChange={(e) => {
+          setChatText(e.target.value);
+          onChatTextChange?.(e.target.value);
+        }}
         placeholder="Digite sua mensagem..."
         style={{ flex: 1, padding: 8, borderRadius: 4 }}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") {
+            sendMessage();
+          }
+        }}
         aria-label="Campo para digitar mensagem"
       />
       <Button color="primary" onPress={sendMessage} aria-label="Enviar mensagem">
