@@ -19,6 +19,8 @@ export const useRoleManagement = () => {
           canCreateEvents: true,
           canRegisterForEvents: true,
           canManageEventRegistrations: true,
+          canViewEvents: true,
+          canViewOwnRosterStatus: true,
         };
       
       case 'moderator':
@@ -30,6 +32,8 @@ export const useRoleManagement = () => {
           canCreateEvents: true,
           canRegisterForEvents: true,
           canManageEventRegistrations: true,
+          canViewEvents: true,
+          canViewOwnRosterStatus: true,
         };
       
       case 'manager':
@@ -41,6 +45,8 @@ export const useRoleManagement = () => {
           canCreateEvents: true,
           canRegisterForEvents: true,
           canManageEventRegistrations: true,
+          canViewEvents: true,
+          canViewOwnRosterStatus: true,
         };
       
       case 'pro':
@@ -51,8 +57,10 @@ export const useRoleManagement = () => {
           canChangeRoles: false,
           canManageOrganization: false,
           canCreateEvents: false,
-          canRegisterForEvents: false,
+          canRegisterForEvents: false, // Não podem inscrever a organização
           canManageEventRegistrations: false,
+          canViewEvents: true, // Nova permissão: podem visualizar eventos
+          canViewOwnRosterStatus: true, // Nova permissão: podem ver seu status no roster
         };
       
       default:
@@ -64,6 +72,8 @@ export const useRoleManagement = () => {
           canCreateEvents: false,
           canRegisterForEvents: false,
           canManageEventRegistrations: false,
+          canViewEvents: false,
+          canViewOwnRosterStatus: false,
         };
     }
   };
