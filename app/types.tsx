@@ -25,6 +25,13 @@ export interface User {
   tag: string;
   avatar: string;
   createdAt?: Date;
+  displayName?: string;
+  email?: string;
+  photoURL?: string;
+  stats?: {
+    organizationsCount: number;
+    eventsParticipated: number;
+  };
 }
 
 export interface ChatOverview {
@@ -42,5 +49,125 @@ export interface ChatMessage {
   senderAvatar?: string;
   text: string;
   createdAt: any; // serverTimestamp
+}
+
+// ===== SISTEMA DE CARGOS E ORGANIZAÇÕES =====
+
+export type OrganizationRole = "owner" | "moderator" | "manager" | "pro" | "ranked";
+
+export type MembershipStatus = "pending" | "accepted" | "removed" | "banned";
+
+export type OrganizationVisibility = "public" | "private";
+
+export type GameType = "CODM" | "multi";
+
+export interface RoleHistoryEntry {
+  role: OrganizationRole;
+  changedAt: any; // Timestamp
+  changedBy: string; // userId
+  reason?: string;
+}
+
+export interface Organization {
+  id: string;
+  name: string;
+  tag: string; // tag única da organização
+  slug: string; // único globalmente
+  ownerId: string;
+  createdAt: any; // Timestamp
+  updatedAt: any; // Timestamp
+  logoURL?: string;
+  region: string; // "BR", "NA", "EU", etc.
+  game: GameType;
+  visibility: OrganizationVisibility;
+  memberCount: number; // denormalizado para performance
+  description?: string; // descrição da organização
+  maxMembers: number; // limite máximo de membros
+  settings: {
+    allowPublicJoin: boolean;
+    requireApproval: boolean;
+  };
+}
+
+export interface Membership {
+  id?: string;
+  organizationId: string;
+  userId: string;
+  role: OrganizationRole;
+  status: MembershipStatus;
+  joinedAt: any; // Timestamp
+  updatedAt: any; // Timestamp
+  invitedBy: string; // userId de quem convidou
+  invitedAt?: any; // Timestamp de quando foi convidado
+  roleHistory: RoleHistoryEntry[];
+}
+
+// ===== EVENTOS E COMPETIÇÕES (FASE 2) =====
+
+export type EventType = "scrim" | "tournament";
+
+export type EventStatus = "draft" | "open" | "closed" | "finished";
+
+export type GameMode = "BR" | "MP";
+
+export type RegistrationState = "pending" | "approved" | "rejected" | "withdrawn";
+
+export interface Event {
+  id: string;
+  type: EventType;
+  hostOrgId: string; // organização que criou o evento
+  name: string;
+  description: string;
+  gameMode: GameMode;
+  teamSize: number; // 3, 4, 5
+  rosterMin: number;
+  rosterMax: number;
+  startsAt: any; // Timestamp
+  checkinWindow?: number; // minutos antes do início
+  rulesURL?: string;
+  status: EventStatus;
+  createdBy: string; // userId do manager/moderator/owner
+  createdAt: any; // Timestamp
+  maxTeams?: number;
+  prizePool?: string;
+  region: string;
+}
+
+export interface EventRegistration {
+  eventId: string;
+  orgId: string;
+  managerId: string; // quem inscreveu a organização
+  roster: string[]; // array de userIds
+  substitutes?: string[]; // reservas
+  createdAt: any; // Timestamp
+  updatedAt: any; // Timestamp
+  state: RegistrationState;
+  notes?: string; // observações do manager
+  approvedBy?: string; // userId de quem aprovou (se aplicável)
+  approvedAt?: any; // Timestamp
+}
+
+// ===== UTILITÁRIOS E VALIDAÇÕES =====
+
+export interface RolePermissions {
+  canInviteMembers: boolean;
+  canRemoveMembers: boolean;
+  canChangeRoles: boolean;
+  canManageOrganization: boolean;
+  canCreateEvents: boolean;
+  canRegisterForEvents: boolean;
+  canManageEventRegistrations: boolean;
+}
+
+export interface OrganizationInvite {
+  id: string;
+  organizationId: string;
+  invitedUserId: string;
+  invitedEmail: string;
+  invitedBy: OrganizationRole;
+  message?: string | null;
+  createdAt: any; // Timestamp
+  status: "pending" | "accepted" | "rejected" | "expired";
+  expiresAt: any; // Timestamp
 }
 
