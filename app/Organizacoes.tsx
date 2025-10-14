@@ -14,12 +14,13 @@ import { Card } from "@heroui/card";
 
 interface Organizacao {
   id: string;
-  nome: string;
-  creatorId: string;
+  name: string;
+  ownerId: string;
   members: string[];
-  maxMembros: number;
+  maxMembers: number;
   tag?: string;
   pendingRequests?: string[];
+  visibility?: string;
 }
 
 interface User {
@@ -38,7 +39,7 @@ export default function Organizacoes() {
 
   // Carrega organizações e membros de todas de uma vez
   useEffect(() => {
-    const unsub = onSnapshot(collection(db, "Organizacoes"), async (snap) => {
+    const unsub = onSnapshot(collection(db, "organizations"), async (snap) => {
       const list: Organizacao[] = snap.docs.map((d) => ({ id: d.id, ...d.data() } as Organizacao));
       setOrgs(list);
 
@@ -50,12 +51,20 @@ export default function Organizacoes() {
       const allMembers: Record<string, User[]> = {};
       await Promise.all(
         list.map(async (org) => {
-          const docs = await Promise.all(org.members.map((uid) => getDoc(doc(db, "Users", uid))));
-          const users: User[] = docs.map((d) => ({ uid: d.id, ...d.data() } as User));
+          if (org.members && org.members.length > 0) {
+            const docs = await Promise.all(org.members.map((uid) => getDoc(doc(db, "Users", uid))));
+            const users: User[] = docs.map((d) => ({ uid: d.id, ...d.data() } as User));
 
-          // Criador sempre primeiro
-          users.sort((a, b) => (a.uid === org.creatorId ? -1 : b.uid === org.creatorId ? 1 : 0));
-          allMembers[org.id] = users;
+            // Criador sempre primeiro
+            users.sort((a, b) => (a.uid === org.ownerId ? -1 : b.uid === org.ownerId ? 1 : 0));
+            allMembers[org.id] = users;
+          } else {
+            // Se não há membros definidos, adicionar apenas o owner
+            const ownerDoc = await getDoc(doc(db, "Users", org.ownerId));
+            if (ownerDoc.exists()) {
+              allMembers[org.id] = [{ uid: ownerDoc.id, ...ownerDoc.data() } as User];
+            }
+          }
         })
       );
       setMembersData(allMembers);
@@ -68,7 +77,7 @@ export default function Organizacoes() {
   const handleRequestToJoin = async (org: Organizacao) => {
     if (!user) return;
 
-    if (org.members.includes(user.uid)) {
+    if (org.members && org.members.includes(user.uid)) {
       return addToast({ title: "Aviso", description: "Você já é membro desta organização", color: "warning" });
     }
 
@@ -77,7 +86,7 @@ export default function Organizacoes() {
     }
 
     try {
-      const orgRef = doc(db, "Organizacoes", org.id);
+      const orgRef = doc(db, "organizations", org.id);
       await updateDoc(orgRef, {
         pendingRequests: arrayUnion(user.uid),
       });
@@ -100,13 +109,13 @@ export default function Organizacoes() {
         {orgs.map((org) => (
           <AccordionItem
             key={org.id}
-            aria-label={`org-${org.nome}`}
+            aria-label={`org-${org.name}`}
             title={
               <div className="flex items-center justify-between w-full">
                 <div>
-                  <div className="font-semibold">{org.nome}</div>
+                  <div className="font-semibold">{org.name}</div>
                   <div className="text-xs text-gray-500">
-                    Membros: {org.members.length}/{org.maxMembros}
+                    Membros: {org.members?.length || 1}/{org.maxMembers}
                   </div>
                 </div>
         
@@ -122,11 +131,11 @@ export default function Organizacoes() {
       <Avatar src={m.photoURL || "/default-avatar.png"} alt={m.displayName || m.email || "Usuário"} />
       <span>
             <Code color="danger">{m.tag}</Code> {m.displayName || m.email || m.uid}{" "}
-        {m.uid === org.creatorId && <strong>(Criador)</strong>}
+        {m.uid === org.ownerId && <strong>(Criador)</strong>}
       </span>
     </li>
   ))}
-    {user && !org.members.includes(user.uid) && (
+    {user && !(org.members && org.members.includes(user.uid)) && (
                   <Button
                     color="primary"
                     size="sm"
