@@ -47,13 +47,19 @@ interface PainelOrganizacaoProps {
   userOrg: Organization | null;
   userMembership: Membership | null;
   loading: boolean;
+  userOrganizations?: Organization[];
+  selectedOrgId?: string;
+  onSelectOrganization?: (orgId: string) => void;
 }
 
 const PainelOrganizacao: React.FC<PainelOrganizacaoProps> = ({
   user,
   userOrg,
   userMembership,
-  loading
+  loading,
+  userOrganizations = [],
+  selectedOrgId,
+  onSelectOrganization
 }) => {
   const [activeTab, setActiveTab] = useState("overview");
   const { getRoleName, getRoleEmoji, getRolePermissions } = useRoleManagement();
@@ -292,6 +298,38 @@ const PainelOrganizacao: React.FC<PainelOrganizacaoProps> = ({
 
   return (
     <div className="space-y-6">
+      {/* Seletor de Organização */}
+      {userOrganizations.length > 1 && (
+        <Card>
+          <CardBody>
+            <div className="flex items-center gap-4">
+              <h3 className="text-lg font-semibold">Selecionar Organização:</h3>
+              <div className="flex gap-2 flex-wrap">
+                {userOrganizations.map((org) => (
+                  <Button
+                    key={org.id}
+                    size="sm"
+                    variant={selectedOrgId === org.id ? "solid" : "bordered"}
+                    color={selectedOrgId === org.id ? "primary" : "default"}
+                    onClick={() => onSelectOrganization?.(org.id)}
+                    startContent={
+                      <Avatar
+                        src={org.logoURL}
+                        name={org.name}
+                        size="sm"
+                        className="w-5 h-5"
+                      />
+                    }
+                  >
+                    {org.name}
+                  </Button>
+                ))}
+              </div>
+            </div>
+          </CardBody>
+        </Card>
+      )}
+
       {/* Header da Organização */}
       <Card>
         <CardBody>
