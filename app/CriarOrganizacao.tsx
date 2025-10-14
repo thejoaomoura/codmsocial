@@ -259,7 +259,7 @@ export default function CriarOrganizacao() {
           <Select
             label="Visibilidade"
             placeholder="Selecione a visibilidade"
-            selectedKeys={new Set([visibilidade])}
+            selectedKeys={visibilidade ? new Set([visibilidade]) : new Set()}
             onSelectionChange={(keys) => {
               const selected = Array.from(keys)[0] as OrganizationVisibility;
               setVisibilidade(selected);
@@ -283,7 +283,7 @@ export default function CriarOrganizacao() {
                 <div>
                   <div className="font-medium">Privada</div>
                   <div className="text-xs text-gray-500">
-                    Apenas membros com status "accepted" podem ver a organização.
+                    Apenas membros com status "aceito" podem ver a organização.
                   </div>
                 </div>
               </div>
