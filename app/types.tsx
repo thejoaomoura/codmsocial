@@ -7,6 +7,13 @@ export interface PostComment {
   createdAt: any;
 }
 
+export interface PostReaction {
+  userId: string;
+  emoji: string;
+  name: string;
+  createdAt: any;
+}
+
 export interface Post {
   id: string;
   authorName: string;
@@ -15,7 +22,8 @@ export interface Post {
   authorAvatar: string;
   text: string;
   createdAt: any; 
-  reactions: string[];
+  reactions: string[]; 
+  detailedReactions?: PostReaction[]; // Novo sistema de reações detalhadas
   comments: PostComment[];
 }
 
@@ -157,6 +165,8 @@ export interface RolePermissions {
   canCreateEvents: boolean;
   canRegisterForEvents: boolean;
   canManageEventRegistrations: boolean;
+  canViewEvents?: boolean; // Permissão para visualizar eventos (read-only)
+  canViewOwnRosterStatus?: boolean; // Permissão para ver próprio status no roster
 }
 
 export interface OrganizationInvite {
