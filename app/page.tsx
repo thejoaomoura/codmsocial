@@ -16,9 +16,7 @@ import { Dropdown, DropdownTrigger, DropdownMenu, DropdownItem } from "@heroui/d
 import { Avatar } from "@heroui/avatar";
 import { Button } from "@heroui/button";
 import { HiOutlineHome, HiOutlineInbox, HiOutlineLogout, HiOutlineMenu, HiOutlineNewspaper, HiOutlinePencil, HiOutlineSave, HiOutlineTicket, HiOutlineUserGroup, HiOutlineViewList, HiOutlineX } from "react-icons/hi";
-import { initializeApp } from "firebase/app";
 import {
-  getFirestore,
   collection,
   addDoc,
   onSnapshot,
@@ -36,7 +34,6 @@ import {
 } from "firebase/firestore";
 
 import {
-  getAuth,
   signInWithPopup,
   GoogleAuthProvider,
   signOut,
@@ -44,6 +41,8 @@ import {
   User,
   updateProfile,
 } from "firebase/auth";
+
+import { db, auth, provider } from "./firebase";
 
 import {
   Modal,
@@ -59,31 +58,28 @@ import { Input } from "@heroui/input";
 import { Tooltip } from "@heroui/tooltip";
 import CriarOrganizacao from "./CriarOrganizacao";
 import Organizacoes from "./Organizacoes";
+import { useUserOrganizations, useOrganizations } from "./hooks/useOrganizations";
+import { useUserMembership } from "./hooks/useMemberships";
+import { useRoleManagement } from "./hooks/useRoleManagement";
+import { HiOutlineBriefcase, HiOutlineGlobe, HiOutlineCog, HiOutlineShieldCheck } from "react-icons/hi";
 
-const firebaseConfig = {
-  apiKey: "AIzaSyBZl9_FYc-wndFiFSrzN8RNJHrlR6VV5MY",
-  authDomain: "coach-bc3b3.firebaseapp.com",
-  projectId: "coach-bc3b3",
-  storageBucket: "coach-bc3b3.appspot.com",
-  messagingSenderId: "672742580848",
-  appId: "1:672742580848:web:34dfa4f35be4a470950ab5",
-};
-
-const app = initializeApp(firebaseConfig);
-const db = getFirestore(app);
-const auth = getAuth(app);
-const provider = new GoogleAuthProvider();
+// Componentes para as novas funcionalidades
+import MinhasOrganizacoes from "./components/MinhasOrganizacoes";
+import ExplorarOrganizacoes from "./components/ExplorarOrganizacoes";
+import PainelOrganizacao from "./components/PainelOrganizacao";
 
 const navigation = [
   { label: "Feed", icon: <HiOutlineNewspaper className="w-5 h-5" /> },
   { label: "Conversas", icon: <HiOutlineInbox className="w-5 h-5" /> },
-    { label: "Criar Organizacão", icon: <HiOutlineHome className="w-5 h-5" /> },
-        { label: "Organizacões", icon: <HiOutlineUserGroup className="w-5 h-5" /> },
+  { label: "Minhas Organizações", icon: <HiOutlineBriefcase className="w-5 h-5" /> },
+  { label: "Explorar Organizações", icon: <HiOutlineGlobe className="w-5 h-5" /> },
+  { label: "Criar Organização", icon: <HiOutlineHome className="w-5 h-5" /> },
+  { label: "Painel da Organização", icon: <HiOutlineShieldCheck className="w-5 h-5" /> },
 ];
 
 export default function Home() {
   const [user, setUser] = useState<User | null>(null);
-const [activeTab, setActiveTab] = useState<"Feed" | "Conversas" | "Criar Organizacão" | "Organizacões">("Feed");
+const [activeTab, setActiveTab] = useState<"Feed" | "Conversas" | "Minhas Organizações" | "Explorar Organizações" | "Criar Organização" | "Painel da Organização">("Feed");
   const [posts, setPosts] = useState<Post[]>([]);
   const [text, setText] = useState("");
   const [conversas, setConversas] = useState<ChatOverview[]>([]);
@@ -107,10 +103,50 @@ const [activeTab, setActiveTab] = useState<"Feed" | "Conversas" | "Criar Organiz
     return () => window.removeEventListener("goToConversas", listener);
   }, []);
 
+  // Listener para mudanças de aba via eventos customizados
+  useEffect(() => {
+    const handleTabChange = (event: CustomEvent) => {
+      setActiveTab(event.detail as any);
+    };
+    
+    window.addEventListener("changeTab", handleTabChange as EventListener);
+    return () => window.removeEventListener("changeTab", handleTabChange as EventListener);
+  }, []);
+
   const [profileNameTag, setProfileNameTag] = useState(""); 
 
+  // Hooks para organizações - só executar se user estiver logado
+  const { userOrganizations, loading: userOrgsLoading } = useUserOrganizations(user?.uid || null);
+  const { userOrganizations: publicOrganizations, loading: publicOrgsLoading } = useOrganizations();
+  const { getRoleName, getRoleEmoji } = useRoleManagement();
+
+  // Pegar a primeira organização do usuário 
+  const userOrg = userOrganizations?.[0] || null;
+  const { membership: userMembership, loading: membershipLoading } = useUserMembership(
+    userOrg?.id || null, 
+    user?.uid || null
+  );
+
+  // Debug: Verificar valores dos hooks
+  console.log('Page.tsx Debug:', {
+    user: user ? `logged in as ${user.uid}` : 'undefined',
+    userOrganizations: userOrganizations?.length || 0,
+    userOrg: userOrg ? `found: ${userOrg.id}` : 'undefined',
+    userMembership: userMembership ? `found: ${userMembership.role}` : 'undefined',
+    userOrgsLoading,
+    membershipLoading
+  });
+
+  // Debug adicional: Verificar se o usuário tem organizações mas não está sendo detectado
+  if (user && userOrganizations && userOrganizations.length > 0) {
+    console.log('Page.tsx - User has organizations:', userOrganizations);
+    console.log('Page.tsx - First organization:', userOrganizations[0]);
+  }
+
 useEffect(() => {
+  console.log('Setting up auth listener...');
   const unsub = onAuthStateChanged(auth, async (u) => {
+    console.log('Auth state changed:', u ? `User logged in: ${u.uid}` : 'User logged out');
     setUser(u);
     if (u) {
       const userDocRef = doc(db, "Users", u.uid);
@@ -168,28 +204,49 @@ useEffect(() => {
   }, [user]);
 
   const handleGoogleLogin = async () => {
-    const auth = getAuth();
-    const provider = new GoogleAuthProvider();
-    const result = await signInWithPopup(auth, provider);
-    const user = result.user;
+    try {
+      console.log('handleGoogleLogin - Iniciando login com Google...');
+      const result = await signInWithPopup(auth, provider);
+      const user = result.user;
+      console.log('handleGoogleLogin - Login bem-sucedido, usuário:', user.uid);
 
-    const userRef = doc(db, "Users", user.uid);
-    const userSnap = await getDoc(userRef);
+      const userRef = doc(db, "Users", user.uid);
+      const userSnap = await getDoc(userRef);
 
-    if (!userSnap.exists()) {
-      // Novo usuário: salva createdAt
-      await setDoc(userRef, {
-        displayName: user.displayName,
-        email: user.email,
-        photoURL: user.photoURL,
-        createdAt: serverTimestamp(), // <-- timestamp para 24h
-      });
-    } else {
-      // Usuário já existe: atualiza dados sem alterar createdAt
-      await updateDoc(userRef, {
-        displayName: user.displayName,
-        email: user.email,
-        photoURL: user.photoURL,
+      if (!userSnap.exists()) {
+        console.log('handleGoogleLogin - Novo usuário, criando documento...');
+        // Novo usuário: salva createdAt
+        await setDoc(userRef, {
+          displayName: user.displayName,
+          email: user.email,
+          photoURL: user.photoURL,
+          createdAt: serverTimestamp(), // <-- timestamp para 24h
+        });
+        console.log('handleGoogleLogin - Documento do usuário criado');
+      } else {
+        console.log('handleGoogleLogin - Usuário existente, atualizando dados...');
+        // Usuário já existe: atualiza dados sem alterar createdAt
+        await updateDoc(userRef, {
+          displayName: user.displayName,
+          email: user.email,
+          photoURL: user.photoURL,
+        });
+        console.log('handleGoogleLogin - Dados do usuário atualizados');
+      }
+    } catch (error: any) {
+      // Tratar erros de popup cancelado pelo usuário sem mostrar erro
+      if (error.code === 'auth/popup-closed-by-user' || error.code === 'auth/cancelled-popup-request') {
+        // Usuário cancelou o login voluntariamente, não mostrar erro
+        console.log('Login cancelado pelo usuário');
+        return;
+      }
+      
+      // Para outros erros, mostrar mensagem
+      console.error('Erro no login:', error);
+      addToast({
+        title: "Erro no Login",
+        description: "Erro ao fazer login. Tente novamente.",
+        color: "danger"
       });
     }
   };
@@ -295,11 +352,24 @@ const handleDeleteComment = async (postId: string, comment: any) => {
     const chatId = [user.uid, c.otherUserId].sort().join("_");
     const chatCol = collection(db, "Chats", chatId, "Messages");
 
-    onSnapshot(query(chatCol, orderBy("createdAt")), (snap) => {
-      const msgs = snap.docs.map((d) => d.data() as ChatMessage);
-      setChatMessages(msgs);
-    });
+    // Configurar listener em tempo real para mensagens com ordenação correta
+    const unsubscribe = onSnapshot(
+      query(chatCol, orderBy("createdAt", "asc")), 
+      (snap) => {
+        console.log('Mensagens recebidas:', snap.docs.length);
+        const msgs = snap.docs.map((d) => {
+          const data = d.data() as ChatMessage;
+          console.log('Mensagem:', data);
+          return data;
+        });
+        setChatMessages(msgs);
+      },
+      (error) => {
+        console.error('Erro no listener de mensagens:', error);
+      }
+    );
 
+    // Marcar mensagens como lidas
     const chatDoc = doc(db, "Chats", chatId);
     getDoc(chatDoc).then((snap) => {
       if (!snap.exists()) return;
@@ -321,34 +391,50 @@ const handleDeleteComment = async (postId: string, comment: any) => {
     const chatDoc = doc(db, "Chats", chatId);
     const chatCol = collection(db, "Chats", chatId, "Messages");
 
-    await addDoc(chatCol, {
-      senderId: user.uid,
-      senderName: user.displayName || user.email?.split("@")[0],
-      senderAvatar: user.photoURL || "",
-      text: chatText.trim(),
-      createdAt: serverTimestamp(),
-    });
+    try {
+      console.log('Enviando mensagem para chatId:', chatId);
+      
+      // Adicionar mensagem à subcoleção
+      await addDoc(chatCol, {
+        senderId: user.uid,
+        senderName: user.displayName || user.email?.split("@")[0],
+        senderAvatar: user.photoURL || "",
+        text: chatText.trim(),
+        createdAt: serverTimestamp(),
+      });
 
-    await setDoc(
-      chatDoc,
-      {
-        participants: [user.uid, showChatWith.otherUserId],
-        names: {
-          [user.uid]: user.displayName || user.email?.split("@")[0],
-          [showChatWith.otherUserId]: showChatWith.otherUserName,
-        },
-        avatars: {
-          [user.uid]: user.photoURL || "",
-          [showChatWith.otherUserId]: showChatWith.otherUserAvatar || "",
-        },
-        lastMessage: chatText.trim(),
-        unreadBy: [showChatWith.otherUserId],
-        updatedAt: serverTimestamp(),
-      },
-      { merge: true }
-    );
+      console.log('Mensagem enviada com sucesso');
 
-    setChatText("");
+      // Atualizar documento principal do chat
+      await setDoc(
+        chatDoc,
+        {
+          participants: [user.uid, showChatWith.otherUserId],
+          names: {
+            [user.uid]: user.displayName || user.email?.split("@")[0],
+            [showChatWith.otherUserId]: showChatWith.otherUserName,
+          },
+          avatars: {
+            [user.uid]: user.photoURL || "",
+            [showChatWith.otherUserId]: showChatWith.otherUserAvatar || "",
+          },
+          lastMessage: chatText.trim(),
+          unreadBy: [showChatWith.otherUserId],
+          updatedAt: serverTimestamp(),
+        },
+        { merge: true }
+      );
+
+      console.log('Documento do chat atualizado');
+      setChatText("");
+    } catch (error) {
+      console.error('Erro ao enviar mensagem:', error);
+      addToast({
+        title: "Erro",
+        description: "Erro ao enviar mensagem. Tente novamente.",
+        color: "danger"
+      });
+    }
   };
 
   const handleProfileSave = async (newName: string) => {
@@ -441,7 +527,7 @@ const handleDeleteComment = async (postId: string, comment: any) => {
   {navigation.map((n) => (
     <NavbarItem key={n.label} isActive={activeTab === n.label}>
       <Tooltip content={n.label} placement="bottom">
-<Button onPress={() => setActiveTab(n.label as "Feed" | "Conversas" | "Criar Organizacão" | "Organizacões")}>
+<Button onPress={() => setActiveTab(n.label as "Feed" | "Conversas" | "Minhas Organizações" | "Explorar Organizações" | "Criar Organização" | "Painel da Organização")}>
           {n.icon}
           {/* Badge vermelho para Conversas */}
           {n.label === "Conversas" && conversas.some((c) => c.unread) && (
@@ -475,7 +561,7 @@ const handleDeleteComment = async (postId: string, comment: any) => {
                 {navigation.map((n) => (
                 <DropdownItem
   key={n.label}
-  onPress={() => setActiveTab(n.label as "Feed" | "Conversas" | "Criar Organizacão" | "Organizacões")}
+  onPress={() => setActiveTab(n.label as "Feed" | "Conversas" | "Minhas Organizações" | "Explorar Organizações" | "Criar Organização" | "Painel da Organização")}
   className="flex items-center justify-between w-full"
 >
                     {/* Ícone + Texto lado a lado */}
@@ -694,17 +780,36 @@ const handleDeleteComment = async (postId: string, comment: any) => {
           />
         )}
 
-          {activeTab === "Criar Organizacão" && (
-    <div>
-      <CriarOrganizacao />
-    </div>
-  )}
+        {activeTab === "Minhas Organizações" && (
+          <MinhasOrganizacoes 
+            user={user}
+            userOrganizations={userOrganizations}
+            loading={userOrgsLoading}
+          />
+        )}
 
-  {activeTab === "Organizacões" && (
-    <div>
-      <Organizacoes />
-    </div>
-  )}
+        {activeTab === "Explorar Organizações" && (
+          <ExplorarOrganizacoes 
+            user={user}
+            organizations={publicOrganizations}
+            loading={publicOrgsLoading}
+          />
+        )}
+
+        {activeTab === "Criar Organização" && (
+          <div>
+            <CriarOrganizacao />
+          </div>
+        )}
+
+        {activeTab === "Painel da Organização" && (
+          <PainelOrganizacao 
+            user={user}
+            userOrg={userOrg}
+            userMembership={userMembership}
+            loading={userOrgsLoading || membershipLoading}
+          />
+        )}
 
         
       </div>
