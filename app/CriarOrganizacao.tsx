@@ -1,345 +1,316 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
-import { db } from "./firebase";
+import React, { useState } from "react";
+import { db, auth } from "./firebase";
 import {
   collection,
   addDoc,
   serverTimestamp,
   doc,
   updateDoc,
-  arrayUnion,
-  arrayRemove,
-  onSnapshot,
-  getDoc,
+  query,
+  where,
+  getDocs,
+  setDoc,
 } from "firebase/firestore";
 import { useAuthState } from "react-firebase-hooks/auth";
-import { auth } from "./firebase";
 import { Input } from "@heroui/input";
 import { Button } from "@heroui/button";
-import { HiOutlineSave, HiOutlineCheck, HiOutlineX, HiOutlineUserRemove, HiOutlineUserAdd, HiOutlineUsers } from "react-icons/hi";
+import { Select, SelectItem } from "@heroui/select";
+import { Input as Textarea } from "@heroui/input";
+import { HiOutlineSave, HiOutlinePlus } from "react-icons/hi";
 import { addToast } from "@heroui/toast";
-import { Card } from "@heroui/card";
-import { Table, TableHeader, TableBody, TableColumn, TableRow, TableCell } from "@heroui/table";
-import { Avatar } from "@heroui/avatar";
-import { Code } from "@heroui/code";
+import { Card, CardBody, CardHeader } from "@heroui/card";
+import { 
+  Organization, 
+  Membership, 
+  OrganizationVisibility
+} from "./types";
+import { validateOrganizationCreation, validateTagFormat } from './utils/validation';
 
-
-interface Organizacao {
-  id: string;
-  nome: string;
-  tag?: string;
-  creatorId: string;
-  members: string[];
-  maxMembros: number;
-  pendingRequests?: string[];
-}
-
-interface User {
-  uid: string;
-  photoURL: string;
-  displayName?: string;
-  email?: string;
-  tag?: string;
-}
-
-export default function CriarOuGerenciarOrganizacao() {
+export default function CriarOrganizacao() {
   const [user] = useAuthState(auth);
   const [nome, setNome] = useState("");
   const [tag, setTag] = useState("");
-  const [myOrg, setMyOrg] = useState<Organizacao | null>(null);
-  const [membersData, setMembersData] = useState<User[]>([]);
-  const [pendingUsers, setPendingUsers] = useState<User[]>([]);
-  const maxMembros = 100;
-
-  // Carrega organização do usuário (criador ou membro)
-  useEffect(() => {
-    if (!user) return;
-
-    const unsub = onSnapshot(collection(db, "Organizacoes"), (snap) => {
-      const list = snap.docs.map((d) => ({ id: d.id, ...d.data() } as Organizacao));
-      const orgDoUsuario = list.find((o) => o.creatorId === user.uid || o.members.includes(user.uid));
-      setMyOrg(orgDoUsuario || null);
-    });
-
-    return () => unsub();
-  }, [user]);
-
-  // Carrega os usuários pendentes
-  useEffect(() => {
-    if (!myOrg?.pendingRequests?.length) {
-      setPendingUsers([]);
-      return;
-    }
-
-    const loadPendingUsers = async () => {
-      try {
-        const docs = await Promise.all(
-          myOrg.pendingRequests!.map((uid) => getDoc(doc(db, "Users", uid)))
-        );
-        const users: User[] = docs.map((d) => ({ uid: d.id, ...d.data() } as User));
-        setPendingUsers(users);
-      } catch (err) {
-        console.error(err);
-        addToast({ title: "Erro", description: "Falha ao carregar usuários pendentes", color: "danger" });
-      }
-    };
-
-    loadPendingUsers();
-  }, [myOrg?.pendingRequests]);
+  const [descricao, setDescricao] = useState("");
+  const [visibilidade, setVisibilidade] = useState<OrganizationVisibility>("public");
+  const [isCreating, setIsCreating] = useState(false);
 
   // Criar organização
   const handleCreate = async () => {
-    if (!user || !nome.trim() || !tag.trim()) {
-      return addToast({ title: "Erro", description: "Nome e tag são obrigatórios", color: "danger" });
+    if (!user) {
+      addToast({
+        title: "Erro",
+        description: "Usuário não autenticado. Faça login para criar uma organização.",
+        color: "danger"
+      });
+      return;
     }
 
+    // Validar dados da organização
+    const orgValidation = validateOrganizationCreation({
+      name: nome,
+      tag: tag,
+      description: descricao
+    });
+
+    if (!orgValidation.valid) {
+      addToast({
+        title: "Erro de Validação",
+        description: orgValidation.reason,
+        color: "danger"
+      });
+      return;
+    }
+
+    // Validar formato da tag
+    const tagValidation = validateTagFormat(tag);
+    if (!tagValidation.valid) {
+      addToast({
+        title: "Erro na Tag",
+        description: tagValidation.reason,
+        color: "danger"
+      });
+      return;
+    }
+
+    setIsCreating(true);
+
     try {
-      const orgRef = await addDoc(collection(db, "Organizacoes"), {
-        nome: nome.trim(),
-        tag: tag.trim(),
-        creatorId: user.uid,
-        members: [user.uid],
-        maxMembros,
-        createdAt: serverTimestamp(),
-        pendingRequests: [],
+      // Verificar se a tag já existe
+      const tagQuery = query(
+        collection(db, "organizations"),
+        where("tag", "==", tag.toLowerCase().trim())
+      );
+      const tagSnapshot = await getDocs(tagQuery);
+
+      if (!tagSnapshot.empty) {
+        addToast({
+          title: "Tag Indisponível",
+          description: "Esta tag já está em uso. Escolha outra.",
+          color: "danger"
+        });
+        setIsCreating(false);
+        return;
+      }
+
+      const slug = nome.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
+
+      // Validar campos obrigatórios antes de enviar para Firebase
+      if (!visibilidade || (visibilidade !== 'public' && visibilidade !== 'private')) {
+        addToast({
+          title: "Erro de Validação",
+          description: "Visibilidade deve ser 'public' ou 'private'",
+          color: "danger"
+        });
+        setIsCreating(false);
+        return;
+      }
+
+      // Criar organização
+      const orgData: Omit<Organization, 'id'> = {
+        name: nome.trim(),
+        tag: tag.toLowerCase().trim(),
+        slug,
+        description: descricao.trim() || undefined,
+        visibility: visibilidade as OrganizationVisibility,
+        ownerId: user.uid,
+        createdAt: serverTimestamp() as any,
+        updatedAt: serverTimestamp() as any,
+        memberCount: 1,
+        maxMembers: 50,
+        region: "BR", // Padrão para Brasil
+        game: "CODM", // Padrão 
+        settings: {
+          allowPublicJoin: visibilidade === 'public',
+          requireApproval: true
+        }
+      };
+
+      console.log('🔧 Criando nova organização:', orgData);
+      const orgRef = await addDoc(collection(db, "organizations"), orgData);
+      console.log('✅ Organização criada com ID:', orgRef.id);
+
+      // Criar membership para o owner
+      const membershipData: Omit<Membership, 'id'> = {
+        organizationId: orgRef.id,
+        userId: user.uid,
+        role: 'owner',
+        status: 'accepted',
+        joinedAt: serverTimestamp() as any,
+        updatedAt: serverTimestamp() as any,
+        invitedBy: user.uid,
+        invitedAt: serverTimestamp() as any,
+        roleHistory: []
+      };
+
+      // Criar membership na subcoleção da organização usando setDoc para definir o ID
+      console.log('🔧 Criando membership na subcoleção:', `organizations/${orgRef.id}/memberships/${user.uid}`);
+      await setDoc(doc(db, `organizations/${orgRef.id}/memberships`, user.uid), membershipData);
+      console.log('✅ Membership criado na subcoleção com sucesso');
+
+      // Também criar na coleção global de memberships para consultas gerais
+      console.log('🔧 Criando membership na coleção global...');
+      await addDoc(collection(db, "memberships"), membershipData);
+      console.log('✅ Membership criado na coleção global com sucesso');
+
+      // Atualizar perfil do usuário
+      const userRef = doc(db, "Users", user.uid);
+      await updateDoc(userRef, {
+        organizationTag: tag.toLowerCase().trim(),
+        organizationRole: 'owner',
+        updatedAt: serverTimestamp()
       });
 
-      const userRef = doc(db, "Users", user.uid);
-      await updateDoc(userRef, { tag: tag.trim() });
+      addToast({
+        title: "Organização Criada!",
+        description: `"${nome}" foi criada com sucesso! Você agora é o proprietário.`,
+        color: "success"
+      });
 
-      addToast({ title: "Sucesso", description: "Organização criada!", color: "success" });
+      // Limpar formulário
       setNome("");
       setTag("");
-    } catch (err) {
-      console.error(err);
-      addToast({ title: "Erro", description: "Falha ao criar organização", color: "danger" });
-    }
-  };
+      setDescricao("");
+      setVisibilidade("public");
 
-  // Aprovar membro
-  const handleApprove = async (userId: string) => {
-    if (!myOrg || !user) return;
-    if (myOrg.members.length >= myOrg.maxMembros) {
-      return addToast({ title: "Erro", description: "Número máximo de membros atingido", color: "danger" });
-    }
-
-    try {
-      const orgRef = doc(db, "Organizacoes", myOrg.id);
-      const userRef = doc(db, "Users", userId);
-
-      await updateDoc(orgRef, {
-        members: arrayUnion(userId),
-        pendingRequests: arrayRemove(userId),
+    } catch (error) {
+      console.error("Erro ao criar organização:", error);
+      addToast({
+        title: "Erro Interno",
+        description: "Erro ao criar organização. Verifique sua conexão e tente novamente.",
+        color: "danger"
       });
-
-      await updateDoc(userRef, { tag: myOrg.tag || null });
-
-      addToast({ title: "Aprovado", description: "Usuário adicionado à organização", color: "success" });
-    } catch (err) {
-      console.error(err);
-      addToast({ title: "Erro", description: "Falha ao aprovar usuário", color: "danger" });
+    } finally {
+      setIsCreating(false);
     }
   };
 
-  // Rejeitar membro
-  const handleReject = async (userId: string) => {
-    if (!myOrg) return;
-    try {
-      const orgRef = doc(db, "Organizacoes", myOrg.id);
-      await updateDoc(orgRef, { pendingRequests: arrayRemove(userId) });
-      addToast({ title: "Rejeitado", description: "Usuário removido da fila", color: "warning" });
-    } catch (err) {
-      console.error(err);
-      addToast({ title: "Erro", description: "Falha ao rejeitar usuário", color: "danger" });
-    }
-  };
-
-  // Buscar membros completos
-  const loadMembers = async () => {
-    if (!myOrg) return;
-
-    try {
-      const membersDocs = await Promise.all(myOrg.members.map((uid) => getDoc(doc(db, "Users", uid))));
-      const users: User[] = membersDocs.map((d) => ({ uid: d.id, ...d.data() } as User));
-      // Criador sempre em primeiro
-      users.sort((a, b) => (a.uid === myOrg.creatorId ? -1 : b.uid === myOrg.creatorId ? 1 : 0));
-      setMembersData(users);
-    } catch (err) {
-      console.error(err);
-      addToast({ title: "Erro", description: "Falha ao carregar membros", color: "danger" });
-    }
-  };
-
-  // Remover membro
-  const handleRemoveMember = async (uid: string) => {
-    if (!myOrg) return;
-
-    if (uid === myOrg.creatorId) {
-      return addToast({ title: "Erro", description: "Não é possível remover o criador", color: "danger" });
-    }
-
-    try {
-      const orgRef = doc(db, "Organizacoes", myOrg.id);
-      const userRef = doc(db, "Users", uid);
-
-      await updateDoc(orgRef, { members: arrayRemove(uid) });
-      await updateDoc(userRef, { tag: null });
-
-      addToast({ title: "Removido", description: "Membro removido da organização", color: "warning" });
-
-      loadMembers();
-    } catch (err) {
-      console.error(err);
-      addToast({ title: "Erro", description: "Falha ao remover membro", color: "danger" });
-    }
-  };
-
-  // Carrega membros automaticamente assim que myOrg mudar
-useEffect(() => {
-  if (!myOrg) return;
-
-  const loadMembers = async () => {
-    try {
-      const membersDocs = await Promise.all(
-        myOrg.members.map((uid) => getDoc(doc(db, "Users", uid)))
-      );
-      const users: User[] = membersDocs.map((d) => ({ uid: d.id, ...d.data() } as User));
-
-      // Criador sempre primeiro
-      users.sort((a, b) => (a.uid === myOrg.creatorId ? -1 : b.uid === myOrg.creatorId ? 1 : 0));
-      setMembersData(users);
-    } catch (err) {
-      console.error(err);
-      addToast({ title: "Erro", description: "Falha ao carregar membros", color: "danger" });
-    }
-  };
-
-  loadMembers();
-}, [myOrg]);
-
- // Render
-if (myOrg) {
-  if (user?.uid === myOrg.creatorId) {
-    // Criador vê o painel completo
+  // Se não estiver logado, mostrar mensagem
+  if (!user) {
     return (
-      <Card className="max-w-2xl mx-auto p-4">
-        <h2 className="text-lg font-semibold mb-4">{myOrg.nome}</h2>
-
-    <div className="w-max mb-2">
-                    <Code color="primary" className="flex items-center">
-                        <HiOutlineUserAdd className="mr-2" /> Solicitações
-                    </Code>
-                </div>
-  {/* Solicitações */}
-          {pendingUsers.length ? (
-            <Table className="mb-4">
-              <TableHeader>
-                <TableColumn>Avatar</TableColumn>
-                <TableColumn>Nome</TableColumn>
-                <TableColumn>Email</TableColumn>
-                <TableColumn>Ações</TableColumn>
-              </TableHeader>
-              <TableBody>
-                {pendingUsers.map((u) => (
-                  <TableRow key={u.uid}>
-                    <TableCell>
-                      <Avatar src={u.photoURL || "/default-avatar.png"} alt={u.displayName || u.email || "Usuário"} />
-                    </TableCell>
-                    <TableCell>{u.displayName || u.uid}</TableCell>
-                    <TableCell>{u.email || "-"}</TableCell>
-                    <TableCell>
-                      <div className="flex gap-1">
-                        <Button color="success" size="sm" onPress={() => handleApprove(u.uid)}>
-                          <HiOutlineCheck className="w-4 h-4" />
-                        </Button>
-                        <Button color="danger" size="sm" onPress={() => handleReject(u.uid)}>
-                          <HiOutlineX className="w-4 h-4" />
-                        </Button>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          ) : (
-            <div className="mb-4">Nenhuma solicitação pendente.</div>
-          )}
-
-              <div className="w-max mb-2">
-                    <Code color="danger" className="flex items-center">
-                        <HiOutlineUsers className="mr-2" /> Membros
-                    </Code>
-                </div>
-   {membersData.length > 0 && (
-  <Table className="mt-2">
-    <TableHeader>
-      <TableColumn>Avatar</TableColumn>
-      <TableColumn>Nome</TableColumn>
-      <TableColumn>Email</TableColumn>
-      <TableColumn>Ações</TableColumn>
-    </TableHeader>
-    <TableBody>
-      {membersData.map((m) => (
-        <TableRow key={m.uid}>
-          <TableCell>
-            <Avatar src={m.photoURL || "/default-avatar.png"} alt={m.displayName || m.email || "Usuário"} />
-          </TableCell>
-          <TableCell>
-            {m.displayName} {m.uid === myOrg?.creatorId && <strong>(Criador)</strong>}
-          </TableCell>
-          <TableCell>{m.email || "-"}</TableCell>
-          <TableCell>
-            {m.uid !== myOrg?.creatorId && (
-              <Button color="danger" size="sm" onPress={() => handleRemoveMember(m.uid)}>
-                <HiOutlineUserRemove className="w-4 h-4" />
-              </Button>
-            )}
-          </TableCell>
-        </TableRow>
-      ))}
-    </TableBody>
-  </Table>
-)}
-   
-      </Card>
-    );
-  } else {
-    // Membro comum vê apenas mensagem
-    return (
-      <div className="max-w-md mx-auto p-4">
-        <h2 className="text-lg font-semibold mb-4">
-          Você já pertence à organização: {myOrg.nome}
-        </h2>
+      <div className="max-w-2xl mx-auto p-6">
+        <Card>
+          <CardBody className="text-center py-12">
+            <HiOutlinePlus className="w-16 h-16 text-gray-400 mx-auto mb-4" />
+            <h2 className="text-xl font-semibold mb-2">Faça Login para Criar uma Organização</h2>
+            <p className="text-gray-600">
+              Você precisa estar logado para criar uma nova organização.
+            </p>
+          </CardBody>
+        </Card>
       </div>
     );
   }
-}
 
-// Caso contrário, criar organização
-return (
-  <Card className="max-w-md mx-auto p-4">
-    <h2 className="text-lg font-semibold mb-4">Criar Organização</h2>
+  // Formulário de criação de organização
+  return (
+    <div className="max-w-2xl mx-auto p-6">
+      <Card>
+        <CardHeader>
+          <div className="flex items-center gap-3">
+            <HiOutlinePlus className="w-6 h-6 text-primary" />
+            <div>
+              <h1 className="text-2xl font-bold">Criar Nova Organização</h1>
+              <p className="text-gray-600">
+                Crie sua organização e comece a gerenciar sua equipe
+              </p>
+            </div>
+          </div>
+        </CardHeader>
+        <CardBody className="space-y-4">
+          <div className="bg-gray-800 border border-gray-700 rounded-lg p-4 mb-4">
+            <h3 className="font-semibold text-gray-200 mb-2">📋 Regras de Criação</h3>
+            <ul className="text-sm text-gray-300 space-y-1">
+              <li>• Qualquer usuário autenticado pode criar organizações</li>
+              <li>• Você se tornará automaticamente o Owner da organização</li>
+              <li>• Seu cargo atual em outras organizações não interfere aqui</li>
+              <li>• Você pode criar múltiplas organizações</li>
+            </ul>
+          </div>
 
-    <Input
-      type="text"
-      placeholder="Nome da organização"
-      value={nome}
-      onChange={(e) => setNome(e.target.value)}
-      className="mb-3"
-    />
+          <Input
+            label="Nome da Organização"
+            placeholder="Digite o nome da sua organização"
+            value={nome}
+            onChange={(e) => setNome(e.target.value)}
+            isRequired
+            isDisabled={isCreating}
+          />
 
-    <Input
-      type="text"
-      placeholder="Tag da organização"
-      value={tag}
-      onChange={(e) => setTag(e.target.value)}
-      className="mb-3"
-    />
+          <Input
+            label="Tag da Organização"
+            placeholder="tag-unica"
+            value={tag}
+            onChange={(e) => setTag(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ''))}
+            description="Apenas letras minúsculas, números e hífens. Esta será a identificação única da sua organização."
+            isRequired
+            isDisabled={isCreating}
+          />
 
-    <Button color="primary" onPress={handleCreate}>
-      <HiOutlineSave className="w-4 h-4 mr-1" /> Criar
-    </Button>
-  </Card>
-);
+          <Textarea
+            label="Descrição (opcional)"
+            placeholder="Descreva sua organização..."
+            value={descricao}
+            onChange={(e) => setDescricao(e.target.value)}
+            isDisabled={isCreating}
+          />
+
+          <Select
+            label="Visibilidade"
+            placeholder="Selecione a visibilidade"
+            selectedKeys={new Set([visibilidade])}
+            onSelectionChange={(keys) => {
+              const selected = Array.from(keys)[0] as OrganizationVisibility;
+              setVisibilidade(selected);
+            }}
+            isDisabled={isCreating}
+          >
+            <SelectItem key="public">
+              <div className="flex items-center gap-2">
+                <span>🌍</span>
+                <div>
+                  <div className="font-medium">Pública</div>
+                  <div className="text-xs text-gray-500">
+                    Visível para todos usuários autenticados. Lista e página da organização são públicas.
+                  </div>
+                </div>
+              </div>
+            </SelectItem>
+            <SelectItem key="private">
+              <div className="flex items-center gap-2">
+                <span>🔒</span>
+                <div>
+                  <div className="font-medium">Privada</div>
+                  <div className="text-xs text-gray-500">
+                    Apenas membros com status "accepted" podem ver a organização.
+                  </div>
+                </div>
+              </div>
+            </SelectItem>
+          </Select>
+
+          <div className="flex gap-3 pt-4">
+            <Button 
+              color="primary" 
+              onPress={handleCreate}
+              isDisabled={!nome.trim() || !tag.trim() || isCreating}
+              isLoading={isCreating}
+              startContent={!isCreating && <HiOutlineSave className="w-4 h-4" />}
+              className="flex-1"
+            >
+              {isCreating ? "Criando..." : "Criar Organização"}
+            </Button>
+          </div>
+
+          <div className="text-xs text-gray-500 mt-4">
+            <p>
+              <strong>Nota:</strong> Após criar a organização, você poderá gerenciá-la através do 
+              painel "Minhas Organizações" ou "Painel da Organização".
+            </p>
+          </div>
+        </CardBody>
+      </Card>
+    </div>
+  );
 }
