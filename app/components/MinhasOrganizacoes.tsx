@@ -1,0 +1,184 @@
+"use client";
+
+import React from 'react';
+import { Card, CardBody, CardHeader } from '@heroui/card';
+import { Chip } from '@heroui/chip';
+import { Avatar } from '@heroui/avatar';
+import { Button } from '@heroui/button';
+import { Spinner } from '@heroui/spinner';
+import { HiOutlinePlus, HiOutlineUsers, HiOutlineCog, HiOutlineEye } from 'react-icons/hi';
+import { Organization } from '../types';
+import { User } from 'firebase/auth';
+import { useRoleManagement } from '../hooks/useRoleManagement';
+
+interface MinhasOrganizacoesProps {
+  user: User | null;
+  userOrganizations: Organization[];
+  loading: boolean;
+}
+
+const MinhasOrganizacoes: React.FC<MinhasOrganizacoesProps> = ({
+  user,
+  userOrganizations,
+  loading
+}) => {
+  const { getRoleName, getRoleEmoji } = useRoleManagement();
+
+  if (!user) {
+    return (
+      <div className="text-center py-8">
+        <p className="text-gray-500">Faça login para ver suas organizações</p>
+      </div>
+    );
+  }
+
+  if (loading) {
+    return (
+      <div className="flex justify-center py-8">
+        <Spinner size="lg" />
+      </div>
+    );
+  }
+
+  if (userOrganizations.length === 0) {
+    return (
+      <div className="text-center py-12">
+        <div className="mb-6">
+          <HiOutlineUsers className="w-16 h-16 text-gray-400 mx-auto mb-4" />
+          <h3 className="text-xl font-semibold text-gray-700 mb-2">
+            Nenhuma Organização Encontrada
+          </h3>
+          <p className="text-gray-500 mb-6">
+            Você ainda não faz parte de nenhuma organização. Crie uma nova ou explore organizações da comunidade para se juntar.
+          </p>
+        </div>
+        <div className="flex gap-4 justify-center">
+          <Button 
+            color="primary" 
+            startContent={<HiOutlinePlus className="w-4 h-4" />}
+            onClick={() => {
+              // Navegar para criar organização
+              const event = new CustomEvent('changeTab', { detail: 'Criar Organização' });
+              window.dispatchEvent(event);
+            }}
+          >
+            Criar Organização
+          </Button>
+          <Button 
+            variant="bordered" 
+            startContent={<HiOutlineEye className="w-4 h-4" />}
+            onClick={() => {
+              // Navegar para explorar organizações
+              const event = new CustomEvent('changeTab', { detail: 'Explorar Organizações' });
+              window.dispatchEvent(event);
+            }}
+          >
+            Explorar Organizações
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      <div className="flex justify-between items-center">
+        <div>
+          <h2 className="text-2xl font-bold text-gray-800">Minhas Organizações</h2>
+          <p className="text-gray-600">Gerencie suas organizações e veja seu status</p>
+        </div>
+        <Button 
+          color="primary" 
+          startContent={<HiOutlinePlus className="w-4 h-4" />}
+          onClick={() => {
+            const event = new CustomEvent('changeTab', { detail: 'Criar Organização' });
+            window.dispatchEvent(event);
+          }}
+        >
+          Nova Organização
+        </Button>
+      </div>
+
+      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+        {userOrganizations.map((org) => (
+          <Card key={org.id} className="hover:shadow-lg transition-shadow">
+            <CardHeader className="pb-2">
+              <div className="flex items-center gap-3 w-full">
+                <Avatar
+                  src={org.logoURL}
+                  name={org.name}
+                  size="md"
+                  className="flex-shrink-0"
+                />
+                <div className="flex-1 min-w-0">
+                  <h3 className="font-semibold text-lg truncate">{org.name}</h3>
+                  <div className="flex items-center gap-2">
+                    <Chip size="sm" variant="flat" color="primary">
+                      {org.tag}
+                    </Chip>
+                    {org.ownerId === user.uid && (
+                      <Chip 
+                        size="sm" 
+                        variant="flat" 
+                        color="warning"
+                        startContent={<span className="text-xs">👑</span>}
+                      >
+                        {getRoleName('owner')}
+                      </Chip>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </CardHeader>
+            
+            <CardBody className="pt-0">
+              <div className="space-y-3">
+                <p className="text-sm text-gray-600 line-clamp-2">
+                  {org.description || "Sem descrição"}
+                </p>
+                
+                <div className="flex items-center justify-between text-sm">
+                  <div className="flex items-center gap-1 text-gray-500">
+                    <HiOutlineUsers className="w-4 h-4" />
+                    <span>{org.memberCount || 1} membros</span>
+                  </div>
+                  <Chip 
+                    size="sm" 
+                    variant="dot" 
+                    color={org.visibility === 'public' ? 'success' : 'default'}
+                  >
+                    {org.visibility === 'public' ? 'Pública' : 'Privada'}
+                  </Chip>
+                </div>
+
+                <div className="flex gap-2 pt-2">
+                  <Button 
+                    size="sm" 
+                    variant="flat" 
+                    color="primary"
+                    startContent={<HiOutlineCog className="w-3 h-3" />}
+                    onClick={() => {
+                      const event = new CustomEvent('changeTab', { detail: 'Painel da Organização' });
+                      window.dispatchEvent(event);
+                    }}
+                  >
+                    Gerenciar
+                  </Button>
+                  <Button 
+                    size="sm" 
+                    variant="bordered"
+                    startContent={<HiOutlineEye className="w-3 h-3" />}
+                  >
+                    Ver Detalhes
+                  </Button>
+                </div>
+              </div>
+            </CardBody>
+          </Card>
+        ))}
+      </div>
+    </div>
+  );
+};
+
+export default MinhasOrganizacoes;
