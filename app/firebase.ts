@@ -1,19 +1,21 @@
-// src/app/firebase.ts
-import { initializeApp } from "firebase/app";
+import { initializeApp, getApps, getApp } from "firebase/app";
 import { getFirestore } from "firebase/firestore";
 import { getAuth, GoogleAuthProvider } from "firebase/auth";
 
+// Chave Principal do Firebase do Projeto
 const firebaseConfig = {
-  apiKey: "AIzaSyBZl9_FYc-wndFiFSrzN8RNJHrlR6VV5MY",
-  authDomain: "coach-bc3b3.firebaseapp.com",
-  projectId: "coach-bc3b3",
-  storageBucket: "coach-bc3b3.appspot.com",
-  messagingSenderId: "672742580848",
-  appId: "1:672742580848:web:34dfa4f35be4a470950ab5",
+  apiKey: "AIzaSyC9b62CSL3fEwR2Z0s5757B3aXvrkhfvK4",
+  authDomain: "codmsocial-e2649.firebaseapp.com",
+  projectId: "codmsocial-e2649",
+  storageBucket: "codmsocial-e2649.firebasestorage.app",
+  messagingSenderId: "753477650265",
+  appId: "1:753477650265:web:2209a48126e572c824ae48"
 };
 
-const app = initializeApp(firebaseConfig);
+// Inicializa o Firebase apenas se não existir uma instância
+const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
+const db = getFirestore(app);
+const auth = getAuth(app);
+const provider = new GoogleAuthProvider();
 
-export const db = getFirestore(app);
-export const auth = getAuth(app);
-export const provider = new GoogleAuthProvider();
+export { db, auth, provider };
