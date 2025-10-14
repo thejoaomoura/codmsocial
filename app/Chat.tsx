@@ -79,7 +79,7 @@ const Chat: React.FC<ChatProps> = ({
         case "user":
           return (
             <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              <Avatar src={c.otherUserAvatar} alt={c.otherUserName} />
+              <Avatar src={c.otherUserAvatar} alt={c.otherUserName} aria-label={`Avatar de ${c.otherUserName}`} />
             </div>
           );
         case "lastMessage":
@@ -113,6 +113,7 @@ const Chat: React.FC<ChatProps> = ({
             isClearable
             style={{ marginBottom: 0 }}
             startContent={<HiOutlineSearch style={{ fontSize: 18, color: "#6b7280" }} />}
+            aria-label="Campo de busca para filtrar conversas"
           />
           <Table className="mt-2">
             <TableHeader columns={columns}>
@@ -139,7 +140,7 @@ const Chat: React.FC<ChatProps> = ({
     >
   <DrawerContent>
     <DrawerHeader style={{ display: "flex", alignItems: "center", gap: 8 }}>
-      <Avatar src={showChatWith?.otherUserAvatar} alt={showChatWith?.otherUserName} />
+      <Avatar src={showChatWith?.otherUserAvatar} alt={showChatWith?.otherUserName} aria-label={`Avatar de ${showChatWith?.otherUserName}`} />
       <span>{showChatWith?.otherUserName}</span>
     </DrawerHeader>
 
@@ -185,8 +186,9 @@ const Chat: React.FC<ChatProps> = ({
         onChange={(e) => setChatText(e.target.value)}
         placeholder="Digite sua mensagem..."
         style={{ flex: 1, padding: 8, borderRadius: 4 }}
+        aria-label="Campo para digitar mensagem"
       />
-      <Button color="primary" onPress={sendMessage}>
+      <Button color="primary" onPress={sendMessage} aria-label="Enviar mensagem">
                 <HiArrowRight className="w-3 h-3" />
       </Button>
     </DrawerFooter>
