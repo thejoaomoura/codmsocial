@@ -15,12 +15,16 @@ interface MinhasOrganizacoesProps {
   user: User | null;
   userOrganizations: Organization[];
   loading: boolean;
+  selectedOrgId?: string | null;
+  onSelectOrganization?: (orgId: string) => void;
 }
 
 const MinhasOrganizacoes: React.FC<MinhasOrganizacoesProps> = ({
   user,
   userOrganizations,
-  loading
+  loading,
+  selectedOrgId,
+  onSelectOrganization
 }) => {
   const { getRoleName, getRoleEmoji } = useRoleManagement();
 
@@ -100,82 +104,101 @@ const MinhasOrganizacoes: React.FC<MinhasOrganizacoesProps> = ({
       </div>
 
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-        {userOrganizations.map((org) => (
-          <Card key={org.id} className="hover:shadow-lg transition-shadow">
-            <CardHeader className="pb-2">
-              <div className="flex items-center gap-3 w-full">
-                <Avatar
-                  src={org.logoURL}
-                  name={org.name}
-                  size="md"
-                  className="flex-shrink-0"
-                />
-                <div className="flex-1 min-w-0">
-                  <h3 className="font-semibold text-lg truncate">{org.name}</h3>
-                  <div className="flex items-center gap-2">
-                    <Chip size="sm" variant="flat" color="primary">
-                      {org.tag}
-                    </Chip>
-                    {org.ownerId === user.uid && (
-                      <Chip 
-                        size="sm" 
-                        variant="flat" 
-                        color="warning"
-                        startContent={<span className="text-xs">👑</span>}
-                      >
-                        {getRoleName('owner')}
+        {userOrganizations.map((org) => {
+          const isSelected = selectedOrgId === org.id;
+          return (
+            <Card 
+              key={org.id} 
+              className={`hover:shadow-lg transition-all cursor-pointer ${
+                isSelected ? 'ring-2 ring-primary border-primary' : ''
+              }`}
+              onClick={() => onSelectOrganization?.(org.id)}
+            >
+              <CardHeader className="pb-2">
+                <div className="flex items-center gap-3 w-full">
+                  <Avatar
+                    src={org.logoURL}
+                    name={org.name}
+                    size="md"
+                    className="flex-shrink-0"
+                  />
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <h3 className="font-semibold text-lg truncate">{org.name}</h3>
+                      {isSelected && (
+                        <Chip size="sm" color="primary" variant="flat">
+                          Selecionada
+                        </Chip>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Chip size="sm" variant="flat" color="primary">
+                        {org.tag}
                       </Chip>
-                    )}
+                      {org.ownerId === user.uid && (
+                        <Chip 
+                          size="sm" 
+                          variant="flat" 
+                          color="warning"
+                          startContent={<span className="text-xs">👑</span>}
+                        >
+                          {getRoleName('owner')}
+                        </Chip>
+                      )}
+                    </div>
                   </div>
                 </div>
-              </div>
-            </CardHeader>
-            
-            <CardBody className="pt-0">
-              <div className="space-y-3">
-                <p className="text-sm text-gray-600 line-clamp-2">
-                  {org.description || "Sem descrição"}
-                </p>
-                
-                <div className="flex items-center justify-between text-sm">
-                  <div className="flex items-center gap-1 text-gray-500">
-                    <HiOutlineUsers className="w-4 h-4" />
-                    <span>{org.memberCount || 1} membros</span>
+              </CardHeader>
+              
+              <CardBody className="pt-0">
+                <div className="space-y-3">
+                  <p className="text-sm text-gray-600 line-clamp-2">
+                    {org.description || "Sem descrição"}
+                  </p>
+                  
+                  <div className="flex items-center justify-between text-sm">
+                    <div className="flex items-center gap-1 text-gray-500">
+                      <HiOutlineUsers className="w-4 h-4" />
+                      <span>{org.memberCount || 1} membros</span>
+                    </div>
+                    <Chip 
+                      size="sm" 
+                      variant="dot" 
+                      color={org.visibility === 'public' ? 'success' : 'default'}
+                    >
+                      {org.visibility === 'public' ? 'Pública' : 'Privada'}
+                    </Chip>
                   </div>
-                  <Chip 
-                    size="sm" 
-                    variant="dot" 
-                    color={org.visibility === 'public' ? 'success' : 'default'}
-                  >
-                    {org.visibility === 'public' ? 'Pública' : 'Privada'}
-                  </Chip>
-                </div>
 
-                <div className="flex gap-2 pt-2">
-                  <Button 
-                    size="sm" 
-                    variant="flat" 
-                    color="primary"
-                    startContent={<HiOutlineCog className="w-3 h-3" />}
-                    onClick={() => {
-                      const event = new CustomEvent('changeTab', { detail: 'Painel da Organização' });
-                      window.dispatchEvent(event);
-                    }}
-                  >
-                    Gerenciar
-                  </Button>
-                  <Button 
-                    size="sm" 
-                    variant="bordered"
-                    startContent={<HiOutlineEye className="w-3 h-3" />}
-                  >
-                    Ver Detalhes
-                  </Button>
+                  <div className="flex gap-2 pt-2">
+                    <Button 
+                      size="sm" 
+                      variant="flat" 
+                      color="primary"
+                      startContent={<HiOutlineCog className="w-3 h-3" />}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onSelectOrganization?.(org.id);
+                        const event = new CustomEvent('changeTab', { detail: 'Painel da Organização' });
+                        window.dispatchEvent(event);
+                      }}
+                    >
+                      Gerenciar
+                    </Button>
+                    <Button 
+                      size="sm" 
+                      variant="bordered"
+                      startContent={<HiOutlineEye className="w-3 h-3" />}
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      Ver Detalhes
+                    </Button>
+                  </div>
                 </div>
-              </div>
-            </CardBody>
-          </Card>
-        ))}
+              </CardBody>
+            </Card>
+          );
+        })}
       </div>
     </div>
   );

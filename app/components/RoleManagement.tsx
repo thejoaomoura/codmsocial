@@ -74,9 +74,8 @@ const RoleChangeModal: React.FC<RoleChangeModalProps> = ({
   }, [isOpen, member]);
 
   const handleConfirm = async () => {
-    if (!member || !selectedRole || selectedRole === '') return;
+    if (!member || selectedRole === '') return;
 
-    // Validar alteração de cargo usando o hook de role management
     const validation = validateRoleChange(
       currentUserRole,
       member.userId,

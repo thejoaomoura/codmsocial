@@ -142,6 +142,7 @@ export interface Event {
 }
 
 export interface EventRegistration {
+  id?: string; // ID do documento
   eventId: string;
   orgId: string;
   managerId: string; // quem inscreveu a organização
