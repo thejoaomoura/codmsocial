@@ -8,6 +8,7 @@ import { Button } from '@heroui/button';
 import { Spinner } from '@heroui/spinner';
 import { Tabs, Tab } from '@heroui/tabs';
 import { Input } from '@heroui/input';
+import { Select, SelectItem } from '@heroui/select';
 import { 
   HiOutlineUsers, 
   HiOutlineCog, 
@@ -19,12 +20,14 @@ import {
   HiOutlineX,
   HiOutlinePhotograph,
   HiOutlineUpload,
-  HiOutlineTrash
+  HiOutlineTrash,
+  HiOutlineEye,
+  HiOutlineLockClosed
 } from 'react-icons/hi';
 import { Organization, Membership } from '../types';
 import { User } from 'firebase/auth';
 import { useRoleManagement } from '../hooks/useRoleManagement';
-import { useMembersWithUserData } from '../hooks/useMemberships';
+import { useMembersWithUserData, usePendingMemberships } from '../hooks/useMemberships';
 import RoleManagement from './RoleManagement';
 import InviteSystem from './InviteSystem';
 import EventsManagement from './EventsManagement';
@@ -70,7 +73,8 @@ const PainelOrganizacao: React.FC<PainelOrganizacaoProps> = ({
     name: userOrg?.name || '',
     tag: userOrg?.tag || '',
     description: userOrg?.description || '',
-    logoURL: userOrg?.logoURL || ''
+    logoURL: userOrg?.logoURL || '',
+    visibility: userOrg?.visibility || 'public'
   });
   const [settingsLoading, setSettingsLoading] = useState(false);
   const [tagValidation, setTagValidation] = useState({ isValid: true, message: '' });
@@ -79,6 +83,9 @@ const PainelOrganizacao: React.FC<PainelOrganizacaoProps> = ({
   
   // Carregar membros da organização
   const { membersWithData: members, loading: membersLoading } = useMembersWithUserData(userOrg?.id || "");
+  
+  // Carregar memberships pendentes
+  const { pendingMemberships, loading: pendingLoading } = usePendingMemberships(userOrg?.id || "");
 
   if (!user) {
     return (
@@ -221,6 +228,7 @@ const PainelOrganizacao: React.FC<PainelOrganizacaoProps> = ({
         tag: orgSettings.tag.trim(),
         description: orgSettings.description.trim(),
         logoURL: orgSettings.logoURL.trim() || null,
+        visibility: orgSettings.visibility,
         updatedAt: serverTimestamp()
       });
 
@@ -292,7 +300,8 @@ const PainelOrganizacao: React.FC<PainelOrganizacaoProps> = ({
       name: userOrg?.name || '',
       tag: userOrg?.tag || '',
       description: userOrg?.description || '',
-      logoURL: userOrg?.logoURL || ''
+      logoURL: userOrg?.logoURL || '',
+      visibility: userOrg?.visibility || 'public'
     });
     setTagValidation({ isValid: true, message: '' });
   };
@@ -411,7 +420,7 @@ const PainelOrganizacao: React.FC<PainelOrganizacaoProps> = ({
               <Card>
                 <CardBody className="text-center">
                   <div className="text-2xl font-bold text-purple-600">
-                    {0 /* TODO: Implementar contagem via memberships pendentes */}
+                    {pendingLoading ? '...' : pendingMemberships.length}
                   </div>
                   <div className="text-sm text-gray-600">Solicitações Pendentes</div>
                 </CardBody>
@@ -683,11 +692,11 @@ const PainelOrganizacao: React.FC<PainelOrganizacaoProps> = ({
               <Card>
                 <CardHeader>
                  <div className="mt-2">
-    <h3 className="text-lg font-semibold">Configurações da Organização</h3>
-    <p className="text-sm text-gray-500">
-      Edite as informações básicas da sua organização
-    </p>
-  </div>
+                  <h3 className="text-lg font-semibold">Configurações da Organização</h3>
+                  <p className="text-sm text-gray-500">
+                    Edite as informações básicas da sua organização
+                  </p>
+                </div>
                 </CardHeader>
                 <CardBody>
                   <div className="space-y-4">
@@ -765,6 +774,36 @@ const PainelOrganizacao: React.FC<PainelOrganizacaoProps> = ({
                       description="Descrição da organização (máximo 500 caracteres)"
                     />
 
+                    {/* Visibilidade da Organização */}
+                    <Select
+                      label="Visibilidade da Organização"
+                      placeholder="Selecione a visibilidade"
+                      selectedKeys={[orgSettings.visibility]}
+                      onSelectionChange={(keys) => {
+                        const selectedKey = Array.from(keys)[0] as string;
+                        setOrgSettings(prev => ({ ...prev, visibility: selectedKey as 'public' | 'private' }));
+                      }}
+                      description="Define se a organização é pública ou privada"
+                      startContent={
+                        orgSettings.visibility === 'public' ? 
+                          <HiOutlineEye className="w-4 h-4 text-green-500" /> : 
+                          <HiOutlineLockClosed className="w-4 h-4 text-orange-500" />
+                      }
+                    >
+                      <SelectItem 
+                        key="public" 
+                        startContent={<HiOutlineEye className="w-4 h-4 text-green-500" />}
+                      >
+                        Pública - Visível para todos
+                      </SelectItem>
+                      <SelectItem 
+                        key="private" 
+                        startContent={<HiOutlineLockClosed className="w-4 h-4 text-orange-500" />}
+                      >
+                        Privada - Apenas membros podem ver
+                      </SelectItem>
+                    </Select>
+
                     {/* Preview do Logo */}
                   {orgSettings.logoURL && (
   <div className="flex items-start gap-3 p-3 rounded-lg">
@@ -831,6 +870,10 @@ Remover
                     <div className="flex items-start gap-2">
                       <span className="text-blue-500">•</span>
                       <span>O logo deve ser uma URL válida de uma imagem (PNG, JPG, GIF)</span>
+                    </div>
+                    <div className="flex items-start gap-2">
+                      <span className="text-blue-500">•</span>
+                      <span>Organizações públicas são visíveis para todos, enquanto privadas só aparecem para membros</span>
                     </div>
                     <div className="flex items-start gap-2">
                       <span className="text-blue-500">•</span>
