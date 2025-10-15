@@ -18,7 +18,8 @@ import {
   HiOutlineSave,
   HiOutlineX,
   HiOutlinePhotograph,
-  HiOutlineUpload
+  HiOutlineUpload,
+  HiOutlineTrash
 } from 'react-icons/hi';
 import { Organization, Membership } from '../types';
 import { User } from 'firebase/auth';
@@ -105,18 +106,17 @@ const PainelOrganizacao: React.FC<PainelOrganizacaoProps> = ({
 
   if (!userOrg || !userMembership) {
     return (
+                  <Card className="space-y-6">
       <div className="text-center py-12">
         <div className="mb-6">
           <HiOutlineShieldCheck className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-          <h3 className="text-xl font-semibold text-gray-700 mb-2">
+          <h3 className="text-xl font-semibold mb-2">
             Nenhuma Organização
           </h3>
           <p className="text-gray-500 mb-6">
             Você não faz parte de nenhuma organização ainda. Crie uma nova ou junte-se a uma existente.
           </p>
-          <div className="text-xs text-gray-400 mb-4">
-            Debug: userOrg={userOrg ? 'exists' : 'null'}, userMembership={userMembership ? 'exists' : 'null'}
-          </div>
+
         </div>
         <div className="flex gap-4 justify-center">
           <Button 
@@ -141,6 +141,7 @@ const PainelOrganizacao: React.FC<PainelOrganizacaoProps> = ({
           </Button>
         </div>
       </div>
+      </Card>
     );
   }
 
@@ -681,10 +682,12 @@ const PainelOrganizacao: React.FC<PainelOrganizacaoProps> = ({
             <div className="space-y-6">
               <Card>
                 <CardHeader>
-                  <h3 className="text-lg font-semibold">Configurações da Organização</h3>
-                  <p className="text-sm text-gray-500">
-                    Edite as informações básicas da sua organização
-                  </p>
+                 <div className="mt-2">
+    <h3 className="text-lg font-semibold">Configurações da Organização</h3>
+    <p className="text-sm text-gray-500">
+      Edite as informações básicas da sua organização
+    </p>
+  </div>
                 </CardHeader>
                 <CardBody>
                   <div className="space-y-4">
@@ -721,7 +724,7 @@ const PainelOrganizacao: React.FC<PainelOrganizacaoProps> = ({
                     {/* Logo da Organização */}
                     <div className="space-y-2">
                       <label className="text-sm font-medium">Logo da Organização</label>
-                      <div className="flex gap-3">
+                      <div className="flex gap-3 mt-3">
                         <Button
                           variant="bordered"
                           onPress={() => logoInputRef.current?.click()}
@@ -731,17 +734,7 @@ const PainelOrganizacao: React.FC<PainelOrganizacaoProps> = ({
                         >
                           {logoUploading ? 'Enviando...' : 'Escolher Imagem'}
                         </Button>
-                        {orgSettings.logoURL && (
-                          <Button
-                            variant="light"
-                            color="danger"
-                            onPress={() => setOrgSettings(prev => ({ ...prev, logoURL: '' }))}
-                            isDisabled={settingsLoading || logoUploading}
-                            startContent={<HiOutlineX className="w-4 h-4" />}
-                          >
-                            Remover
-                          </Button>
-                        )}
+                       
                       </div>
                       <p className="text-xs text-gray-500">
                         Faça upload de uma imagem para o logo da organização (PNG, JPG, GIF)
@@ -773,20 +766,33 @@ const PainelOrganizacao: React.FC<PainelOrganizacaoProps> = ({
                     />
 
                     {/* Preview do Logo */}
-                    {orgSettings.logoURL && (
-                      <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
-                        <span className="text-sm text-gray-600">Preview:</span>
-                        <Avatar
-                          src={orgSettings.logoURL}
-                          name={orgSettings.name}
-                          size="md"
-                        />
-                        <div>
-                          <p className="font-medium">{orgSettings.name}</p>
-                          <p className="text-sm text-gray-500">[{orgSettings.tag}]</p>
-                        </div>
-                      </div>
-                    )}
+                  {orgSettings.logoURL && (
+  <div className="flex items-start gap-3 p-3 rounded-lg">
+    {/* Avatar + botão em coluna */}
+    <div className="flex flex-col items-center">
+      <Avatar
+        src={orgSettings.logoURL}
+        name={orgSettings.name}
+        className="w-16 h-16"
+      />
+        <Button
+  className="mt-3 -mb-8 p-1 w-6 h-8 flex items-center justify-center rounded"
+  variant="light"
+  color="danger"
+  onPress={() => setOrgSettings(prev => ({ ...prev, logoURL: '' }))}
+  isDisabled={settingsLoading || logoUploading}
+>
+Remover
+</Button>
+    </div>
+
+    {/* Nome e tag ao lado */}
+    <div className="flex flex-col justify-center">
+      <p className="font-medium">{orgSettings.name}</p>
+      <p className="text-sm text-gray-500">[{orgSettings.tag}]</p>
+    </div>
+  </div>
+)}
 
                     {/* Botões de Ação */}
                     <div className="flex gap-3 pt-4">
