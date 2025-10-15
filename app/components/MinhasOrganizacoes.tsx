@@ -97,17 +97,7 @@ const MinhasOrganizacoes: React.FC<MinhasOrganizacoesProps> = ({
           <p className="text-gray-600 ml-5">Gerencie suas organizações e veja seu status</p>
         </div>
 
-        <Button 
-          color="primary" 
-          className="mr-5"
-          startContent={<HiOutlinePlus className="w-4 h-4" />}
-          onClick={() => {
-            const event = new CustomEvent('changeTab', { detail: 'Criar Organização' });
-            window.dispatchEvent(event);
-          }}
-        >
-          Nova Organização
-        </Button>
+        {/* Botão "Nova Organização" removido - usuários que já são membros não devem criar novas organizações */}
       </div>
    
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3 ml-5 mr-5 mb-10">
