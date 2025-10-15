@@ -57,29 +57,29 @@ export const useUserMembership = (orgId: string | null, userId: string | null) =
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    console.log('useUserMembership - orgId:', orgId, 'userId:', userId);
+    //console.log('useUserMembership - orgId:', orgId, 'userId:', userId);
     
     if (!orgId || !userId) {
-      console.log('useUserMembership - Missing orgId or userId, setting null');
+      //console.log('useUserMembership - Missing orgId or userId, setting null');
       setMembership(null);
       setLoading(false);
       return;
     }
 
-    console.log('useUserMembership - Setting up listener for membership document');
+    //console.log('useUserMembership - Setting up listener for membership document');
     const membershipDocPath = `organizations/${orgId}/memberships/${userId}`;
-    console.log('useUserMembership - Document path:', membershipDocPath);
+    //console.log('useUserMembership - Document path:', membershipDocPath);
 
     const unsubscribe = onSnapshot(
       doc(db, membershipDocPath),
       (doc) => {
-        console.log('useUserMembership - Document snapshot received, exists:', doc.exists());
+        //console.log('useUserMembership - Document snapshot received, exists:', doc.exists());
         if (doc.exists()) {
           const membershipData = { ...doc.data() } as Membership;
-          console.log('useUserMembership - Membership data:', membershipData);
+          //console.log('useUserMembership - Membership data:', membershipData);
           setMembership(membershipData);
         } else {
-          console.log('useUserMembership - No membership document found');
+          //console.log('useUserMembership - No membership document found');
           setMembership(null);
         }
         setLoading(false);
