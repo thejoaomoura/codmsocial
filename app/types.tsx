@@ -14,6 +14,11 @@ export interface PostReaction {
   createdAt: any;
 }
 
+export interface PostReaction {
+  name: string;
+  emoji: string;
+}
+
 export interface Post {
   id: string;
   authorName: string;
@@ -21,9 +26,10 @@ export interface Post {
   authorId: string;
   authorAvatar: string;
   text: string;
-  createdAt: any; 
-  reactions: string[]; 
-  detailedReactions?: PostReaction[]; // Novo sistema de reações detalhadas
+  createdAt: any;
+  // Agora reactions é um objeto onde a chave é o uid do usuário
+  reactions: Record<string, PostReaction>;
+  detailedReactions?: PostReaction[];
   comments: PostComment[];
 }
 
@@ -181,4 +187,3 @@ export interface OrganizationInvite {
   status: "pending" | "accepted" | "rejected" | "expired";
   expiresAt: any; // Timestamp
 }
-
