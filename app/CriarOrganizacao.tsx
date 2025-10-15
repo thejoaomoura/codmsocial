@@ -205,7 +205,7 @@ export default function CriarOrganizacao() {
 
   // Formulário de criação de organização
   return (
-    <div className="max-w-2xl mx-auto p-6">
+    <div>
       <Card>
         <CardHeader>
           <div className="flex items-center gap-3">
