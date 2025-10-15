@@ -6,7 +6,7 @@ import { Chip } from '@heroui/chip';
 import { Avatar } from '@heroui/avatar';
 import { Button } from '@heroui/button';
 import { Spinner } from '@heroui/spinner';
-import { HiOutlinePlus, HiOutlineUsers, HiOutlineCog, HiOutlineEye } from 'react-icons/hi';
+import { HiOutlinePlus, HiOutlineUsers, HiOutlineCog, HiOutlineEye, HiOutlineCheck } from 'react-icons/hi';
 import { Organization } from '../types';
 import { User } from 'firebase/auth';
 import { useRoleManagement } from '../hooks/useRoleManagement';
@@ -46,10 +46,11 @@ const MinhasOrganizacoes: React.FC<MinhasOrganizacoesProps> = ({
 
   if (userOrganizations.length === 0) {
     return (
+         <Card className="space-y-6">
       <div className="text-center py-12">
         <div className="mb-6">
           <HiOutlineUsers className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-          <h3 className="text-xl font-semibold text-gray-700 mb-2">
+          <h3 className="text-xl font-semibold mb-2">
             Nenhuma Organização Encontrada
           </h3>
           <p className="text-gray-500 mb-6">
@@ -81,18 +82,24 @@ const MinhasOrganizacoes: React.FC<MinhasOrganizacoesProps> = ({
           </Button>
         </div>
       </div>
+      </Card>
     );
   }
 
   return (
+                      <Card className="space-y-6">
     <div className="space-y-6">
+           
       <div className="flex justify-between items-center">
+
         <div>
-          <h2 className="text-2xl font-bold text-gray-800">Minhas Organizações</h2>
-          <p className="text-gray-600">Gerencie suas organizações e veja seu status</p>
+          <h2 className="text-2xl font-bold ml-5 mt-3">Minhas Organizações</h2>
+          <p className="text-gray-600 ml-5">Gerencie suas organizações e veja seu status</p>
         </div>
+
         <Button 
           color="primary" 
+          className="mr-5"
           startContent={<HiOutlinePlus className="w-4 h-4" />}
           onClick={() => {
             const event = new CustomEvent('changeTab', { detail: 'Criar Organização' });
@@ -102,8 +109,8 @@ const MinhasOrganizacoes: React.FC<MinhasOrganizacoesProps> = ({
           Nova Organização
         </Button>
       </div>
-
-      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+   
+      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3 ml-5 mr-5 mb-10">
         {userOrganizations.map((org) => {
           const isSelected = selectedOrgId === org.id;
           return (
@@ -127,7 +134,7 @@ const MinhasOrganizacoes: React.FC<MinhasOrganizacoesProps> = ({
                       <h3 className="font-semibold text-lg truncate">{org.name}</h3>
                       {isSelected && (
                         <Chip size="sm" color="primary" variant="flat">
-                          Selecionada
+                          <HiOutlineCheck />
                         </Chip>
                       )}
                     </div>
@@ -185,22 +192,18 @@ const MinhasOrganizacoes: React.FC<MinhasOrganizacoesProps> = ({
                     >
                       Gerenciar
                     </Button>
-                    <Button 
-                      size="sm" 
-                      variant="bordered"
-                      startContent={<HiOutlineEye className="w-3 h-3" />}
-                      onClick={(e) => e.stopPropagation()}
-                    >
-                      Ver Detalhes
-                    </Button>
+
                   </div>
                 </div>
               </CardBody>
             </Card>
           );
         })}
+        
       </div>
+      
     </div>
+         </Card>
   );
 };
 

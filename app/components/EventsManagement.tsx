@@ -27,8 +27,14 @@ import { Event, EventRegistration, Organization, Membership, User, OrganizationR
 import { useRoleManagement } from '../hooks/useRoleManagement';
 import { useEventRegistrations } from '../hooks/useEventRegistrations';
 import { formatDate, formatDateTime, isValidDate, parseDateTime } from '../utils/dateUtils';
-import { collection, addDoc, serverTimestamp, onSnapshot, query, where, orderBy } from 'firebase/firestore';
+import { collection, addDoc, serverTimestamp, onSnapshot, query, where, orderBy, Timestamp } from 'firebase/firestore';
 import { db } from '../firebase';
+import {DatePicker} from "@heroui/date-picker";
+import { parseZonedDateTime, ZonedDateTime } from "@internationalized/date";
+import { I18nProvider } from "@react-aria/i18n";
+
+
+
 
 interface EventsManagementProps {
   organization: Organization;
@@ -123,27 +129,72 @@ const EventsManagement: React.FC<EventsManagementProps> = ({
       return;
     }
 
-    // Validação da data
-    const eventDate = parseDateTime(eventForm.startsAt);
-    if (!eventDate || !isValidDate(eventDate)) {
-      addToast({
-        title: 'Data inválida',
-        description: 'Por favor, selecione uma data e hora válidas',
-        color: 'danger'
-      });
-      return;
-    }
 
-    // Verificar se a data não é no passado
-    if (eventDate <= new Date()) {
-      addToast({
-        title: 'Data inválida',
-        description: 'A data do evento deve ser no futuro',
-        color: 'danger'
-      });
-      return;
-    }
 
+    
+let eventDate: ZonedDateTime | null = null;
+
+try {
+  if (!eventForm.startsAt) throw new Error("empty");
+
+  eventDate = parseZonedDateTime(eventForm.startsAt);
+
+  if (!(eventDate instanceof ZonedDateTime)) {
+    throw new Error("invalid");
+  }
+
+  // ✅ Data válida
+  console.log("Data válida:", eventDate.toString());
+
+} catch (error) {
+  addToast({
+    title: "Data inválida",
+    description: "Por favor, selecione uma data e hora válidas",
+    color: "danger",
+  });
+  return;
+}
+
+
+    try {
+  const eventDate = eventForm.startsAt
+    ? parseZonedDateTime(eventForm.startsAt)
+    : null;
+
+  if (!eventDate || !(eventDate instanceof ZonedDateTime)) {
+    addToast({
+      title: "Data inválida",
+      description: "Por favor, selecione uma data e hora válidas",
+      color: "danger",
+    });
+    return;
+  }
+
+  // ✅ Se passou, a data é válida — pode continuar daqui
+} catch (error) {
+  addToast({
+    title: "Data inválida",
+    description: "Por favor, selecione uma data e hora válidas",
+    color: "danger",
+  });
+  return;
+}
+
+    
+
+  
+// Converte para Date padrão do JS
+const jsDate = new Date(eventDate.toString());
+
+// Agora podemos comparar
+if (jsDate <= new Date()) {
+  addToast({
+    title: "Data inválida",
+    description: "A data do evento deve ser no futuro",
+    color: "danger",
+  });
+  return;
+}
     if (eventForm.rosterMin > eventForm.rosterMax) {
       addToast({
         title: 'Erro de validação',
@@ -166,25 +217,25 @@ const EventsManagement: React.FC<EventsManagementProps> = ({
     setCreateEventLoading(true);
 
     try {
-      const eventData: Omit<Event, 'id'> = {
-        type: eventForm.type,
-        hostOrgId: organization.id,
-        name: eventForm.name.trim(),
-        description: eventForm.description.trim(),
-        gameMode: eventForm.gameMode,
-        teamSize: eventForm.teamSize,
-        rosterMin: eventForm.rosterMin,
-        rosterMax: eventForm.rosterMax,
-        startsAt: eventDate,
-        checkinWindow: eventForm.checkinWindow,
-        status: 'open' as EventStatus,
-        createdBy: currentUserId || '',
-        createdAt: serverTimestamp(),
-        region: organization.region,
-        ...(eventForm.maxTeams && { maxTeams: eventForm.maxTeams }),
-        ...(eventForm.prizePool.trim() && { prizePool: eventForm.prizePool.trim() }),
-        ...(eventForm.rulesURL.trim() && { rulesURL: eventForm.rulesURL.trim() })
-      };
+     const eventData: Omit<Event, 'id'> = {
+  type: eventForm.type,
+  hostOrgId: organization.id,
+  name: eventForm.name.trim(),
+  description: eventForm.description.trim(),
+  gameMode: eventForm.gameMode,
+  teamSize: eventForm.teamSize,
+  rosterMin: eventForm.rosterMin,
+  rosterMax: eventForm.rosterMax,
+  startsAt: eventDate.toString(), // ✅ converte para string ISO
+  checkinWindow: eventForm.checkinWindow,
+  status: 'open' as EventStatus,
+  createdBy: currentUserId || '',
+  createdAt: serverTimestamp(),
+  region: organization.region,
+  ...(eventForm.maxTeams && { maxTeams: eventForm.maxTeams }),
+  ...(eventForm.prizePool.trim() && { prizePool: eventForm.prizePool.trim() }),
+  ...(eventForm.rulesURL.trim() && { rulesURL: eventForm.rulesURL.trim() })
+};
 
       console.log('Dados do evento antes de enviar:', eventData);
 
@@ -417,6 +468,29 @@ const EventsManagement: React.FC<EventsManagementProps> = ({
     }
   };
 
+const formatEventDate = (dateString?: string) => {
+  if (!dateString) return "";
+
+  try {
+    // Remove o timezone em colchetes, mantendo a parte ISO que JS entende
+    const cleanedString = dateString.replace(/\[.*\]$/, ""); // "2025-10-15T20:00:00-03:00"
+
+    const jsDate = new Date(cleanedString);
+
+    if (isNaN(jsDate.getTime())) return "";
+
+    const day = jsDate.getDate().toString().padStart(2, "0");
+    const month = (jsDate.getMonth() + 1).toString().padStart(2, "0");
+    const year = jsDate.getFullYear();
+    const hours = jsDate.getHours().toString().padStart(2, "0");
+    const minutes = jsDate.getMinutes().toString().padStart(2, "0");
+
+    return `${day}/${month}/${year} às ${hours}:${minutes}`;
+  } catch (error) {
+    console.error("Erro ao formatar a data:", error);
+    return "";
+  }
+};
   // Filtrar eventos que o usuário pode ver
   const visibleEvents = events.filter(canViewEvent);
 
@@ -430,6 +504,8 @@ const EventsManagement: React.FC<EventsManagementProps> = ({
       </div>
     );
   }
+
+
 
   return (
     <div className="space-y-6">
@@ -551,10 +627,12 @@ const EventsManagement: React.FC<EventsManagementProps> = ({
                     <HiOutlineUsers className="w-4 h-4 text-default-500" />
                     <span className="text-default-700">Roster: {event.rosterMin}-{event.rosterMax}</span>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <HiOutlineClock className="w-4 h-4 text-default-500" />
-                    <span className="text-default-700">{formatDate(event.startsAt)}</span>
-                  </div>
+<div className="flex items-center gap-2">
+  <HiOutlineClock className="w-4 h-4 text-default-500" />
+  <span className="text-default-700">
+    {formatEventDate(event.startsAt)}
+  </span>
+</div>
                   <div className="flex items-center gap-2">
                     <span className="text-default-700">Região: {event.region}</span>
                   </div>
@@ -719,13 +797,13 @@ const EventsManagement: React.FC<EventsManagementProps> = ({
                           <strong>Roster:</strong> {selectedEvent.rosterMin} - {selectedEvent.rosterMax} jogadores
                         </span>
                       </div>
-                      <div className="flex items-center gap-2">
-                        <HiOutlineClock className="w-4 h-4 text-default-500" />
-                        <span className="text-sm text-default-700">
-                          <strong>Data/Hora:</strong> {formatDateTime(selectedEvent.startsAt)}
-                        </span>
-                      </div>
-                    </div>
+                        <div className="flex items-center gap-2">
+  <HiOutlineClock className="w-4 h-4 text-default-500" />
+  <span className="text-default-700">
+    {formatEventDate(selectedEvent.startsAt)}
+  </span>
+</div>
+                                        </div>
                     <div className="space-y-3">
                       <div className="text-sm">
                         <strong>Modo de Jogo:</strong> {selectedEvent.gameMode}
@@ -1001,20 +1079,24 @@ const EventsManagement: React.FC<EventsManagementProps> = ({
               <h3 className="text-lg font-medium">Data e Horário</h3>
               
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <Input
-                  type="datetime-local"
-                  label="Data e Hora de Início"
-                  value={eventForm.startsAt}
-                  onChange={(e) => setEventForm({ ...eventForm, startsAt: e.target.value })}
-                  isRequired
-                  variant="bordered"
-                  classNames={{
-                    input: "text-default-900",
-                    label: "text-default-700 mb-2",
-                    inputWrapper: "mt-1"
-                  }}
-                />
-
+<div>
+  <I18nProvider locale="pt-BR">
+      <DatePicker
+        className="max-w-xs"
+        label="Data e Hora de Início"
+        labelPlacement="outside"
+        value={
+          eventForm.startsAt
+            ? parseZonedDateTime(eventForm.startsAt)
+            : parseZonedDateTime("2025-10-14T00:00[America/Sao_Paulo]")
+        }
+        onChange={(date) =>
+          setEventForm({ ...eventForm, startsAt: date?.toString() || "" })
+        }
+        hourCycle={24} // usa formato 24h
+      />
+    </I18nProvider>
+</div>
                 <Input
                   type="number"
                   label="Check-in (minutos antes)"
