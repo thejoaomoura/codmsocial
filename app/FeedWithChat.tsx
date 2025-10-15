@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
+import { createPortal } from "react-dom";
 import Chat, { ChatOverview, ChatMessage } from "./Chat";
 import { Post, PostReaction } from "./types";
 import { doc, deleteDoc, getDoc, onSnapshot, collection, updateDoc } from "firebase/firestore";
@@ -47,12 +48,12 @@ interface User {
 }
 
 interface LikesUser {
-  uid: string;
-  name: string;
-  tag: string;
-  avatar: string;
-  reactionEmoji: string;
-  reactionName: string;
+    uid: string;
+    name: string;
+    tag: string;
+    avatar: string;
+    reactionEmoji: string;
+    reactionName: string;
 }
 
 const FeedWithChat: React.FC<FeedProps> = ({
@@ -90,11 +91,95 @@ const FeedWithChat: React.FC<FeedProps> = ({
     const [users, setUsers] = useState<{ uid: string; avatar: string; name: string; tag: string; createdAt?: Date; }[]>([]);
     const [showReactionPicker, setShowReactionPicker] = useState<string | null>(null);
     const [reactionTimeout, setReactionTimeout] = useState<NodeJS.Timeout | null>(null);
+    const [pickerPosition, setPickerPosition] = useState<{ top: number; left: number; width?: number } | null>(null);
+
+    // Refs para cada botão de reação
+    const reactionButtonRefs = useRef<{ [key: string]: HTMLDivElement | null }>({});
+
+    // Constantes para o picker
+    const PICKER_W_MOBILE = 260;
+    const PICKER_W_DESKTOP = 360;
+    const PICKER_H = 60; // altura aproximada do picker
+    const GAP = 10; // espaço entre botão e picker
+    const MARGIN = 16; // margem das bordas
+
+    // Detecta dispositivos touch
+    const isTouchDevice = () => {
+        if (typeof window === 'undefined') return false;
+        return window.matchMedia('(pointer: coarse)').matches;
+    };
+
+    // Função para calcular posição dinâmica do picker
+    const calculatePickerPosition = (postId: string) => {
+        const btn = reactionButtonRefs.current[postId];
+        if (!btn) return null;
+
+        const rect = btn.getBoundingClientRect(); // relativo à viewport
+        const vw = window.innerWidth;
+        const vh = window.innerHeight;
+
+        const pickerWidth = vw < 768 ? PICKER_W_MOBILE : PICKER_W_DESKTOP;
+
+        let left = rect.left + rect.width / 2;
+        // tenta colocar ACIMA primeiro
+        let top = rect.top - GAP - PICKER_H;
+
+        if (top < MARGIN) top = rect.bottom + GAP;
+
+        // se não couber abaixo (teclado aberto / viewport pequena), força dentro do viewport
+        if (top + PICKER_H > vh - MARGIN) top = Math.max(MARGIN, vh - MARGIN - PICKER_H);
+
+        // clamp horizontal (considera safe-area dos iPhones)
+        const minX = MARGIN + pickerWidth / 2;
+        const maxX = vw - MARGIN - pickerWidth / 2;
+        left = Math.min(Math.max(left, minX), maxX);
+
+        return { top, left, width: pickerWidth };
+    };
 
     useEffect(() => {
         setLocalPosts(posts);
     }, [posts]);
 
+    // Adicionar listener para fechar picker em touch fora dele
+    useEffect(() => {
+        if (!showReactionPicker || !isTouchDevice()) return;
+
+        const handleTouchOutside = (e: TouchEvent) => {
+            const target = e.target as Element;
+            const picker = document.querySelector('[data-reaction-picker]');
+            const button = reactionButtonRefs.current[showReactionPicker];
+
+            if (picker && !picker.contains(target) && button && !button.contains(target)) {
+                setShowReactionPicker(null);
+                setPickerPosition(null);
+            }
+        };
+
+        document.addEventListener('touchstart', handleTouchOutside);
+        return () => document.removeEventListener('touchstart', handleTouchOutside);
+    }, [showReactionPicker]);
+    useEffect(() => {
+        if (!showReactionPicker) return;
+
+        const handler = () => {
+            const id = showReactionPicker as string;
+            setPickerPosition(calculatePickerPosition(id));
+        };
+
+        window.addEventListener('scroll', handler, { passive: true });
+        window.addEventListener('resize', handler);
+        window.addEventListener('orientationchange', handler);
+
+        // primeira posição
+        handler();
+
+        return () => {
+            window.removeEventListener('scroll', handler);
+            window.removeEventListener('resize', handler);
+            window.removeEventListener('orientationchange', handler);
+        };
+    }, [showReactionPicker]);
 
     useEffect(() => {
         // Reseta conversa aberta ao trocar de usuário
@@ -103,17 +188,17 @@ const FeedWithChat: React.FC<FeedProps> = ({
     }, [currentUserId]);
 
 
-        const getReactionSummary = (reactions: Record<string, PostReaction> | undefined) => {
-  if (!reactions) return {};
+    const getReactionSummary = (reactions: Record<string, PostReaction> | undefined) => {
+        if (!reactions) return {};
 
-  const summary: Record<string, number> = {};
+        const summary: Record<string, number> = {};
 
-  Object.values(reactions).forEach((reaction) => {
-    summary[reaction.emoji] = (summary[reaction.emoji] || 0) + 1;
-  });
+        Object.values(reactions).forEach((reaction) => {
+            summary[reaction.emoji] = (summary[reaction.emoji] || 0) + 1;
+        });
 
-  return summary;
-};
+        return summary;
+    };
 
     const openChatFromFeed = (p: Post) => {
         const convo: ChatOverview = {
@@ -144,7 +229,7 @@ const FeedWithChat: React.FC<FeedProps> = ({
     const [postToDeleteId, setPostToDeleteId] = useState<string | null>(null);
     // Adicione no começo do componente FeedWithChat
     const [showLikesModal, setShowLikesModal] = useState(false);
-const [likesUsers, setLikesUsers] = useState<LikesUser[]>([]);
+    const [likesUsers, setLikesUsers] = useState<LikesUser[]>([]);
 
     const fetchUserInfo = async (uid: string) => {
         const userRef = doc(db, "Users", uid);
@@ -169,103 +254,114 @@ const [likesUsers, setLikesUsers] = useState<LikesUser[]>([]);
     };
 
 
-   const openLikesModal = async (p: Post) => {
-  const postReactions = p.reactions || {};
-  const uids = Object.keys(postReactions);
+    const openLikesModal = async (p: Post) => {
+        const postReactions = p.reactions || {};
+        const uids = Object.keys(postReactions);
 
-  if (uids.length === 0) {
-    setLikesUsers([]);
-    setShowLikesModal(true);
-    return;
-  }
+        if (uids.length === 0) {
+            setLikesUsers([]);
+            setShowLikesModal(true);
+            return;
+        }
 
-  // Busca os dados dos usuários que reagiram
-  const users = await Promise.all(
-    uids.map(async (uid) => {
-      const userInfo = await fetchUserInfo(uid);
-      const reaction = postReactions[uid];
-      return {
-        ...userInfo,
-        reactionEmoji: reaction.emoji,
-        reactionName: reaction.name,
-      };
-    })
-  );
+        // Busca os dados dos usuários que reagiram
+        const users = await Promise.all(
+            uids.map(async (uid) => {
+                const userInfo = await fetchUserInfo(uid);
+                const reaction = postReactions[uid];
+                return {
+                    ...userInfo,
+                    reactionEmoji: reaction.emoji,
+                    reactionName: reaction.name,
+                };
+            })
+        );
 
-  setLikesUsers(users);
-  setShowLikesModal(true);
-};
+        setLikesUsers(users);
+        setShowLikesModal(true);
+    };
 
     // Funções para o sistema de reações
     const handleReactionHover = (postId: string) => {
+        // Em dispositivos touch, não usar hover timeouts
+        if (isTouchDevice()) return;
+
         // Limpar timeout anterior se existir
         if (reactionTimeout) {
             clearTimeout(reactionTimeout);
             setReactionTimeout(null);
         }
-        
+
         const timeout = setTimeout(() => {
-            setShowReactionPicker(postId);
-        }, 300); 
+            const position = calculatePickerPosition(postId);
+            if (position) {
+                setPickerPosition(position);
+                setShowReactionPicker(postId);
+            }
+        }, 200); // Reduzido de 300ms para 200ms para abrir mais rápido
         setReactionTimeout(timeout);
     };
 
     const handleReactionLeave = () => {
+        // Em dispositivos touch, não usar hover timeouts
+        if (isTouchDevice()) return;
+
         if (reactionTimeout) {
             clearTimeout(reactionTimeout);
             setReactionTimeout(null);
         }
-        
-        // Delay menor para fechar o picker
+
+        // Delay maior para fechar o picker
         const timeout = setTimeout(() => {
             setShowReactionPicker(null);
-        }, 150);
+            setPickerPosition(null);
+        }, 500); // 500ms
         setReactionTimeout(timeout);
     };
 
-const handleReactionSelect = async (post: Post, reaction: { name: string; emoji: string }) => {
-  if (!user?.uid) return;
+    const handleReactionSelect = async (post: Post, reaction: { name: string; emoji: string }) => {
+        if (!user?.uid) return;
 
-  const postRef = doc(db, "Posts", post.id);
-  const postSnap = await getDoc(postRef);
-  const postData = postSnap.exists() ? postSnap.data() : {};
+        const postRef = doc(db, "Posts", post.id);
+        const postSnap = await getDoc(postRef);
+        const postData = postSnap.exists() ? postSnap.data() : {};
 
-  // Estrutura de reações atual
-  const currentReactions = postData.reactions || {};
+        // Estrutura de reações atual
+        const currentReactions = postData.reactions || {};
 
-  // Se o usuário já reagiu com outra reação, substitui
-  const updatedReactions = {
-    ...currentReactions,
-    [user.uid]: {
-      emoji: reaction.emoji,
-      name: reaction.name,
-      createdAt: new Date().toISOString(),
-    },
-  };
+        // Se o usuário já reagiu com outra reação, substitui
+        const updatedReactions = {
+            ...currentReactions,
+            [user.uid]: {
+                emoji: reaction.emoji,
+                name: reaction.name,
+                createdAt: new Date().toISOString(),
+            },
+        };
 
-  // Atualiza no Firestore
-  await updateDoc(postRef, { reactions: updatedReactions });
+        // Atualiza no Firestore
+        await updateDoc(postRef, { reactions: updatedReactions });
 
-  // Atualiza localmente o estado
-  setLocalPosts(prevPosts =>
-    prevPosts.map(p =>
-      p.id === post.id
-        ? {
-            ...p,
-            reactions: updatedReactions,
-          }
-        : p
-    )
-  );
+        // Atualiza localmente o estado
+        setLocalPosts(prevPosts =>
+            prevPosts.map(p =>
+                p.id === post.id
+                    ? {
+                        ...p,
+                        reactions: updatedReactions,
+                    }
+                    : p
+            )
+        );
 
-  setShowReactionPicker(null);
-};
+        setShowReactionPicker(null);
+    };
 
-const getUserReaction = (post: Post) => {
-  if (!user?.uid || !post.reactions) return null;
-  const reaction = post.reactions[user.uid];
-  return reaction ? { name: reaction.name, emoji: reaction.emoji } : null;
-};
+    const getUserReaction = (post: Post) => {
+        if (!user?.uid || !post.reactions) return null;
+        const reaction = post.reactions[user.uid];
+        return reaction ? { name: reaction.name, emoji: reaction.emoji } : null;
+    };
 
 
     const handleDeleteClick = (postId: string, authorId: string) => {
@@ -307,10 +403,6 @@ const getUserReaction = (post: Post) => {
         });
         return () => unsub();
     }, []);
-
-
-
-
 
     return (
         <>
@@ -409,9 +501,9 @@ const getUserReaction = (post: Post) => {
                 <div></div>
             ) : (
                 localPosts.map((p) => {
-                  const liked = !!p.reactions && Object.keys(p.reactions).includes(user.uid);
+                    const liked = !!p.reactions && Object.keys(p.reactions).includes(user.uid);
                     const isOwner = p.authorId === currentUserId;
-           const reactionSummary = getReactionSummary(p.reactions);
+                    const reactionSummary = getReactionSummary(p.reactions);
                     return (
                         <Card key={p.id} className="mb-3">
                             <CardHeader className="flex items-center gap-3">
@@ -471,100 +563,63 @@ const getUserReaction = (post: Post) => {
                             </CardBody>
                             <CardFooter className="overflow-visible">
                                 <div className="flex flex-col w-full mt-0 overflow-visible">
-{Object.keys(reactionSummary).length > 0 && (
-  <div className="flex flex-wrap gap-1 mb-3">
-    {Object.entries(reactionSummary).map(([emoji, count]) => (
-      <Chip
-        key={emoji}
-        startContent={<span className="text-sm">{emoji}</span>}
-        variant="faded"
-        className="text-xs px-2 py-[2px]"
-      >
-        {count}
-      </Chip>
-    ))}
-  </div>
-)}
+                                    {Object.keys(reactionSummary).length > 0 && (
+                                        <div className="flex flex-wrap gap-1 mb-3">
+                                            {Object.entries(reactionSummary).map(([emoji, count]) => (
+                                                <Chip
+                                                    key={emoji}
+                                                    startContent={<span className="text-sm">{emoji}</span>}
+                                                    variant="faded"
+                                                    className="text-xs px-2 py-[2px]"
+                                                >
+                                                    {count}
+                                                </Chip>
+                                            ))}
+                                        </div>
+                                    )}
                                     {/* Botões de reação */}
                                     <div className="flex items-center relative overflow-visible">
                                         {/* Botão principal de reação com hover */}
-                                        <div 
+                                        <div
+                                            ref={(el) => {
+                                                reactionButtonRefs.current[p.id] = el;
+                                            }}
                                             className="relative overflow-visible"
                                             onMouseEnter={() => handleReactionHover(p.id)}
                                             onMouseLeave={handleReactionLeave}
+                                            onTouchStart={() => {
+                                                if (isTouchDevice()) {
+                                                    const position = calculatePickerPosition(p.id);
+                                                    if (position) {
+                                                        setPickerPosition(position);
+                                                        setShowReactionPicker(p.id);
+                                                    }
+                                                }
+                                            }}
                                         >
                                             <Button
                                                 onPress={() => toggleReaction(p)}
                                                 size="sm"
-                                                className={`flex items-center justify-center transition-all duration-200 ${
-                                                    getUserReaction(p)
-                                                        ? "bg-red-500 text-white scale-105"
-                                                        : "hover:scale-105"
-                                                }`}
+                                                className={`flex items-center justify-center transition-all duration-200 ${getUserReaction(p)
+                                                    ? "bg-red-500 text-white scale-105"
+                                                    : "hover:scale-105"
+                                                    }`}
                                             >
                                                 {getUserReaction(p) ? (
                                                     <span className="text-lg mr-1">{getUserReaction(p)?.emoji}</span>
                                                 ) : (
-                                                   <></>
+                                                    <></>
                                                 )}
                                                 <span className="text-xs">
                                                     {getUserReaction(p) ? getUserReaction(p)?.name : "Reagir"}
                                                 </span>
                                             </Button>
-
-                                            {/* Picker de reações (aparece no hover) */}
-                                            {showReactionPicker === p.id && (
-                                                <div 
-                                                    className="fixed backdrop-blur-sm rounded-full px-4 py-3 shadow-2xl border border-gray-600/50 flex z-[9999] animate-in fade-in-0 zoom-in-0 slide-in-from-bottom-2 duration-300"
-                                                    style={{
-                                                        marginTop: '10px',
-
-                                                    }}
-                                                    onMouseEnter={() => {
-                                                        if (reactionTimeout) {
-                                                            clearTimeout(reactionTimeout);
-                                                            setReactionTimeout(null);
-                                                        }
-                                                        setShowReactionPicker(p.id);
-                                                    }}
-                                                    onMouseLeave={() => {
-                                                        const timeout = setTimeout(() => {
-                                                            setShowReactionPicker(null);
-                                                        }, 200);
-                                                        setReactionTimeout(timeout);
-                                                    }}
-                                                >
-                                                    {feedReactions.map((reaction, index) => (
-                                                        <button
-                                                            key={index}
-                                                            onClick={(e) => {
-                                                                e.preventDefault();
-                                                                e.stopPropagation();
-                                                                handleReactionSelect(p, reaction);
-                                                            }}
-                                                            onMouseDown={(e) => {
-                                                                e.preventDefault();
-                                                                e.stopPropagation();
-                                                            }}
-                                                            className="text-3xl hover:scale-150 transition-all duration-200 p-2 rounded-full hover:bg-gray-700/50 transform hover:-translate-y-1 cursor-pointer"
-                                                            title={reaction.name}
-                                                            style={{
-                                                                filter: 'drop-shadow(0 4px 8px rgba(0,0,0,0.3))'
-                                                            }}
-                                                        >
-                                                            {reaction.emoji}
-                                                        </button>
-                                                    ))}
-                                                </div>
-                                            )}
                                         </div>
 
-                                        
-
-                            <Button size="sm" className="ml-2" onPress={() => openLikesModal(p)}>
-  <HiOutlineUsers className="w-4 h-4 mr-1" />
-  {Object.keys(p.reactions || {}).length}
-</Button>
+                                        <Button size="sm" className="ml-2" onPress={() => openLikesModal(p)}>
+                                            <HiOutlineUsers className="w-4 h-4 mr-1" />
+                                            {Object.keys(p.reactions || {}).length}
+                                        </Button>
 
                                         {p.authorId !== user.uid && (
                                             <Button
@@ -576,8 +631,6 @@ const getUserReaction = (post: Post) => {
                                             </Button>
                                         )}
                                     </div>
-                         
-
 
                                     {/* Campo de comentário */}
                                     <div className="mt-3 flex w-full">
@@ -730,7 +783,7 @@ const getUserReaction = (post: Post) => {
                 <ModalContent>
                     <ModalHeader className="flex items-center gap-2">
                         <span className="text-md italic text-gray-300 mt-0.5">
-                           Reacoes
+                            Reacoes
                         </span>
                     </ModalHeader>
                     <ModalBody>
@@ -744,24 +797,24 @@ const getUserReaction = (post: Post) => {
                                     list: "max-h-[300px] overflow-y-auto",
                                 }}
                             >
-                              {likesUsers.map((u) => (
-  <ListboxItem key={u.uid} textValue={u.name}>
-    <div className="flex items-center gap-2">
-      <Avatar
-        src={u.avatar || "/default-avatar.png"}
-        alt={u.name}
-        size="sm"
-        className="shrink-0"
-      />
-      <span className="font-medium flex items-center gap-1">
-        {u.tag && <Code color="danger">{u.tag}</Code>}
-        {u.name}
-        <span className="ml-2 text-lg">{u.reactionEmoji}</span>
-      </span>
-    </div>
-  </ListboxItem>
-))}
-      
+                                {likesUsers.map((u) => (
+                                    <ListboxItem key={u.uid} textValue={u.name}>
+                                        <div className="flex items-center gap-2">
+                                            <Avatar
+                                                src={u.avatar || "/default-avatar.png"}
+                                                alt={u.name}
+                                                size="sm"
+                                                className="shrink-0"
+                                            />
+                                            <span className="font-medium flex items-center gap-1">
+                                                {u.tag && <Code color="danger">{u.tag}</Code>}
+                                                {u.name}
+                                                <span className="ml-2 text-lg">{u.reactionEmoji}</span>
+                                            </span>
+                                        </div>
+                                    </ListboxItem>
+                                ))}
+
                             </Listbox>
                         )}
                     </ModalBody>
@@ -783,6 +836,65 @@ const getUserReaction = (post: Post) => {
                     </ModalFooter>
                 </ModalContent>
             </Modal>
+
+            {/* Portal para o picker de reações */}
+            {showReactionPicker && pickerPosition && typeof document !== 'undefined' && createPortal(
+                <div
+                    className="fixed rounded-full px-3 py-2 shadow-2xl border border-gray-600/50 flex z-[9999] backdrop-blur-sm animate-in fade-in-0 zoom-in-0 slide-in-from-bottom-2 duration-300 max-w-[90vw]"
+                    data-reaction-picker
+                    style={{
+                        top: pickerPosition.top,
+                        left: pickerPosition.left,
+                        width: pickerPosition.width,
+                        transform: 'translateX(-50%)',
+                        // opcional: respeitar safe area no iOS
+                        paddingLeft: 'max(12px, env(safe-area-inset-left))',
+                        paddingRight: 'max(12px, env(safe-area-inset-right))',
+                    }}
+                    // no touch não use hover timeouts
+                    onMouseEnter={() => {
+                        if (!isTouchDevice() && reactionTimeout) {
+                            clearTimeout(reactionTimeout);
+                            setReactionTimeout(null);
+                        }
+                    }}
+                    onMouseLeave={() => {
+                        if (!isTouchDevice()) {
+                            const timeout = setTimeout(() => {
+                                setShowReactionPicker(null);
+                                setPickerPosition(null);
+                            }, 300);
+                            setReactionTimeout(timeout);
+                        }
+                    }}
+                >
+                    {feedReactions.map((reaction, index) => (
+                        <button
+                            key={index}
+                            onClick={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                const currentPost = localPosts.find(post => post.id === showReactionPicker);
+                                if (currentPost) {
+                                    handleReactionSelect(currentPost, reaction);
+                                }
+                            }}
+                            onMouseDown={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                            }}
+                            className="text-2xl md:text-3xl hover:scale-150 transition-all duration-200 p-1 md:p-2 rounded-full hover:bg-gray-700/50 transform hover:-translate-y-1 cursor-pointer"
+                            title={reaction.name}
+                            style={{
+                                filter: 'drop-shadow(0 4px 8px rgba(0,0,0,0.3))'
+                            }}
+                        >
+                            {reaction.emoji}
+                        </button>
+                    ))}
+                </div>,
+                document.body
+            )}
         </>
 
 
