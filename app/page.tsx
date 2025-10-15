@@ -67,7 +67,7 @@ import { HiOutlineBriefcase, HiOutlineGlobe, HiOutlineCog, HiOutlineShieldCheck 
 import MinhasOrganizacoes from "./components/MinhasOrganizacoes";
 import ExplorarOrganizacoes from "./components/ExplorarOrganizacoes";
 import PainelOrganizacao from "./components/PainelOrganizacao";
-import {Breadcrumbs, BreadcrumbItem} from "@heroui/breadcrumbs";
+import { Breadcrumbs, BreadcrumbItem } from "@heroui/breadcrumbs";
 
 
 const navigation = [
@@ -82,7 +82,7 @@ const navigation = [
 
 export default function Home() {
   const [user, setUser] = useState<User | null>(null);
-const [activeTab, setActiveTab] = useState<"Feed" | "Conversas" | "Minhas Organizações" | "Explorar Organizações" | "Criar Organização" | "Painel da Organização">("Feed");
+  const [activeTab, setActiveTab] = useState<"Feed" | "Conversas" | "Minhas Organizações" | "Explorar Organizações" | "Criar Organização" | "Painel da Organização">("Feed");
   const [posts, setPosts] = useState<Post[]>([]);
   const [text, setText] = useState("");
   const [conversas, setConversas] = useState<ChatOverview[]>([]);
@@ -90,11 +90,11 @@ const [activeTab, setActiveTab] = useState<"Feed" | "Conversas" | "Minhas Organi
   const [showChatWith, setShowChatWith] = useState<ChatOverview | null>(null);
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
   const [chatText, setChatText] = useState("");
-  
+
   // Estados para typing indicator
-  const [isTyping, setIsTyping] = useState<{[chatId: string]: {userId: string, userName: string, timestamp: number}}>({});
+  const [isTyping, setIsTyping] = useState<{ [chatId: string]: { userId: string, userName: string, timestamp: number } }>({});
   const [typingTimeout, setTypingTimeout] = useState<NodeJS.Timeout | null>(null);
-  
+
   // Ref para armazenar o unsubscribe do listener de mensagens atual
   const messagesUnsubscribeRef = useRef<(() => void) | null>(null);
 
@@ -127,12 +127,12 @@ const [activeTab, setActiveTab] = useState<"Feed" | "Conversas" | "Minhas Organi
     const handleTabChange = (event: CustomEvent) => {
       setActiveTab(event.detail as any);
     };
-    
+
     window.addEventListener("changeTab", handleTabChange as EventListener);
     return () => window.removeEventListener("changeTab", handleTabChange as EventListener);
   }, []);
 
-  const [profileNameTag, setProfileNameTag] = useState(""); 
+  const [profileNameTag, setProfileNameTag] = useState("");
 
   // Hooks para organizações - só executar se user estiver logado
   const { userOrganizations, loading: userOrgsLoading } = useUserOrganizations(user?.uid || null);
@@ -143,12 +143,12 @@ const [activeTab, setActiveTab] = useState<"Feed" | "Conversas" | "Minhas Organi
   const [selectedOrgId, setSelectedOrgId] = useState<string | undefined>(undefined);
 
   // Pegar a organização selecionada ou a primeira disponível
-  const userOrg = selectedOrgId 
+  const userOrg = selectedOrgId
     ? userOrganizations?.find(org => org.id === selectedOrgId) || null
     : userOrganizations?.[0] || null;
-    
+
   const { membership: userMembership, loading: membershipLoading } = useUserMembership(
-    userOrg?.id || null, 
+    userOrg?.id || null,
     user?.uid || null
   );
 
@@ -159,28 +159,28 @@ const [activeTab, setActiveTab] = useState<"Feed" | "Conversas" | "Minhas Organi
     }
   }, [userOrganizations, selectedOrgId]);
 
-useEffect(() => {
-  console.log('Setting up auth listener...');
-  const unsub = onAuthStateChanged(auth, async (u) => {
-    console.log('Auth state changed:', u ? `User logged in: ${u.uid}` : 'User logged out');
-    setUser(u);
-    if (u) {
-      const userDocRef = doc(db, "Users", u.uid);
-      const userDocSnap = await getDoc(userDocRef);
-      if (userDocSnap.exists()) {
-        const userData = userDocSnap.data();
-        setProfileName(userData.displayName || "");
-        setProfileNameTag(userData.tag || ""); // nova state para a tag
-        setProfilePhoto(userData.photoURL || "");
-      } else {
-        setProfileName(u.displayName || "");
-        setProfileNameTag(""); // sem tag
-        setProfilePhoto(u.photoURL || "");
+  useEffect(() => {
+    console.log('Setting up auth listener...');
+    const unsub = onAuthStateChanged(auth, async (u) => {
+      console.log('Auth state changed:', u ? `User logged in: ${u.uid}` : 'User logged out');
+      setUser(u);
+      if (u) {
+        const userDocRef = doc(db, "Users", u.uid);
+        const userDocSnap = await getDoc(userDocRef);
+        if (userDocSnap.exists()) {
+          const userData = userDocSnap.data();
+          setProfileName(userData.displayName || "");
+          setProfileNameTag(userData.tag || ""); // nova state para a tag
+          setProfilePhoto(userData.photoURL || "");
+        } else {
+          setProfileName(u.displayName || "");
+          setProfileNameTag(""); // sem tag
+          setProfilePhoto(u.photoURL || "");
+        }
       }
-    }
-  });
-  return () => unsub();
-}, []);
+    });
+    return () => unsub();
+  }, []);
 
   // Posts
   useEffect(() => {
@@ -195,24 +195,24 @@ useEffect(() => {
   // Conversas
   useEffect(() => {
     if (!user) return;
-    
+
     const unsub = onSnapshot(collection(db, "Chats"), (snap) => {
       const list: ChatOverview[] = [];
       const seenIds = new Set<string>(); // Prevenir duplicatas
-      
+
       snap.forEach((docSnap) => {
         const data = docSnap.data() as any;
         if (!data.participants?.includes(user.uid)) return;
 
         const otherUid = data.participants.find((uid: string) => uid !== user.uid);
         if (!otherUid || seenIds.has(docSnap.id)) return; // Evitar duplicatas
-        
+
         seenIds.add(docSnap.id);
-        
+
         const otherName = data.names?.[otherUid] || otherUid;
         const otherAvatar = data.avatars?.[otherUid] || "";
         const unread = data.unreadBy?.includes(user.uid) || false;
-        
+
         list.push({
           id: docSnap.id,
           otherUserId: otherUid,
@@ -222,17 +222,17 @@ useEffect(() => {
           unread: unread,
         });
       });
-      
+
       // Ordenar por última mensagem (mais recentes primeiro)
       list.sort((a, b) => {
         if (a.unread && !b.unread) return -1;
         if (!a.unread && b.unread) return 1;
         return 0;
       });
-      
+
       setConversas(list);
     });
-    
+
     return () => unsub();
   }, [user]);
 
@@ -273,7 +273,7 @@ useEffect(() => {
         console.log('Login cancelado pelo usuário');
         return;
       }
-      
+
       // Para outros erros, mostrar mensagem
       console.error('Erro no login:', error);
       addToast({
@@ -287,110 +287,110 @@ useEffect(() => {
 
   const handleLogout = async () => await signOut(auth);
 
-const handlePost = async () => {
-  if (!user || !text.trim()) return;
+  const handlePost = async () => {
+    if (!user || !text.trim()) return;
 
-  const userDocRef = doc(db, "Users", user.uid);
-  const userDocSnap = await getDoc(userDocRef);
-  const userData = userDocSnap.exists() ? userDocSnap.data() : {};
+    const userDocRef = doc(db, "Users", user.uid);
+    const userDocSnap = await getDoc(userDocRef);
+    const userData = userDocSnap.exists() ? userDocSnap.data() : {};
 
-  await addDoc(collection(db, "Posts"), {
-    authorName: userData.displayName || user.displayName || user.email?.split("@")[0],
-    authorTag: userData.tag || null, // envia tag separada se existir
-    authorId: user.uid,
-    authorAvatar: userData.photoURL || user.photoURL || "",
-    text: text.trim(),
-    createdAt: serverTimestamp(),
-    reactions: {},
-  });
+    await addDoc(collection(db, "Posts"), {
+      authorName: userData.displayName || user.displayName || user.email?.split("@")[0],
+      authorTag: userData.tag || null, // envia tag separada se existir
+      authorId: user.uid,
+      authorAvatar: userData.photoURL || user.photoURL || "",
+      text: text.trim(),
+      createdAt: serverTimestamp(),
+      reactions: {},
+    });
 
-  setText("");
-};
-
-
-const handleComment = async (postId: string, commentText: string) => {
-  if (!user || !commentText.trim()) return;
-
-  const postRef = doc(db, "Posts", postId);
-
-  // Carrega a tag do usuário (se existir)
-  let userTag = "";
-  try {
-    const userRef = doc(db, "Users", user.uid);
-    const userSnap = await getDoc(userRef);
-    if (userSnap.exists()) {
-      userTag = userSnap.data().tag || "";
-    }
-  } catch (error) {
-    console.error("Erro ao buscar tag do usuário:", error);
-  }
-
-  const newComment = {
-    authorId: user.uid,
-    authorName: profileName || user.displayName || user.email?.split("@")[0] || "Anonymous",
-    authorAvatar: profilePhoto || user.photoURL || "",
-    authorTag: userTag || "", // ✅ adiciona tag se existir
-    text: commentText.trim(),
-    createdAt: new Date(),
+    setText("");
   };
 
-  try {
-    await updateDoc(postRef, {
-      comments: arrayUnion(newComment),
-    });
-    console.log("Comentário adicionado no post:", postId);
-  } catch (error) {
-    console.error("Erro ao adicionar comentário:", error);
-  }
-};
 
+  const handleComment = async (postId: string, commentText: string) => {
+    if (!user || !commentText.trim()) return;
 
-// Função para deletar comentário
-const handleDeleteComment = async (postId: string, comment: any) => {
-  if (!user) return;
+    const postRef = doc(db, "Posts", postId);
 
-  // Só permite deletar se for o autor do comentário
-  if (comment.authorId !== user.uid) {
-    alert("Você só pode deletar seus próprios comentários.");
-    return;
-  }
+    // Carrega a tag do usuário (se existir)
+    let userTag = "";
+    try {
+      const userRef = doc(db, "Users", user.uid);
+      const userSnap = await getDoc(userRef);
+      if (userSnap.exists()) {
+        userTag = userSnap.data().tag || "";
+      }
+    } catch (error) {
+      console.error("Erro ao buscar tag do usuário:", error);
+    }
 
-  const postRef = doc(db, "Posts", postId);
-
-  try {
-    await updateDoc(postRef, {
-      comments: arrayRemove(comment), // remove exatamente o objeto do array
-    });
-    console.log("Comentário deletado:", comment);
-  } catch (err) {
-    console.error("Erro ao deletar comentário:", err);
-  }
-};
-
-
-const toggleReaction = async (post: Post, reaction?: { name: string; emoji: string }) => {
-  if (!user || !post.id) return;
-
-  const pRef = doc(db, "Posts", post.id);
-
-  // Clona o objeto de reações
-  const reactions = { ...(post.reactions || {}) };
-
-  if (reactions[user.uid]) {
-    // Se já reagiu, remove a reação
-    delete reactions[user.uid];
-  } else if (reaction) {
-    // Adiciona a nova reação
-    reactions[user.uid] = {
-      userId: user.uid,
-      name: reaction.name,
-      emoji: reaction.emoji,
+    const newComment = {
+      authorId: user.uid,
+      authorName: profileName || user.displayName || user.email?.split("@")[0] || "Anonymous",
+      authorAvatar: profilePhoto || user.photoURL || "",
+      authorTag: userTag || "", // ✅ adiciona tag se existir
+      text: commentText.trim(),
       createdAt: new Date(),
     };
-  }
 
-  await updateDoc(pRef, { reactions });
-};
+    try {
+      await updateDoc(postRef, {
+        comments: arrayUnion(newComment),
+      });
+      console.log("Comentário adicionado no post:", postId);
+    } catch (error) {
+      console.error("Erro ao adicionar comentário:", error);
+    }
+  };
+
+
+  // Função para deletar comentário
+  const handleDeleteComment = async (postId: string, comment: any) => {
+    if (!user) return;
+
+    // Só permite deletar se for o autor do comentário
+    if (comment.authorId !== user.uid) {
+      alert("Você só pode deletar seus próprios comentários.");
+      return;
+    }
+
+    const postRef = doc(db, "Posts", postId);
+
+    try {
+      await updateDoc(postRef, {
+        comments: arrayRemove(comment), // remove exatamente o objeto do array
+      });
+      console.log("Comentário deletado:", comment);
+    } catch (err) {
+      console.error("Erro ao deletar comentário:", err);
+    }
+  };
+
+
+  const toggleReaction = async (post: Post, reaction?: { name: string; emoji: string }) => {
+    if (!user || !post.id) return;
+
+    const pRef = doc(db, "Posts", post.id);
+
+    // Clona o objeto de reações
+    const reactions = { ...(post.reactions || {}) };
+
+    if (reactions[user.uid]) {
+      // Se já reagiu, remove a reação
+      delete reactions[user.uid];
+    } else if (reaction) {
+      // Adiciona a nova reação
+      reactions[user.uid] = {
+        userId: user.uid,
+        name: reaction.name,
+        emoji: reaction.emoji,
+        createdAt: new Date(),
+      };
+    }
+
+    await updateDoc(pRef, { reactions });
+  };
 
 
   // Função para atualizar status de digitação
@@ -447,13 +447,13 @@ const toggleReaction = async (post: Post, reaction?: { name: string; emoji: stri
 
   const openChatFromConversa = (c: ChatOverview): void => {
     if (!user) return;
-    
+
     // Limpar listener anterior se existir
     if (messagesUnsubscribeRef.current) {
       messagesUnsubscribeRef.current();
       messagesUnsubscribeRef.current = null;
     }
-    
+
     setActiveTab("Conversas");
     setActiveChatOverview(c);
 
@@ -463,7 +463,7 @@ const toggleReaction = async (post: Post, reaction?: { name: string; emoji: stri
 
     // Configurar listener em tempo real para mensagens com ordenação correta
     const messagesUnsubscribe = onSnapshot(
-      query(chatCol, orderBy("createdAt", "asc")), 
+      query(chatCol, orderBy("createdAt", "asc")),
       (snap) => {
         console.log('Mensagens recebidas:', snap.docs.length);
         const msgs = snap.docs.map((d) => {
@@ -480,15 +480,15 @@ const toggleReaction = async (post: Post, reaction?: { name: string; emoji: stri
 
     // Configurar listener para status de digitação
     const typingUnsubscribe = onSnapshot(typingCol, (snap) => {
-      const typingData: {[userId: string]: {userId: string, userName: string, timestamp: number}} = {};
-      
+      const typingData: { [userId: string]: { userId: string, userName: string, timestamp: number } } = {};
+
       snap.forEach((doc) => {
         const data = doc.data();
         if (data.isTyping && data.userId !== user.uid) {
           // Verificar se o timestamp não é muito antigo (mais de 2 minutos)
           const now = Date.now();
           const typingTime = data.timestamp?.toDate?.()?.getTime() || 0;
-          
+
           if (now - typingTime < 120000) { // 2 minutos
             typingData[data.userId] = {
               userId: data.userId,
@@ -498,7 +498,7 @@ const toggleReaction = async (post: Post, reaction?: { name: string; emoji: stri
           }
         }
       });
-      
+
       setIsTyping(prev => {
         const newState = { ...prev };
         if (Object.keys(typingData).length > 0) {
@@ -509,13 +509,13 @@ const toggleReaction = async (post: Post, reaction?: { name: string; emoji: stri
         return newState;
       });
     });
-    
+
     // Combinar os unsubscribes
     const combinedUnsubscribe = () => {
       messagesUnsubscribe();
       typingUnsubscribe();
     };
-    
+
     // Armazenar o unsubscribe para limpeza posterior
     messagesUnsubscribeRef.current = combinedUnsubscribe;
 
@@ -529,7 +529,7 @@ const toggleReaction = async (post: Post, reaction?: { name: string; emoji: stri
           unreadBy: data.unreadBy.filter((uid: string) => uid !== user.uid),
         }).then(() => {
           // Atualizar o estado local imediatamente para feedback visual
-          setConversas(prev => prev.map(conv => 
+          setConversas(prev => prev.map(conv =>
             conv.id === c.id ? { ...conv, unread: false } : conv
           ));
         });
@@ -548,16 +548,16 @@ const toggleReaction = async (post: Post, reaction?: { name: string; emoji: stri
 
     try {
       console.log('Enviando mensagem para chatId:', chatId);
-      
+
       // Parar de mostrar "digitando" antes de enviar
       updateTypingStatus(false);
-      
+
       // Limpar timeout se existir
       if (typingTimeout) {
         clearTimeout(typingTimeout);
         setTypingTimeout(null);
       }
-      
+
       // Adicionar mensagem à subcoleção
       await addDoc(chatCol, {
         senderId: user.uid,
@@ -687,31 +687,30 @@ const toggleReaction = async (post: Post, reaction?: { name: string; emoji: stri
       <Navbar>
         {/* Navbar esquerda */}
         <NavbarContent justify="start">
-        <div className="hidden sm:flex gap-2">
-  {navigation.map((n) => (
-    <NavbarItem key={n.label} isActive={activeTab === n.label}>
-      <Tooltip content={n.label} placement="bottom">
-<Button onPress={() => setActiveTab(n.label as "Feed" | "Conversas" | "Minhas Organizações" | "Explorar Organizações" | "Criar Organização" | "Painel da Organização")}>
-          {n.icon}
-          {/* Badge vermelho para Conversas */}
-          {n.label === "Conversas" && conversas.some((c) => c.unread) && (
-            <span
-              style={{
-                display: "inline-block",
-                width: 8,
-                height: 8,
-                borderRadius: "50%",
-                background: "red",
-                marginLeft: 4,
-              }}
-            />
-          )}
-        </Button>
-      </Tooltip>
-    </NavbarItem>
-  ))}
-</div>
-
+          <div className="hidden sm:flex gap-2">
+            {navigation.map((n) => (
+              <NavbarItem key={n.label} isActive={activeTab === n.label}>
+                <Tooltip content={n.label} placement="bottom">
+                  <Button onPress={() => setActiveTab(n.label as "Feed" | "Conversas" | "Minhas Organizações" | "Explorar Organizações" | "Criar Organização" | "Painel da Organização")}>
+                    {n.icon}
+                    {/* Badge vermelho para Conversas */}
+                    {n.label === "Conversas" && conversas.some((c) => c.unread) && (
+                      <span
+                        style={{
+                          display: "inline-block",
+                          width: 8,
+                          height: 8,
+                          borderRadius: "50%",
+                          background: "red",
+                          marginLeft: 4,
+                        }}
+                      />
+                    )}
+                  </Button>
+                </Tooltip>
+              </NavbarItem>
+            ))}
+          </div>
 
           {/* Menu Mobile */}
           <div className="flex sm:hidden">
@@ -723,11 +722,11 @@ const toggleReaction = async (post: Post, reaction?: { name: string; emoji: stri
               </DropdownTrigger>
               <DropdownMenu>
                 {navigation.map((n) => (
-                <DropdownItem
-  key={n.label}
-  onPress={() => setActiveTab(n.label as "Feed" | "Conversas" | "Minhas Organizações" | "Explorar Organizações" | "Criar Organização" | "Painel da Organização")}
-  className="flex items-center justify-between w-full"
->
+                  <DropdownItem
+                    key={n.label}
+                    onPress={() => setActiveTab(n.label as "Feed" | "Conversas" | "Minhas Organizações" | "Explorar Organizações" | "Criar Organização" | "Painel da Organização")}
+                    className="flex items-center justify-between w-full"
+                  >
                     {/* Ícone + Texto lado a lado */}
                     <div className="flex items-center gap-2">
                       {n.icon}
@@ -752,10 +751,6 @@ const toggleReaction = async (post: Post, reaction?: { name: string; emoji: stri
             </Dropdown>
           </div>
         </NavbarContent>
-
-
-
-
 
         {/* Navbar direita */}
         <NavbarContent justify="end">
@@ -842,27 +837,27 @@ const toggleReaction = async (post: Post, reaction?: { name: string; emoji: stri
               <ModalHeader>Editar Nome</ModalHeader>
               <ModalBody className="flex flex-col gap-2">
                 <div>
-                              <Code color="primary" className="mb-2">Seu nome atual</Code>
-               <div className="flex items-center gap-2">
-                
-  {/* Tag em Code, alinhada à altura do input */}
-  {profileNameTag && (
-    <Code
-      color="danger"
-      className="flex items-center px-2 h-[38px] text-sm rounded" // h igual à altura do input
-    >
-      {profileNameTag}
-    </Code>
-  )}
+                  <Code color="primary" className="mb-2">Seu nome atual</Code>
+                  <div className="flex items-center gap-2">
 
-  {/* Input com apenas o nome */}
-  <Input
-    type="text"
-    value={profileName}
-    disabled
-    className="h-[38px]" // mesma altura que o Code
-  />
-</div>
+                    {/* Tag em Code, alinhada à altura do input */}
+                    {profileNameTag && (
+                      <Code
+                        color="danger"
+                        className="flex items-center px-2 h-[38px] text-sm rounded" // h igual à altura do input
+                      >
+                        {profileNameTag}
+                      </Code>
+                    )}
+
+                    {/* Input com apenas o nome */}
+                    <Input
+                      type="text"
+                      value={profileName}
+                      disabled
+                      className="h-[38px]" // mesma altura que o Code
+                    />
+                  </div>
                 </div>
                 <div>
                   <Code color="primary" className="mb-2">Seu novo nome</Code>
@@ -882,20 +877,20 @@ const toggleReaction = async (post: Post, reaction?: { name: string; emoji: stri
           </Modal>
         </NavbarContent>
       </Navbar>
-<div style={{ maxWidth: 800, margin: "0 auto", marginTop: 10, marginBottom: -10,   paddingLeft: 40,}}>
-  <Breadcrumbs>
-    {/* Sempre Home */}
-    <BreadcrumbItem startContent={<HiOutlineNewspaper />} onPress={() => setActiveTab("Feed")}>
-      Feed
-    </BreadcrumbItem>
+      <div style={{ maxWidth: 800, margin: "0 auto", marginTop: 10, marginBottom: -10, paddingLeft: 40, }}>
+        <Breadcrumbs>
+          {/* Sempre Home */}
+          <BreadcrumbItem startContent={<HiOutlineNewspaper />} onPress={() => setActiveTab("Feed")}>
+            Feed
+          </BreadcrumbItem>
 
-    {/* Aba ativa */}
-    {activeTab && activeTab !== "Feed" && (
-<BreadcrumbItem isCurrent>{activeTab}</BreadcrumbItem>
+          {/* Aba ativa */}
+          {activeTab && activeTab !== "Feed" && (
+            <BreadcrumbItem isCurrent>{activeTab}</BreadcrumbItem>
 
-    )}
-  </Breadcrumbs>
-</div>
+          )}
+        </Breadcrumbs>
+      </div>
       {/* Conteúdo */}
       <div style={{ maxWidth: 800, margin: "0 auto", padding: 24 }}>
         {activeTab === "Feed" && (
@@ -928,12 +923,10 @@ const toggleReaction = async (post: Post, reaction?: { name: string; emoji: stri
             setChatText={setChatText}
             currentUserId={user.uid}
             openChatFromConversa={openChatFromConversa}
-             handleComment={handleComment} 
-                   handleDeleteComment={handleDeleteComment} 
+            handleComment={handleComment}
+            handleDeleteComment={handleDeleteComment}
           />
         )}
-
-        
 
         {activeTab === "Conversas" && (
           <Chat
@@ -969,7 +962,7 @@ const toggleReaction = async (post: Post, reaction?: { name: string; emoji: stri
         )}
 
         {activeTab === "Minhas Organizações" && (
-          <MinhasOrganizacoes 
+          <MinhasOrganizacoes
             user={user}
             userOrganizations={userOrganizations}
             loading={userOrgsLoading}
@@ -979,7 +972,7 @@ const toggleReaction = async (post: Post, reaction?: { name: string; emoji: stri
         )}
 
         {activeTab === "Explorar Organizações" && (
-          <ExplorarOrganizacoes 
+          <ExplorarOrganizacoes
             user={user}
             organizations={publicOrganizations}
             loading={publicOrgsLoading}
@@ -993,7 +986,7 @@ const toggleReaction = async (post: Post, reaction?: { name: string; emoji: stri
         )}
 
         {activeTab === "Painel da Organização" && (
-          <PainelOrganizacao 
+          <PainelOrganizacao
             user={user}
             userOrg={userOrg}
             userMembership={userMembership}
@@ -1004,7 +997,7 @@ const toggleReaction = async (post: Post, reaction?: { name: string; emoji: stri
           />
         )}
 
-        
+
       </div>
     </div>
   );
