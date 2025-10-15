@@ -15,7 +15,7 @@ import {
 import { Dropdown, DropdownTrigger, DropdownMenu, DropdownItem } from "@heroui/dropdown";
 import { Avatar } from "@heroui/avatar";
 import { Button } from "@heroui/button";
-import { HiOutlineHome, HiOutlineInbox, HiOutlineLogout, HiOutlineMenu, HiOutlineNewspaper, HiOutlinePencil, HiOutlineSave, HiOutlineTicket, HiOutlineUserGroup, HiOutlineViewList, HiOutlineX } from "react-icons/hi";
+import { HiHome, HiOutlineHome, HiOutlineInbox, HiOutlineLogout, HiOutlineMenu, HiOutlineNewspaper, HiOutlinePencil, HiOutlineSave, HiOutlineTicket, HiOutlineUserGroup, HiOutlineViewList, HiOutlineX } from "react-icons/hi";
 import {
   collection,
   addDoc,
@@ -67,6 +67,8 @@ import { HiOutlineBriefcase, HiOutlineGlobe, HiOutlineCog, HiOutlineShieldCheck 
 import MinhasOrganizacoes from "./components/MinhasOrganizacoes";
 import ExplorarOrganizacoes from "./components/ExplorarOrganizacoes";
 import PainelOrganizacao from "./components/PainelOrganizacao";
+import {Breadcrumbs, BreadcrumbItem} from "@heroui/breadcrumbs";
+
 
 const navigation = [
   { label: "Feed", icon: <HiOutlineNewspaper className="w-5 h-5" /> },
@@ -76,6 +78,7 @@ const navigation = [
   { label: "Criar Organização", icon: <HiOutlineHome className="w-5 h-5" /> },
   { label: "Painel da Organização", icon: <HiOutlineShieldCheck className="w-5 h-5" /> },
 ];
+
 
 export default function Home() {
   const [user, setUser] = useState<User | null>(null);
@@ -298,7 +301,7 @@ const handlePost = async () => {
     authorAvatar: userData.photoURL || user.photoURL || "",
     text: text.trim(),
     createdAt: serverTimestamp(),
-    reactions: [],
+    reactions: {},
   });
 
   setText("");
@@ -365,14 +368,30 @@ const handleDeleteComment = async (postId: string, comment: any) => {
 };
 
 
-  const toggleReaction = async (post: Post) => {
-    if (!user || !post.id) return;
-    const pRef = doc(db, "Posts", post.id);
-    const reactions = new Set(post.reactions || []);
-    if (reactions.has(user.uid)) reactions.delete(user.uid);
-    else reactions.add(user.uid);
-    await updateDoc(pRef, { reactions: Array.from(reactions) });
-  };
+const toggleReaction = async (post: Post, reaction?: { name: string; emoji: string }) => {
+  if (!user || !post.id) return;
+
+  const pRef = doc(db, "Posts", post.id);
+
+  // Clona o objeto de reações
+  const reactions = { ...(post.reactions || {}) };
+
+  if (reactions[user.uid]) {
+    // Se já reagiu, remove a reação
+    delete reactions[user.uid];
+  } else if (reaction) {
+    // Adiciona a nova reação
+    reactions[user.uid] = {
+      userId: user.uid,
+      name: reaction.name,
+      emoji: reaction.emoji,
+      createdAt: new Date(),
+    };
+  }
+
+  await updateDoc(pRef, { reactions });
+};
+
 
   // Função para atualizar status de digitação
   const updateTypingStatus = async (isTypingNow: boolean) => {
@@ -734,6 +753,10 @@ const handleDeleteComment = async (postId: string, comment: any) => {
           </div>
         </NavbarContent>
 
+
+
+
+
         {/* Navbar direita */}
         <NavbarContent justify="end">
           <Button color="danger" onPress={handleLogout}>
@@ -859,7 +882,20 @@ const handleDeleteComment = async (postId: string, comment: any) => {
           </Modal>
         </NavbarContent>
       </Navbar>
+<div style={{ maxWidth: 800, margin: "0 auto", marginTop: 10, marginBottom: -10,   paddingLeft: 40,}}>
+  <Breadcrumbs>
+    {/* Sempre Home */}
+    <BreadcrumbItem startContent={<HiOutlineNewspaper />} onPress={() => setActiveTab("Feed")}>
+      Feed
+    </BreadcrumbItem>
 
+    {/* Aba ativa */}
+    {activeTab && activeTab !== "Feed" && (
+<BreadcrumbItem isCurrent>{activeTab}</BreadcrumbItem>
+
+    )}
+  </Breadcrumbs>
+</div>
       {/* Conteúdo */}
       <div style={{ maxWidth: 800, margin: "0 auto", padding: 24 }}>
         {activeTab === "Feed" && (
