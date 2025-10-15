@@ -75,7 +75,7 @@ const navigation = [
   { label: "Conversas", icon: <HiOutlineInbox className="w-5 h-5" /> },
   { label: "Minhas Organizações", icon: <HiOutlineBriefcase className="w-5 h-5" /> },
   { label: "Explorar Organizações", icon: <HiOutlineGlobe className="w-5 h-5" /> },
-  { label: "Criar Organização", icon: <HiOutlineHome className="w-5 h-5" /> },
+  { label: "Criar Organização", icon: <HiOutlineCog className="w-5 h-5" /> },
   { label: "Painel da Organização", icon: <HiOutlineShieldCheck className="w-5 h-5" /> },
 ];
 
@@ -681,6 +681,15 @@ export default function Home() {
 
   if (!user) return <Login handleGoogleLogin={handleGoogleLogin} />;
 
+  // Filtrar navegação baseado no status do usuário
+  const filteredNavigation = navigation.filter(n => {
+    // Se o usuário já é membro de uma organização, não mostrar "Criar Organização"
+    if (n.label === "Criar Organização" && userOrganizations && userOrganizations.length > 0) {
+      return false;
+    }
+    return true;
+  });
+
   return (
     <div>
       {/* Navbar */}
@@ -688,7 +697,7 @@ export default function Home() {
         {/* Navbar esquerda */}
         <NavbarContent justify="start">
           <div className="hidden sm:flex gap-2">
-            {navigation.map((n) => (
+            {filteredNavigation.map((n) => (
               <NavbarItem key={n.label} isActive={activeTab === n.label}>
                 <Tooltip content={n.label} placement="bottom">
                   <Button onPress={() => setActiveTab(n.label as "Feed" | "Conversas" | "Minhas Organizações" | "Explorar Organizações" | "Criar Organização" | "Painel da Organização")}>
@@ -721,7 +730,7 @@ export default function Home() {
                 </Button>
               </DropdownTrigger>
               <DropdownMenu>
-                {navigation.map((n) => (
+                {filteredNavigation.map((n) => (
                   <DropdownItem
                     key={n.label}
                     onPress={() => setActiveTab(n.label as "Feed" | "Conversas" | "Minhas Organizações" | "Explorar Organizações" | "Criar Organização" | "Painel da Organização")}
