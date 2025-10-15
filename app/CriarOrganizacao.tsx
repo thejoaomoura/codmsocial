@@ -259,14 +259,15 @@ export default function CriarOrganizacao() {
           <Select
             label="Visibilidade"
             placeholder="Selecione a visibilidade"
-            selectedKeys={visibilidade ? new Set([visibilidade]) : new Set()}
+            selectedKeys={new Set([visibilidade])}
             onSelectionChange={(keys) => {
               const selected = Array.from(keys)[0] as OrganizationVisibility;
               setVisibilidade(selected);
             }}
             isDisabled={isCreating}
+            isRequired
           >
-            <SelectItem key="public">
+            <SelectItem key="public" textValue="Pública">
               <div className="flex items-center gap-2">
                 <span>🌍</span>
                 <div>
@@ -277,7 +278,7 @@ export default function CriarOrganizacao() {
                 </div>
               </div>
             </SelectItem>
-            <SelectItem key="private">
+            <SelectItem key="private" textValue="Privada">
               <div className="flex items-center gap-2">
                 <span>🔒</span>
                 <div>
