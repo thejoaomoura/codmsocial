@@ -11,6 +11,7 @@ import { Checkbox } from '@heroui/checkbox';
 import { Divider } from '@heroui/divider';
 import { Input } from '@heroui/input';
 import { Select, SelectItem } from '@heroui/select';
+import { Switch } from '@heroui/switch';
 import { addToast } from '@heroui/toast';
 import { 
   HiOutlineCalendar, 
@@ -21,20 +22,18 @@ import {
   HiOutlineX,
   HiOutlineEye,
   HiOutlineExternalLink,
-  HiOutlinePlus
+  HiOutlinePlus,
+  HiOutlinePencil
 } from 'react-icons/hi';
 import { Event, EventRegistration, Organization, Membership, User, OrganizationRole, EventType, GameMode, EventStatus } from '../types';
 import { useRoleManagement } from '../hooks/useRoleManagement';
 import { useEventRegistrations } from '../hooks/useEventRegistrations';
 import { formatDate, formatDateTime, isValidDate, parseDateTime } from '../utils/dateUtils';
-import { collection, addDoc, serverTimestamp, onSnapshot, query, where, orderBy, Timestamp } from 'firebase/firestore';
+import { collection, addDoc, serverTimestamp, onSnapshot, query, where, orderBy, Timestamp, doc, updateDoc } from 'firebase/firestore';
 import { db } from '../firebase';
 import {DatePicker} from "@heroui/date-picker";
 import { parseZonedDateTime, ZonedDateTime } from "@internationalized/date";
 import { I18nProvider } from "@react-aria/i18n";
-
-
-
 
 interface EventsManagementProps {
   organization: Organization;
@@ -53,6 +52,7 @@ const EventsManagement: React.FC<EventsManagementProps> = ({
   const [showRosterModal, setShowRosterModal] = useState(false);
   const [showEventDetailsModal, setShowEventDetailsModal] = useState(false);
   const [showCreateEventModal, setShowCreateEventModal] = useState(false);
+  const [isEditMode, setIsEditMode] = useState(false);
   const [selectedRoster, setSelectedRoster] = useState<string[]>([]);
   const [events, setEvents] = useState<Event[]>([]);
   const [loading, setLoading] = useState(true);
@@ -73,12 +73,43 @@ const EventsManagement: React.FC<EventsManagementProps> = ({
     checkinWindow: 30,
     maxTeams: undefined as number | undefined,
     prizePool: '',
+    prizeCurrency: 'BRL' as 'BRL' | 'USD',
     rulesURL: ''
   });
 
-  const permissions = getRolePermissions(currentUserRole);
+  // Função para formatar valor da premiação
+  const formatPrizeValue = (value: string, currency: 'BRL' | 'USD'): string => {
+    // Remove caracteres não numéricos exceto vírgula e ponto
+    const cleanValue = value.replace(/[^\d.,]/g, '');
+    
+    if (!cleanValue) return '';
+    
+    // Converte vírgula para ponto para processamento
+    const normalizedValue = cleanValue.replace(',', '.');
+    const numericValue = parseFloat(normalizedValue);
+    
+    if (isNaN(numericValue)) return '';
+    
+    // Formata conforme a moeda
+    if (currency === 'BRL') {
+      return new Intl.NumberFormat('pt-BR', {
+        style: 'currency',
+        currency: 'BRL'
+      }).format(numericValue);
+    } else {
+      return new Intl.NumberFormat('en-US', {
+        style: 'currency',
+        currency: 'USD'
+      }).format(numericValue);
+    }
+  };
 
-  // Carregar eventos do Firebase
+  // Função para extrair valor numérico da string formatada
+  const extractNumericValue = (formattedValue: string): string => {
+    return formattedValue.replace(/[^\d.,]/g, '').replace(',', '.');
+  };
+
+  const permissions = getRolePermissions(currentUserRole);
   React.useEffect(() => {
     const eventsQuery = query(
       collection(db, 'events'),
@@ -114,7 +145,35 @@ const EventsManagement: React.FC<EventsManagementProps> = ({
       checkinWindow: 30,
       maxTeams: undefined,
       prizePool: '',
+      prizeCurrency: 'BRL' as 'BRL' | 'USD',
       rulesURL: ''
+    });
+  };
+
+  const populateEventForm = (event: Event) => {
+    const startsAtDate = event.startsAt instanceof Timestamp 
+      ? event.startsAt.toDate() 
+      : new Date(event.startsAt);
+    
+    const formattedDate = startsAtDate.toISOString().slice(0, 16);
+    
+    const prizeValue = event.prizePool ? extractNumericValue(event.prizePool) : '';
+    const currency = event.prizePool?.includes('$') ? 'USD' : 'BRL';
+    
+    setEventForm({
+      name: event.name,
+      description: event.description,
+      type: event.type,
+      gameMode: event.gameMode,
+      teamSize: event.teamSize,
+      rosterMin: event.rosterMin,
+      rosterMax: event.rosterMax,
+      startsAt: formattedDate,
+      checkinWindow: event.checkinWindow || 10,
+      maxTeams: event.maxTeams,
+      prizePool: prizeValue,
+      prizeCurrency: currency,
+      rulesURL: event.rulesURL || ''
     });
   };
 
@@ -233,7 +292,9 @@ if (jsDate <= new Date()) {
   createdAt: serverTimestamp(),
   region: organization.region,
   ...(eventForm.maxTeams && { maxTeams: eventForm.maxTeams }),
-  ...(eventForm.prizePool.trim() && { prizePool: eventForm.prizePool.trim() }),
+  ...(eventForm.prizePool.trim() && { 
+    prizePool: formatPrizeValue(eventForm.prizePool, eventForm.prizeCurrency)
+  }),
   ...(eventForm.rulesURL.trim() && { rulesURL: eventForm.rulesURL.trim() })
 };
 
@@ -254,6 +315,105 @@ if (jsDate <= new Date()) {
       addToast({
         title: 'Erro',
         description: 'Erro ao criar evento. Tente novamente.',
+        color: 'danger'
+      });
+    } finally {
+      setCreateEventLoading(false);
+    }
+  };
+
+  const handleUpdateEvent = async () => {
+    if (!selectedEvent || !eventForm.name.trim() || !eventForm.description.trim() || !eventForm.startsAt) {
+      addToast({
+        title: 'Campos obrigatórios',
+        description: 'Preencha todos os campos obrigatórios',
+        color: 'danger'
+      });
+      return;
+    }
+
+    let eventDate: ZonedDateTime | null = null;
+
+    try {
+      if (!eventForm.startsAt) throw new Error("empty");
+      eventDate = parseZonedDateTime(eventForm.startsAt);
+      if (!(eventDate instanceof ZonedDateTime)) {
+        throw new Error("invalid");
+      }
+    } catch (error) {
+      addToast({
+        title: "Data inválida",
+        description: "Por favor, selecione uma data e hora válidas",
+        color: "danger",
+      });
+      return;
+    }
+
+    const jsDate = new Date(eventDate.toString());
+    if (jsDate <= new Date()) {
+      addToast({
+        title: "Data inválida",
+        description: "A data do evento deve ser no futuro",
+        color: "danger",
+      });
+      return;
+    }
+
+    if (eventForm.rosterMin > eventForm.rosterMax) {
+      addToast({
+        title: 'Erro de validação',
+        description: 'O roster mínimo não pode ser maior que o máximo',
+        color: 'danger'
+      });
+      return;
+    }
+
+    if (!eventForm.type || !eventForm.gameMode) {
+      addToast({
+        title: 'Campos obrigatórios',
+        description: 'Selecione o tipo de evento e modo de jogo',
+        color: 'danger'
+      });
+      return;
+    }
+
+    setCreateEventLoading(true);
+
+    try {
+      const updateData: Partial<Event> = {
+        name: eventForm.name.trim(),
+        description: eventForm.description.trim(),
+        type: eventForm.type,
+        gameMode: eventForm.gameMode,
+        teamSize: eventForm.teamSize,
+        rosterMin: eventForm.rosterMin,
+        rosterMax: eventForm.rosterMax,
+        startsAt: eventDate.toString(),
+        checkinWindow: eventForm.checkinWindow,
+        ...(eventForm.maxTeams && { maxTeams: eventForm.maxTeams }),
+        ...(eventForm.prizePool.trim() && { 
+          prizePool: formatPrizeValue(eventForm.prizePool, eventForm.prizeCurrency)
+        }),
+        ...(eventForm.rulesURL.trim() && { rulesURL: eventForm.rulesURL.trim() })
+      };
+
+      await updateDoc(doc(db, 'events', selectedEvent.id), updateData);
+
+      addToast({
+        title: 'Evento atualizado',
+        description: 'O evento foi atualizado com sucesso!',
+        color: 'success'
+      });
+
+      setShowCreateEventModal(false);
+      setIsEditMode(false);
+      setSelectedEvent(null);
+      resetEventForm();
+    } catch (error) {
+      console.error('Erro ao atualizar evento:', error);
+      addToast({
+        title: 'Erro',
+        description: 'Erro ao atualizar evento. Tente novamente.',
         color: 'danger'
       });
     } finally {
@@ -468,29 +628,29 @@ if (jsDate <= new Date()) {
     }
   };
 
-const formatEventDate = (dateString?: string) => {
-  if (!dateString) return "";
+  const formatEventDate = (dateString?: string) => {
+    if (!dateString) return "";
 
-  try {
-    // Remove o timezone em colchetes, mantendo a parte ISO que JS entende
-    const cleanedString = dateString.replace(/\[.*\]$/, ""); // "2025-10-15T20:00:00-03:00"
+    try {
+      // Remove o timezone em colchetes, mantendo a parte ISO que JS entende
+      const cleanedString = dateString.replace(/\[.*\]$/, ""); // "2025-10-15T20:00:00-03:00"
 
-    const jsDate = new Date(cleanedString);
+      const jsDate = new Date(cleanedString);
 
-    if (isNaN(jsDate.getTime())) return "";
+      if (isNaN(jsDate.getTime())) return "";
 
-    const day = jsDate.getDate().toString().padStart(2, "0");
-    const month = (jsDate.getMonth() + 1).toString().padStart(2, "0");
-    const year = jsDate.getFullYear();
-    const hours = jsDate.getHours().toString().padStart(2, "0");
-    const minutes = jsDate.getMinutes().toString().padStart(2, "0");
+      const day = jsDate.getDate().toString().padStart(2, "0");
+      const month = (jsDate.getMonth() + 1).toString().padStart(2, "0");
+      const year = jsDate.getFullYear();
+      const hours = jsDate.getHours().toString().padStart(2, "0");
+      const minutes = jsDate.getMinutes().toString().padStart(2, "0");
 
-    return `${day}/${month}/${year} às ${hours}:${minutes}`;
-  } catch (error) {
-    console.error("Erro ao formatar a data:", error);
-    return "";
-  }
-};
+      return `${day}/${month}/${year} às ${hours}:${minutes}`;
+    } catch (error) {
+      console.error("Erro ao formatar a data:", error);
+      return "";
+    }
+  };
   // Filtrar eventos que o usuário pode ver
   const visibleEvents = events.filter(canViewEvent);
 
@@ -505,20 +665,34 @@ const formatEventDate = (dateString?: string) => {
     );
   }
 
-
-
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <h3 className="text-xl font-semibold">Eventos Disponíveis</h3>
         {permissions.canCreateEvents && (
-          <Button 
-            color="primary" 
-            startContent={<HiOutlinePlus className="w-4 h-4" />}
-            onClick={() => setShowCreateEventModal(true)}
-          >
-            Criar Evento
-          </Button>
+          <Button
+          startContent={<HiOutlinePlus className="w-4 h-4" />}
+          onClick={() => setShowCreateEventModal(true)}
+          style={{
+            background: "rgba(219, 16, 87, 0.25)",
+            border: "1px solid rgba(219, 16, 87, 0.4)",
+            backdropFilter: "blur(10px)",
+            WebkitBackdropFilter: "blur(10px)",
+            color: "#fff",
+            fontWeight: 500,
+            transition: "all 0.3s ease",
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.background = "rgba(219, 16, 87, 0.4)";
+            e.currentTarget.style.border = "1px solid rgba(219, 16, 87, 0.6)";
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.background = "rgba(219, 16, 87, 0.25)";
+            e.currentTarget.style.border = "1px solid rgba(219, 16, 87, 0.4)";
+          }}
+        >
+          Criar Evento
+        </Button>
         )}
       </div>
 
@@ -581,6 +755,22 @@ const formatEventDate = (dateString?: string) => {
                     >
                       Detalhes
                     </Button>
+                    {/* Botão de edição - apenas para o criador do evento */}
+                    {event.createdBy === currentUserId && (
+                      <Button 
+                        color="primary" 
+                        variant="flat"
+                        size="sm"
+                        isIconOnly
+                        startContent={<HiOutlinePencil className="w-4 h-4" />}
+                        onClick={() => {
+                          setSelectedEvent(event);
+                          populateEventForm(event);
+                          setIsEditMode(true);
+                          setShowCreateEventModal(true);
+                        }}
+                      />
+                    )}
                     {canRegister && !registration && (
                       <Button 
                         color="primary" 
@@ -627,12 +817,12 @@ const formatEventDate = (dateString?: string) => {
                     <HiOutlineUsers className="w-4 h-4 text-default-500" />
                     <span className="text-default-700">Roster: {event.rosterMin}-{event.rosterMax}</span>
                   </div>
-<div className="flex items-center gap-2">
-  <HiOutlineClock className="w-4 h-4 text-default-500" />
-  <span className="text-default-700">
-    {formatEventDate(event.startsAt)}
-  </span>
-</div>
+                  <div className="flex items-center gap-2">
+                    <HiOutlineClock className="w-4 h-4 text-default-500" />
+                    <span className="text-default-700">
+                      {formatEventDate(event.startsAt)}
+                    </span>
+                  </div>
                   <div className="flex items-center gap-2">
                     <span className="text-default-700">Região: {event.region}</span>
                   </div>
@@ -798,12 +988,12 @@ const formatEventDate = (dateString?: string) => {
                         </span>
                       </div>
                         <div className="flex items-center gap-2">
-  <HiOutlineClock className="w-4 h-4 text-default-500" />
-  <span className="text-default-700">
-    {formatEventDate(selectedEvent.startsAt)}
-  </span>
-</div>
-                                        </div>
+                      <HiOutlineClock className="w-4 h-4 text-default-500" />
+                      <span className="text-default-700">
+                        {formatEventDate(selectedEvent.startsAt)}
+                      </span>
+                    </div>
+                    </div>
                     <div className="space-y-3">
                       <div className="text-sm">
                         <strong>Modo de Jogo:</strong> {selectedEvent.gameMode}
@@ -946,8 +1136,12 @@ const formatEventDate = (dateString?: string) => {
       >
         <ModalContent>
           <ModalHeader className="flex flex-col gap-1">
-            <h2 className="text-xl font-semibold">Criar Novo Evento</h2>
-            <p className="text-sm text-default-600">Preencha as informações do evento</p>
+            <h2 className="text-xl font-semibold">
+              {isEditMode ? 'Editar Evento' : 'Criar Novo Evento'}
+            </h2>
+            <p className="text-sm text-default-600">
+              {isEditMode ? 'Atualize as informações do evento' : 'Preencha as informações do evento'}
+            </p>
           </ModalHeader>
           <ModalBody className="gap-4">
             {/* Informações Básicas */}
@@ -1022,7 +1216,6 @@ const formatEventDate = (dateString?: string) => {
             </div>
 
             <Divider />
-
             {/* Configurações da Equipe */}
             <div className="space-y-4">
               <h3 className="text-lg font-medium">Configurações da Equipe</h3>
@@ -1071,7 +1264,6 @@ const formatEventDate = (dateString?: string) => {
                 />
               </div>
             </div>
-
             <Divider />
 
             {/* Data e Horário */}
@@ -1079,24 +1271,24 @@ const formatEventDate = (dateString?: string) => {
               <h3 className="text-lg font-medium">Data e Horário</h3>
               
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-<div>
-  <I18nProvider locale="pt-BR">
-      <DatePicker
-        className="max-w-xs"
-        label="Data e Hora de Início"
-        labelPlacement="outside"
-        value={
-          eventForm.startsAt
-            ? parseZonedDateTime(eventForm.startsAt)
-            : parseZonedDateTime("2025-10-14T00:00[America/Sao_Paulo]")
-        }
-        onChange={(date) =>
-          setEventForm({ ...eventForm, startsAt: date?.toString() || "" })
-        }
-        hourCycle={24} // usa formato 24h
-      />
-    </I18nProvider>
-</div>
+                <div>
+                  <I18nProvider locale="pt-BR">
+                      <DatePicker
+                        className="max-w-xs"
+                        label="Data e Hora de Início"
+                        labelPlacement="outside"
+                        value={
+                          eventForm.startsAt
+                            ? parseZonedDateTime(eventForm.startsAt)
+                            : parseZonedDateTime("2025-10-14T00:00[America/Sao_Paulo]")
+                        }
+                        onChange={(date: ZonedDateTime | null) =>
+                          setEventForm({ ...eventForm, startsAt: date?.toString() || "" })
+                        }
+                        hourCycle={24} // usa formato 24h
+                      />
+                    </I18nProvider>
+                </div>
                 <Input
                   type="number"
                   label="Check-in (minutos antes)"
@@ -1140,17 +1332,47 @@ const formatEventDate = (dateString?: string) => {
                   />
                 )}
 
-                <Input
-                  label="Premiação"
-                  placeholder="Ex: R$ 5.000"
-                  value={eventForm.prizePool}
-                  onChange={(e) => setEventForm({ ...eventForm, prizePool: e.target.value })}
-                  variant="bordered"
-                  classNames={{
-                    input: "text-default-900",
-                    label: "text-default-700"
-                  }}
-                />
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <label className="text-sm font-medium text-default-700">Premiação</label>
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-default-500">BRL</span>
+                      <Switch
+                        size="sm"
+                        isSelected={eventForm.prizeCurrency === 'USD'}
+                        onValueChange={(isSelected) => 
+                          setEventForm({ 
+                            ...eventForm, 
+                            prizeCurrency: isSelected ? 'USD' : 'BRL' 
+                          })
+                        }
+                        classNames={{
+                          wrapper: "p-0 h-4 overflow-visible bg-default-200 group-data-[selected=true]:bg-default-300",
+                          thumb: "w-4 h-4 border-2 shadow-sm bg-white ml-0 group-data-[selected=true]:ml-4"
+                        }}
+                      />
+                      <span className="text-xs text-default-500">USD</span>
+                    </div>
+                  </div>
+                  <Input
+                    placeholder={eventForm.prizeCurrency === 'BRL' ? "Ex: 5000 ou 5000,50" : "Ex: 1000 or 1000.50"}
+                    value={eventForm.prizePool}
+                    onChange={(e) => setEventForm({ ...eventForm, prizePool: e.target.value })}
+                    variant="bordered"
+                    startContent={
+                      <div className="pointer-events-none flex items-center">
+                        <span className="text-default-400 text-small">
+                          {eventForm.prizeCurrency === 'BRL' ? 'R$' : '$'}
+                        </span>
+                      </div>
+                    }
+                    classNames={{
+                      input: "text-default-900",
+                      label: "text-default-700"
+                    }}
+                    description={`Valor será formatado automaticamente para ${eventForm.prizeCurrency === 'BRL' ? 'reais (R$)' : 'dólares ($)'} ao salvar`}
+                  />
+                </div>
               </div>
 
               <Input
@@ -1172,19 +1394,26 @@ const formatEventDate = (dateString?: string) => {
               variant="light" 
               onClick={() => {
                 setShowCreateEventModal(false);
+                setIsEditMode(false);
+                setSelectedEvent(null);
                 resetEventForm();
               }}
             >
               Cancelar
             </Button>
-            <Button 
-              color="primary" 
-              onClick={handleCreateEvent}
-              isLoading={createEventLoading}
-              startContent={!createEventLoading ? <HiOutlinePlus className="w-4 h-4" /> : null}
-            >
-              {createEventLoading ? 'Criando...' : 'Criar Evento'}
-            </Button>
+           <Button
+            onClick={isEditMode ? handleUpdateEvent : handleCreateEvent}
+            isLoading={createEventLoading}
+            startContent={!createEventLoading ? (isEditMode ? <HiOutlinePencil className="w-4 h-4" /> : <HiOutlinePlus className="w-4 h-4" />) : null}
+            className="text-white font-medium transition-all duration-300
+                      [background:rgba(219,16,87,0.25)]
+                      [border:1px_solid_rgba(219,16,87,0.4)]
+                      backdrop-blur-md hover:[background:rgba(219,16,87,0.4)]
+                      hover:[border:1px_solid_rgba(219,16,87,0.6)]
+                      active:[background:rgba(219,16,87,0.5)]
+                      rounded-xl">
+            {createEventLoading ? (isEditMode ? 'Atualizando...' : 'Criando...') : (isEditMode ? 'Atualizar Evento' : 'Criar Evento')}
+          </Button>
           </ModalFooter>
         </ModalContent>
       </Modal>
