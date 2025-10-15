@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import Chat, { ChatOverview, ChatMessage } from "./Chat";
-import { Post } from "./types";
-import { doc, deleteDoc, getDoc, onSnapshot, collection } from "firebase/firestore";
+import { Post, PostReaction } from "./types";
+import { doc, deleteDoc, getDoc, onSnapshot, collection, updateDoc } from "firebase/firestore";
 import { db } from "./firebase";
 import { Button } from "@heroui/button";
 import { Avatar } from "@heroui/avatar";
@@ -15,6 +15,7 @@ import { Input } from "@heroui/input";
 import { Code } from "@heroui/code";
 import AnimatedHeart from "./AnimatedHeart";
 import { Dropdown, DropdownTrigger, DropdownMenu, DropdownItem } from "@heroui/dropdown";
+import { Chip } from "@heroui/chip";
 
 interface FeedProps {
     posts: Post[];
@@ -43,6 +44,15 @@ interface User {
     tag: string;
     avatar: string;
     createdAt?: Date;
+}
+
+interface LikesUser {
+  uid: string;
+  name: string;
+  tag: string;
+  avatar: string;
+  reactionEmoji: string;
+  reactionName: string;
 }
 
 const FeedWithChat: React.FC<FeedProps> = ({
@@ -93,6 +103,18 @@ const FeedWithChat: React.FC<FeedProps> = ({
     }, [currentUserId]);
 
 
+        const getReactionSummary = (reactions: Record<string, PostReaction> | undefined) => {
+  if (!reactions) return {};
+
+  const summary: Record<string, number> = {};
+
+  Object.values(reactions).forEach((reaction) => {
+    summary[reaction.emoji] = (summary[reaction.emoji] || 0) + 1;
+  });
+
+  return summary;
+};
+
     const openChatFromFeed = (p: Post) => {
         const convo: ChatOverview = {
             id: p.id,
@@ -122,9 +144,7 @@ const FeedWithChat: React.FC<FeedProps> = ({
     const [postToDeleteId, setPostToDeleteId] = useState<string | null>(null);
     // Adicione no começo do componente FeedWithChat
     const [showLikesModal, setShowLikesModal] = useState(false);
-    const [likesUsers, setLikesUsers] = useState<
-        { uid: string; name: string; tag: string; avatar: string }[]
-    >([]);
+const [likesUsers, setLikesUsers] = useState<LikesUser[]>([]);
 
     const fetchUserInfo = async (uid: string) => {
         const userRef = doc(db, "Users", uid);
@@ -149,18 +169,32 @@ const FeedWithChat: React.FC<FeedProps> = ({
     };
 
 
-    const openLikesModal = async (p: Post) => {
-        if (!p.reactions || p.reactions.length === 0) {
-            setLikesUsers([]);
-            setShowLikesModal(true);
-            return;
-        }
+   const openLikesModal = async (p: Post) => {
+  const postReactions = p.reactions || {};
+  const uids = Object.keys(postReactions);
 
-        // Busca todos os usuários que deram like
-        const users = await Promise.all(p.reactions.map((uid) => fetchUserInfo(uid)));
-        setLikesUsers(users);
-        setShowLikesModal(true);
-    };
+  if (uids.length === 0) {
+    setLikesUsers([]);
+    setShowLikesModal(true);
+    return;
+  }
+
+  // Busca os dados dos usuários que reagiram
+  const users = await Promise.all(
+    uids.map(async (uid) => {
+      const userInfo = await fetchUserInfo(uid);
+      const reaction = postReactions[uid];
+      return {
+        ...userInfo,
+        reactionEmoji: reaction.emoji,
+        reactionName: reaction.name,
+      };
+    })
+  );
+
+  setLikesUsers(users);
+  setShowLikesModal(true);
+};
 
     // Funções para o sistema de reações
     const handleReactionHover = (postId: string) => {
@@ -189,71 +223,50 @@ const FeedWithChat: React.FC<FeedProps> = ({
         setReactionTimeout(timeout);
     };
 
-    const handleReactionSelect = (post: Post, reaction: { name: string; emoji: string }) => {
-        if (!user?.uid) return;
-        
-        const newReaction = {
-            userId: user.uid,
-            emoji: reaction.emoji,
-            name: reaction.name,
-            createdAt: new Date()
-        };
+const handleReactionSelect = async (post: Post, reaction: { name: string; emoji: string }) => {
+  if (!user?.uid) return;
 
-        // Atualizar o post localmente
-        setLocalPosts(prevPosts => 
-            prevPosts.map(p => {
-                if (p.id === post.id) {
-                    const detailedReactions = p.detailedReactions || [];
-                    const existingReactionIndex = detailedReactions.findIndex(r => r.userId === user.uid);
-                    
-                    let updatedDetailedReactions;
-                    if (existingReactionIndex >= 0) {
-                        // Substituir reação existente
-                        updatedDetailedReactions = [...detailedReactions];
-                        updatedDetailedReactions[existingReactionIndex] = newReaction;
-                    } else {
-                        // Adicionar nova reação
-                        updatedDetailedReactions = [...detailedReactions, newReaction];
-                    }
+  const postRef = doc(db, "Posts", post.id);
+  const postSnap = await getDoc(postRef);
+  const postData = postSnap.exists() ? postSnap.data() : {};
 
-                    const reactions = p.reactions || [];
-                    const hasOldReaction = reactions.includes(user.uid);
-                    const updatedReactions = hasOldReaction ? reactions : [...reactions, user.uid];
+  // Estrutura de reações atual
+  const currentReactions = postData.reactions || {};
 
-                    return {
-                        ...p,
-                        reactions: updatedReactions,
-                        detailedReactions: updatedDetailedReactions
-                    };
-                }
-                return p;
-            })
-        );
+  // Se o usuário já reagiu com outra reação, substitui
+  const updatedReactions = {
+    ...currentReactions,
+    [user.uid]: {
+      emoji: reaction.emoji,
+      name: reaction.name,
+      createdAt: new Date().toISOString(),
+    },
+  };
 
-        setShowReactionPicker(null);
-    };
+  // Atualiza no Firestore
+  await updateDoc(postRef, { reactions: updatedReactions });
 
-    const getUserReaction = (post: Post) => {
-        if (!user?.uid) return null;
-        
-        // Verificar primeiro no sistema novo de reações detalhadas
-        if (post.detailedReactions) {
-            const userReaction = post.detailedReactions.find(r => r.userId === user.uid);
-            if (userReaction) {
-                return {
-                    name: userReaction.name,
-                    emoji: userReaction.emoji
-                };
-            }
-        }
-        
-        // Fallback - retorna "Amei" se o usuário reagiu
-        if (post.reactions?.includes(user.uid)) {
-            return feedReactions[1]; // "Amei" ❤️
-        }
-        
-        return null;
-    };
+  // Atualiza localmente o estado
+  setLocalPosts(prevPosts =>
+    prevPosts.map(p =>
+      p.id === post.id
+        ? {
+            ...p,
+            reactions: updatedReactions,
+          }
+        : p
+    )
+  );
+
+  setShowReactionPicker(null);
+};
+
+const getUserReaction = (post: Post) => {
+  if (!user?.uid || !post.reactions) return null;
+  const reaction = post.reactions[user.uid];
+  return reaction ? { name: reaction.name, emoji: reaction.emoji } : null;
+};
+
 
     const handleDeleteClick = (postId: string, authorId: string) => {
         if (authorId !== currentUserId) {
@@ -294,6 +307,10 @@ const FeedWithChat: React.FC<FeedProps> = ({
         });
         return () => unsub();
     }, []);
+
+
+
+
 
     return (
         <>
@@ -392,9 +409,9 @@ const FeedWithChat: React.FC<FeedProps> = ({
                 <div></div>
             ) : (
                 localPosts.map((p) => {
-                    const liked = p.reactions?.includes(user.uid);
+                  const liked = !!p.reactions && Object.keys(p.reactions).includes(user.uid);
                     const isOwner = p.authorId === currentUserId;
-
+           const reactionSummary = getReactionSummary(p.reactions);
                     return (
                         <Card key={p.id} className="mb-3">
                             <CardHeader className="flex items-center gap-3">
@@ -454,6 +471,20 @@ const FeedWithChat: React.FC<FeedProps> = ({
                             </CardBody>
                             <CardFooter className="overflow-visible">
                                 <div className="flex flex-col w-full mt-0 overflow-visible">
+{Object.keys(reactionSummary).length > 0 && (
+  <div className="flex flex-wrap gap-1 mb-3">
+    {Object.entries(reactionSummary).map(([emoji, count]) => (
+      <Chip
+        key={emoji}
+        startContent={<span className="text-sm">{emoji}</span>}
+        variant="faded"
+        className="text-xs px-2 py-[2px]"
+      >
+        {count}
+      </Chip>
+    ))}
+  </div>
+)}
                                     {/* Botões de reação */}
                                     <div className="flex items-center relative overflow-visible">
                                         {/* Botão principal de reação com hover */}
@@ -474,22 +505,20 @@ const FeedWithChat: React.FC<FeedProps> = ({
                                                 {getUserReaction(p) ? (
                                                     <span className="text-lg mr-1">{getUserReaction(p)?.emoji}</span>
                                                 ) : (
-                                                    <HiHeart className="w-4 h-4 mr-1" />
+                                                   <></>
                                                 )}
                                                 <span className="text-xs">
-                                                    {getUserReaction(p) ? getUserReaction(p)?.name : "Curtir"}
+                                                    {getUserReaction(p) ? getUserReaction(p)?.name : "Reagir"}
                                                 </span>
                                             </Button>
 
                                             {/* Picker de reações (aparece no hover) */}
                                             {showReactionPicker === p.id && (
                                                 <div 
-                                                    className="fixed bg-gray-900/95 backdrop-blur-sm rounded-full px-4 py-3 shadow-2xl border border-gray-600/50 flex gap-2 z-[9999] animate-in fade-in-0 zoom-in-95 slide-in-from-bottom-2 duration-300"
+                                                    className="fixed backdrop-blur-sm rounded-full px-4 py-3 shadow-2xl border border-gray-600/50 flex z-[9999] animate-in fade-in-0 zoom-in-0 slide-in-from-bottom-2 duration-300"
                                                     style={{
-                                                        transform: 'translateY(-110%)',
-                                                        marginTop: '-4px',
-                                                        left: '0px',
-                                                        marginLeft: '0px'
+                                                        marginTop: '10px',
+
                                                     }}
                                                     onMouseEnter={() => {
                                                         if (reactionTimeout) {
@@ -530,10 +559,12 @@ const FeedWithChat: React.FC<FeedProps> = ({
                                             )}
                                         </div>
 
-                                        <Button size="sm" className="ml-2" onPress={() => openLikesModal(p)}>
-                                            <HiOutlineUsers className="w-4 h-4 mr-1" />
-                                            {p.reactions?.length || 0}
-                                        </Button>
+                                        
+
+                            <Button size="sm" className="ml-2" onPress={() => openLikesModal(p)}>
+  <HiOutlineUsers className="w-4 h-4 mr-1" />
+  {Object.keys(p.reactions || {}).length}
+</Button>
 
                                         {p.authorId !== user.uid && (
                                             <Button
@@ -545,6 +576,8 @@ const FeedWithChat: React.FC<FeedProps> = ({
                                             </Button>
                                         )}
                                     </div>
+                         
+
 
                                     {/* Campo de comentário */}
                                     <div className="mt-3 flex w-full">
@@ -696,14 +729,13 @@ const FeedWithChat: React.FC<FeedProps> = ({
             <Modal isOpen={showLikesModal} onOpenChange={setShowLikesModal}>
                 <ModalContent>
                     <ModalHeader className="flex items-center gap-2">
-                        <AnimatedHeart />
                         <span className="text-md italic text-gray-300 mt-0.5">
-                            {likesUsers.length} {likesUsers.length === 1 ? "" : ""}
+                           Reacoes
                         </span>
                     </ModalHeader>
                     <ModalBody>
                         {likesUsers.length === 0 ? (
-                            <p>Ninguém deu amei ainda.</p>
+                            <p>Sem reacao ainda.</p>
                         ) : (
                             <Listbox
                                 aria-label="Lista de usuários que curtiram"
@@ -712,27 +744,24 @@ const FeedWithChat: React.FC<FeedProps> = ({
                                     list: "max-h-[300px] overflow-y-auto",
                                 }}
                             >
-                                {likesUsers.map((u) => (
-                                    <ListboxItem key={u.uid} textValue={u.name}>
-                                        <div className="flex items-center gap-2">
-                                            <Avatar
-                                                src={u.avatar || "/default-avatar.png"}
-                                                alt={u.name}
-                                                size="sm"
-                                                className="shrink-0"
-                                            />
-                                            <span className="font-medium flex items-center gap-1">
-                                                {u.tag && (
-                                                    <Code color="danger">
-                                                        {u.tag}
-                                                    </Code>
-                                                )}
-                                                {u.name}
-                                            </span>
-
-                                        </div>
-                                    </ListboxItem>
-                                ))}
+                              {likesUsers.map((u) => (
+  <ListboxItem key={u.uid} textValue={u.name}>
+    <div className="flex items-center gap-2">
+      <Avatar
+        src={u.avatar || "/default-avatar.png"}
+        alt={u.name}
+        size="sm"
+        className="shrink-0"
+      />
+      <span className="font-medium flex items-center gap-1">
+        {u.tag && <Code color="danger">{u.tag}</Code>}
+        {u.name}
+        <span className="ml-2 text-lg">{u.reactionEmoji}</span>
+      </span>
+    </div>
+  </ListboxItem>
+))}
+      
                             </Listbox>
                         )}
                     </ModalBody>
