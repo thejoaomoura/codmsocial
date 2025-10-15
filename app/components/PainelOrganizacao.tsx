@@ -676,6 +676,7 @@ const PainelOrganizacao: React.FC<PainelOrganizacaoProps> = ({
               organization={userOrg}
               currentUserRole={userMembership.role}
               members={members || []}
+              currentUserId={user?.uid}
             />
           </Tab>
         )}
