@@ -190,14 +190,15 @@ const ExplorarOrganizacoes: React.FC<ExplorarOrganizacoesProps> = ({
   }
 
   return (
+    <Card className="space-y-6">
     <div className="space-y-6">
       <div>
-        <h2 className="text-2xl font-bold text-gray-800 mb-2">Explorar Organizações</h2>
-        <p className="text-gray-600">Descubra e junte-se a organizações da comunidade</p>
+        <h2 className="text-2xl font-bold ml-5 mt-3">Explorar Organizações</h2>
+        <p className="text-gray-600 ml-5">Descubra e junte-se a organizações da comunidade</p>
       </div>
 
       {/* Filtros */}
-      <div className="flex flex-col sm:flex-row gap-4">
+      <div className="flex flex-col sm:flex-row gap-4 ml-5 mr-5 -mt-3">
         <Input
           placeholder="Buscar por nome, tag ou descrição..."
           value={searchTerm}
@@ -242,7 +243,7 @@ const ExplorarOrganizacoes: React.FC<ExplorarOrganizacoesProps> = ({
             const hasPendingRequest = membership && membership.status === 'pending';
             
             return (
-              <Card key={org.id} className="hover:shadow-lg transition-shadow">
+              <Card key={org.id} className="hover:shadow-lg transition-shadow ml-5 mb-5">
                 <CardHeader className="pb-2">
                   <div className="flex items-center gap-3 w-full">
                     <Avatar
@@ -280,10 +281,11 @@ const ExplorarOrganizacoes: React.FC<ExplorarOrganizacoesProps> = ({
                         <HiOutlineUsers className="w-4 h-4" />
                         <span>{org.memberCount || 1} membros</span>
                       </div>
-                      <div className="text-xs text-gray-400">
+        
+                    </div>
+                                  <div className="text-xs text-gray-400">
                         Criada em {new Date(org.createdAt?.toDate?.() || org.createdAt).toLocaleDateString()}
                       </div>
-                    </div>
 
                     <div className="pt-2">
                       {isOwner ? (
@@ -321,6 +323,7 @@ const ExplorarOrganizacoes: React.FC<ExplorarOrganizacoesProps> = ({
         </div>
       )}
     </div>
+    </Card>
   );
 };
 
