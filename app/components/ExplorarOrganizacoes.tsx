@@ -57,53 +57,61 @@ const ExplorarOrganizacoes: React.FC<ExplorarOrganizacoesProps> = ({
   const [modalMembersWithUserData, setModalMembersWithUserData] = useState<(Membership & { displayName?: string; photoURL?: string })[]>([]);
 
   // Verificar memberships do usuário
-  const checkUserMemberships = async () => {
+  const checkUserMemberships = React.useCallback(async () => {
     if (!user) return;
 
     const memberships: {[orgId: string]: Membership} = {};
     const pending: {[orgId: string]: boolean} = {};
 
-    for (const org of organizations) {
-      try {
-        const membershipQuery = query(
-          collection(db, `organizations/${org.id}/memberships`),
-          where('userId', '==', user.uid)
-        );
+    try {
+      // Busca TODAS as memberships do usuário de uma vez só
+      const allMembershipsQuery = query(
+        collection(db, "memberships"),
+        where('userId', '==', user.uid)
+      );
+      
+      const membershipSnapshot = await getDocs(allMembershipsQuery);
+      
+      membershipSnapshot.docs.forEach(doc => {
+        const membershipData = doc.data() as Membership;
+        const orgId = membershipData.organizationId;
         
-        const membershipSnapshot = await getDocs(membershipQuery);
+        memberships[orgId] = membershipData;
         
-        if (!membershipSnapshot.empty) {
-          const membershipData = membershipSnapshot.docs[0].data() as Membership;
-          memberships[org.id] = membershipData;
-          
-          if (membershipData.status === 'pending') {
-            pending[org.id] = true;
-          }
+        if (membershipData.status === 'pending') {
+          pending[orgId] = true;
         }
-      } catch (error) {
-        console.error(`Erro ao verificar membership para organização ${org.id}:`, error);
-      }
+      });
+
+    } catch (error) {
+      console.error('Erro ao verificar memberships:', error);
     }
 
     setUserMemberships(memberships);
     setPendingRequests(pending);
-  };
+  }, [user]);
 
   React.useEffect(() => {
     if (user && organizations.length > 0) {
       checkUserMemberships();
     }
-  }, [user, organizations]);
+  }, [user, organizations.length, checkUserMemberships]); 
 
-  const filteredOrganizations = organizations.filter(org => {
-    const matchesSearch = org.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         org.tag.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         (org.description || '').toLowerCase().includes(searchTerm.toLowerCase());
-    
-    const matchesVisibility = visibilityFilter === 'all' || org.visibility === visibilityFilter;
-    
-    return matchesSearch && matchesVisibility;
-  });
+  // Memoização do cálculo de isMemberOfAnyOrg para evitar recálculo em cada render
+  const isMemberOfAnyOrg = React.useMemo(() => {
+    return Object.values(userMemberships).some(m => m.status === 'accepted');
+  }, [userMemberships]);
+  const filteredOrganizations = React.useMemo(() => {
+    return organizations.filter(org => {
+      const matchesSearch = org.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                           org.tag.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                           (org.description || '').toLowerCase().includes(searchTerm.toLowerCase());
+      
+      const matchesVisibility = visibilityFilter === 'all' || org.visibility === visibilityFilter;
+      
+      return matchesSearch && matchesVisibility;
+    });
+  }, [organizations, searchTerm, visibilityFilter]);
 
   const handleRequestToJoin = async (orgId: string) => {
     if (!user) {
@@ -136,6 +144,32 @@ const ExplorarOrganizacoes: React.FC<ExplorarOrganizacoesProps> = ({
 
     setRequesting(orgId);
     
+    // atualiza o estado imediatamente
+    const optimisticMembership: Membership = {
+      id: user.uid,
+      organizationId: orgId,
+      userId: user.uid,
+      role: 'ranked',
+      status: 'pending' as MembershipStatus,
+      joinedAt: null,
+      updatedAt: new Date() as any,
+      invitedBy: user.uid,
+      invitedAt: new Date() as any,
+      roleHistory: [],
+      displayName: user.displayName || user.email || 'Usuário',
+      photoURL: user.photoURL || ''
+    };
+
+    // Atualiza o estado local imediatamente
+    setUserMemberships(prev => ({
+      ...prev,
+      [orgId]: optimisticMembership
+    }));
+    setPendingRequests(prev => ({
+      ...prev,
+      [orgId]: true
+    }));
+    
     try {
       const membershipData: Omit<Membership, 'id'> = {
         organizationId: orgId,
@@ -154,15 +188,6 @@ const ExplorarOrganizacoes: React.FC<ExplorarOrganizacoesProps> = ({
       await setDoc(doc(db, `organizations/${orgId}/memberships`, user.uid), membershipData);
       await addDoc(collection(db, "memberships"), membershipData);
 
-      setUserMemberships(prev => ({
-        ...prev,
-        [orgId]: { ...membershipData, id: user.uid }
-      }));
-      setPendingRequests(prev => ({
-        ...prev,
-        [orgId]: true
-      }));
-
       addToast({ 
         title: "Solicitação enviada", 
         description: "Sua solicitação foi enviada para a organização e aguarda aprovação", 
@@ -170,6 +195,19 @@ const ExplorarOrganizacoes: React.FC<ExplorarOrganizacoesProps> = ({
       });
     } catch (error) {
       console.error("❌ Erro ao solicitar entrada:", error);
+      
+      // ROLLBACK - reverte o estado otimista em caso de erro
+      setUserMemberships(prev => {
+        const newState = { ...prev };
+        delete newState[orgId];
+        return newState;
+      });
+      setPendingRequests(prev => {
+        const newState = { ...prev };
+        delete newState[orgId];
+        return newState;
+      });
+      
       addToast({ 
         title: "Erro", 
         description: "Falha ao enviar solicitação. Tente novamente.", 
@@ -298,11 +336,10 @@ const ExplorarOrganizacoes: React.FC<ExplorarOrganizacoesProps> = ({
         ) : (
           <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
             {filteredOrganizations.map((org) => {
-              const isOwner = org.ownerId === user.uid;
+              const isOwner = org.ownerId === user?.uid;
               const membership = userMemberships[org.id];
               const isMember = membership && membership.status === 'accepted';
               const hasPendingRequest = membership && membership.status === 'pending';
-              const isMemberOfAnyOrg = Object.values(userMemberships).some(m => m.status === 'accepted');
 
               return (
                 <Card key={org.id} className="hover:shadow-lg transition-shadow ml-5 mb-5">

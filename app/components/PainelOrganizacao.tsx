@@ -31,6 +31,7 @@ import { useMembersWithUserData, usePendingMemberships } from '../hooks/useMembe
 import RoleManagement from './RoleManagement';
 import InviteSystem from './InviteSystem';
 import EventsManagement from './EventsManagement';
+import InfoCardExpandable from './InfoCardExpandable';
 import { 
   doc, 
   updateDoc, 
@@ -856,33 +857,8 @@ Remover
                   </div>
                 </CardBody>
               </Card>
-
               {/* Card de Informações Adicionais */}
-              <Card>
-                <CardHeader>
-                  <h3 className="text-lg font-semibold">Informações Importantes</h3>
-                </CardHeader>
-                <CardBody>
-                  <div className="space-y-3 text-sm text-gray-600">
-                    <div className="flex items-start gap-2">
-                      <span className="text-blue-500">•</span>
-                      <span>A tag da organização deve ser única e não pode ser alterada após outros membros se juntarem</span>
-                    </div>
-                    <div className="flex items-start gap-2">
-                      <span className="text-blue-500">•</span>
-                      <span>O logo deve ser uma URL válida de uma imagem (PNG, JPG, GIF)</span>
-                    </div>
-                    <div className="flex items-start gap-2">
-                      <span className="text-blue-500">•</span>
-                      <span>Organizações públicas são visíveis para todos, enquanto privadas só aparecem para membros</span>
-                    </div>
-                    <div className="flex items-start gap-2">
-                      <span className="text-blue-500">•</span>
-                      <span>Apenas o Owner da organização pode editar essas configurações</span>
-                    </div>
-                  </div>
-                </CardBody>
-              </Card>
+              <InfoCardExpandable />
             </div>
           </Tab>
         )}
