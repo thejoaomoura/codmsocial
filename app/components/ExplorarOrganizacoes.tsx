@@ -198,13 +198,13 @@ const ExplorarOrganizacoes: React.FC<ExplorarOrganizacoesProps> = ({
               };
             }
             
-            const userDoc = await getDoc(doc(db, 'users', member.userId));
+            const userDoc = await getDoc(doc(db, 'Users', member.userId));
             if (userDoc.exists()) {
               const userData = userDoc.data();
               return {
                 ...member,
-                displayName: userData.displayName || userData.name || userData.email || 'Usuário',
-                photoURL: userData.photoURL || userData.avatar || ''
+                displayName: userData.displayName || userData.email || 'Usuário',
+                photoURL: userData.photoURL || ''
               };
             }
             
@@ -423,9 +423,15 @@ const ExplorarOrganizacoes: React.FC<ExplorarOrganizacoesProps> = ({
                   <div key={member.userId} className="flex items-center justify-between p-3 bg-default-100 dark:bg-default-50 rounded-lg border border-default-200 dark:border-default-100">
                     <div className="flex items-center gap-3">
                       <Avatar 
-                        src={member.photoURL} 
+                        src={member.photoURL || undefined} 
                         name={member.displayName || member.userId}
                         size="md"
+                        showFallback
+                        fallback={
+                          <span className="text-sm font-medium">
+                            {(member.displayName || member.userId).charAt(0).toUpperCase()}
+                          </span>
+                        }
                       />
                       <div className="flex flex-col">
                         <span className="font-medium text-sm text-default-900 dark:text-default-800">
