@@ -17,3 +17,22 @@ const app = initializeApp(firebaseConfig);
 export const db = getFirestore(app);
 export const auth = getAuth(app);
 export const provider = new GoogleAuthProvider();
+
+// Configurações para email link authentication
+export const actionCodeSettings = {
+  // URL para redirecionamento após autenticação - deve estar na lista de domínios autorizados do Firebase Console
+  url: typeof window !== 'undefined' ? window.location.origin + '/login' : 'http://localhost:3000/login',
+  // Deve ser sempre true para concluir o processo de login no app
+  handleCodeInApp: true,
+  iOS: {
+    bundleId: 'com.codmsocial.app'
+  },
+  // Configurações para Android
+  android: {
+    packageName: 'com.codmsocial.app',
+    installApp: true,
+    minimumVersion: '12'
+  },
+  // Domínio personalizado (se configurado no Firebase Hosting)
+  // linkDomain: 'codmsocial.com' // Descomentar quanto tiver domínio próprio
+};
