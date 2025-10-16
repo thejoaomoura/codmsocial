@@ -105,6 +105,8 @@ export default function Home() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [showNameModal, setShowNameModal] = useState(false);
   const [newName, setNewName] = useState("");
+  const [showTagModal, setShowTagModal] = useState(false);
+  const [newTag, setNewTag] = useState("");
 
   // Cleanup dos listeners ao desmontar o componente
   useEffect(() => {
@@ -162,7 +164,7 @@ export default function Home() {
   useEffect(() => {
     console.log('Setting up auth listener...');
     const unsub = onAuthStateChanged(auth, async (u) => {
-      console.log('Auth state changed:', u ? `User logged in: ${u.uid}` : 'User logged out');
+      //console.log('Auth state changed:', u ? `User logged in: ${u.uid}` : 'User logged out');
       setUser(u);
       if (u) {
         const userDocRef = doc(db, "Users", u.uid);
@@ -280,6 +282,66 @@ export default function Home() {
         title: "Erro no Login",
         description: "Erro ao fazer login. Tente novamente.",
         color: "danger"
+      });
+    }
+  };
+
+  const handleSubmitTag = async () => {
+    // Validação básica da tag
+    if (newTag.trim() && !/^[a-zA-Z0-9]{1,5}$/.test(newTag.trim())) {
+      return addToast({
+        title: "Erro",
+        description: "Tag deve conter apenas letras e números (máximo 5 caracteres)",
+        color: "danger",
+      });
+    }
+
+    // Verifica se a tag já está em uso (apenas se não estiver vazia)
+    if (newTag.trim()) {
+      const q = query(collection(db, "Users"), where("tag", "==", newTag.trim()));
+      const snap = await getDocs(q);
+
+      if (!snap.empty) {
+        return addToast({
+          title: "Erro",
+          description: "Esta tag já está em uso.",
+          color: "danger",
+        });
+      }
+    }
+
+    try {
+      const userRef = doc(db, "Users", user!.uid);
+      
+      // Verifica se o documento do usuário existe
+      const userDocSnap = await getDoc(userRef);
+      
+      if (userDocSnap.exists()) {
+        await updateDoc(userRef, { tag: newTag.trim() });
+      } else {
+        // Documento não existe, cria um novo com setDoc
+        await setDoc(userRef, {
+          displayName: user!.displayName || "",
+          photoURL: user!.photoURL || "",
+          tag: newTag.trim(),
+          createdAt: serverTimestamp()
+        });
+      }
+
+      setProfileNameTag(newTag.trim());
+      setShowTagModal(false);
+
+      addToast({
+        title: "Sucesso",
+        description: "Tag atualizada com sucesso!",
+        color: "success",
+      });
+    } catch (error) {
+      console.error("Erro ao atualizar tag:", error);
+      addToast({
+        title: "Erro",
+        description: "Erro ao atualizar tag. Tente novamente.",
+        color: "danger",
       });
     }
   };
@@ -636,11 +698,14 @@ export default function Home() {
     }
   };
 
-
-
   const handleEditName = () => {
     setNewName(profileName);
     setShowNameModal(true);
+  };
+
+  const handleEditTag = () => {
+    setNewTag(profileNameTag);
+    setShowTagModal(true);
   };
 
   const handleSubmitName = async () => {
@@ -663,20 +728,43 @@ export default function Home() {
       });
     }
 
-    const userRef = doc(db, "Users", user!.uid);
-    await updateDoc(userRef, { displayName: newName.trim() });
+    try {
+      const userRef = doc(db, "Users", user!.uid);
+      
+      // Verifica se o documento do usuário existe
+      const userDocSnap = await getDoc(userRef);
+      
+      if (userDocSnap.exists()) {
+        await updateDoc(userRef, { displayName: newName.trim() });
+      } else {
+        // Documento não existe, cria um novo com setDoc
+        await setDoc(userRef, {
+          displayName: newName.trim(),
+          photoURL: user!.photoURL || "",
+          tag: "",
+          createdAt: serverTimestamp()
+        });
+      }
 
-    // Atualiza também no Firebase Auth
-    await updateProfile(user!, { displayName: newName.trim() });
+      // Atualiza também no Firebase Auth
+      await updateProfile(user!, { displayName: newName.trim() });
 
-    setProfileName(newName.trim());
-    setShowNameModal(false);
+      setProfileName(newName.trim());
+      setShowNameModal(false);
 
-    addToast({
-      title: "Sucesso",
-      description: "Nome atualizado com sucesso!",
-      color: "success",
-    });
+      addToast({
+        title: "Sucesso",
+        description: "Nome atualizado com sucesso!",
+        color: "success",
+      });
+    } catch (error) {
+      console.error("Erro ao atualizar nome:", error);
+      addToast({
+        title: "Erro",
+        description: "Erro ao atualizar nome. Tente novamente.",
+        color: "danger",
+      });
+    }
   };
 
   if (!user) return <Login handleGoogleLogin={handleGoogleLogin} />;
@@ -784,6 +872,7 @@ export default function Home() {
             <DropdownMenu>
               <DropdownItem key="edit-photo" onClick={() => inputRef.current?.click()}>Editar Foto</DropdownItem>
               <DropdownItem key="edit-name" onClick={handleEditName}>Editar Nome</DropdownItem>
+              <DropdownItem key="edit-tag" onClick={handleEditTag}>Editar Tag</DropdownItem>
             </DropdownMenu>
           </Dropdown>
 
@@ -881,6 +970,49 @@ export default function Home() {
               <ModalFooter className="flex justify-end gap-2">
                 <Button onPress={() => setShowNameModal(false)}><HiOutlineX className="w-4 h-4" /></Button>
                 <Button color="primary" onPress={handleSubmitName}><HiOutlineSave className="w-4 h-4" /></Button>
+              </ModalFooter>
+            </ModalContent>
+          </Modal>
+
+          {/* Modal para editar tag */}
+          <Modal isOpen={showTagModal} onOpenChange={setShowTagModal}>
+            <ModalContent>
+              <ModalHeader>Editar Tag</ModalHeader>
+              <ModalBody className="flex flex-col gap-2">
+                <div>
+                  <Code color="primary" className="mb-2">Sua tag atual</Code>
+                  <div className="flex items-center gap-2">
+                    {profileNameTag ? (
+                      <Code
+                        color="danger"
+                        className="flex items-center px-2 h-[38px] text-sm rounded"
+                      >
+                        {profileNameTag}
+                      </Code>
+                    ) : (
+                      <Code
+                        color="default"
+                        className="flex items-center px-2 h-[38px] text-sm rounded"
+                      >
+                        Sem tag
+                      </Code>
+                    )}
+                  </div>
+                </div>
+                <div>
+                  <Code color="primary" className="mb-2">Nova tag</Code>
+                  <Input
+                    type="text"
+                    value={newTag}
+                    onChange={(e) => setNewTag(e.target.value)}
+                    placeholder="Digite sua nova tag (opcional)"
+                     description="Apenas letras e números (máximo 5 caracteres)"
+                  />
+                </div>
+              </ModalBody>
+              <ModalFooter className="flex justify-end gap-2">
+                <Button onPress={() => setShowTagModal(false)}><HiOutlineX className="w-4 h-4" /></Button>
+                <Button color="primary" onPress={handleSubmitTag}><HiOutlineSave className="w-4 h-4" /></Button>
               </ModalFooter>
             </ModalContent>
           </Modal>
