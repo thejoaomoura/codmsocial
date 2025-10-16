@@ -8,6 +8,7 @@ import { Button } from '@heroui/button';
 import { Spinner } from '@heroui/spinner';
 import { Input } from '@heroui/input';
 import { Select, SelectItem } from '@heroui/select';
+import { Modal, ModalBody, ModalContent, ModalFooter, ModalHeader } from '@heroui/modal';
 import { 
   HiOutlineSearch, 
   HiOutlineUsers, 
@@ -22,8 +23,6 @@ import {
   addDoc, 
   serverTimestamp, 
   doc, 
-  updateDoc, 
-  arrayUnion,
   setDoc,
   query,
   where,
@@ -49,6 +48,11 @@ const ExplorarOrganizacoes: React.FC<ExplorarOrganizacoesProps> = ({
   const [userMemberships, setUserMemberships] = useState<{[orgId: string]: Membership}>({});
   const [pendingRequests, setPendingRequests] = useState<{[orgId: string]: boolean}>({});
 
+  // Modal
+  const [modalOpen, setModalOpen] = useState(false);
+  const [modalMembers, setModalMembers] = useState<Membership[]>([]);
+  const [modalOrgName, setModalOrgName] = useState('');
+
   // Verificar memberships do usuário
   const checkUserMemberships = async () => {
     if (!user) return;
@@ -58,7 +62,6 @@ const ExplorarOrganizacoes: React.FC<ExplorarOrganizacoesProps> = ({
 
     for (const org of organizations) {
       try {
-        // Verificar na subcoleção da organização
         const membershipQuery = query(
           collection(db, `organizations/${org.id}/memberships`),
           where('userId', '==', user.uid)
@@ -83,7 +86,6 @@ const ExplorarOrganizacoes: React.FC<ExplorarOrganizacoesProps> = ({
     setPendingRequests(pending);
   };
 
-  // Executar verificação quando organizações ou usuário mudarem
   React.useEffect(() => {
     if (user && organizations.length > 0) {
       checkUserMemberships();
@@ -106,7 +108,18 @@ const ExplorarOrganizacoes: React.FC<ExplorarOrganizacoesProps> = ({
       return;
     }
 
-    // Verificar se já é membro ou tem solicitação pendente
+    const isMemberOfAnyOrg = Object.values(userMemberships).some(
+      m => m.status === 'accepted'
+    );
+    if (isMemberOfAnyOrg) {
+      addToast({ 
+        title: "Aviso", 
+        description: "Você já é membro de uma organização e não pode solicitar entrada em outra", 
+        color: "warning" 
+      });
+      return;
+    }
+
     if (userMemberships[orgId]) {
       if (userMemberships[orgId].status === 'accepted') {
         addToast({ title: "Aviso", description: "Você já é membro desta organização", color: "warning" });
@@ -121,32 +134,21 @@ const ExplorarOrganizacoes: React.FC<ExplorarOrganizacoesProps> = ({
     setRequesting(orgId);
     
     try {
-      console.log('🔧 Criando solicitação de entrada para organização:', orgId);
-
-      // Dados da membership pendente
       const membershipData: Omit<Membership, 'id'> = {
         organizationId: orgId,
         userId: user.uid,
-        role: 'ranked', // Role padrão para novos membros
+        role: 'ranked',
         status: 'pending' as MembershipStatus,
-        joinedAt: null, // Será preenchido quando aceito
+        joinedAt: null,
         updatedAt: serverTimestamp() as any,
-        invitedBy: user.uid, // O próprio usuário está solicitando
+        invitedBy: user.uid,
         invitedAt: serverTimestamp() as any,
         roleHistory: []
       };
 
-      // Criar na subcoleção da organização usando setDoc para definir o ID
-      //console.log('🔧 Criando membership na subcoleção:', `organizations/${orgId}/memberships/${user.uid}`);
       await setDoc(doc(db, `organizations/${orgId}/memberships`, user.uid), membershipData);
-      console.log('✅ Membership criado na subcoleção com sucesso');
-
-      // Também criar na coleção global de memberships para consultas gerais
-      console.log('🔧 Criando membership na coleção global...');
       await addDoc(collection(db, "memberships"), membershipData);
-      console.log('✅ Membership criado na coleção global com sucesso');
 
-      // Atualizar estado local
       setUserMemberships(prev => ({
         ...prev,
         [orgId]: { ...membershipData, id: user.uid }
@@ -173,6 +175,19 @@ const ExplorarOrganizacoes: React.FC<ExplorarOrganizacoesProps> = ({
     }
   };
 
+  const openMembersModal = async (orgId: string, orgName: string) => {
+    try {
+      const membersSnap = await getDocs(collection(db, `organizations/${orgId}/memberships`));
+      const membersData: Membership[] = membersSnap.docs.map(doc => doc.data() as Membership);
+      setModalMembers(membersData);
+      setModalOrgName(orgName);
+      setModalOpen(true);
+    } catch (error) {
+      console.error('Erro ao buscar membros da organização:', error);
+      addToast({ title: 'Erro', description: 'Não foi possível carregar membros', color: 'danger' });
+    }
+  };
+
   if (!user) {
     return (
       <div className="text-center py-8">
@@ -190,140 +205,182 @@ const ExplorarOrganizacoes: React.FC<ExplorarOrganizacoesProps> = ({
   }
 
   return (
+    <>
     <Card className="space-y-6">
-    <div className="space-y-6">
-      <div>
-        <h2 className="text-2xl font-bold ml-5 mt-3">Explorar Organizações</h2>
-        <p className="text-gray-600 ml-5">Descubra e junte-se a organizações da comunidade</p>
-      </div>
-
-      {/* Filtros */}
-      <div className="flex flex-col sm:flex-row gap-4 ml-5 mr-5 -mt-3">
-        <Input
-          placeholder="Buscar por nome, tag ou descrição..."
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-          startContent={<HiOutlineSearch className="w-4 h-4 text-gray-400" />}
-          className="flex-1"
-        />
-        <Select
-          placeholder="Filtrar por visibilidade"
-          selectedKeys={[visibilityFilter]}
-          onSelectionChange={(keys) => setVisibilityFilter(Array.from(keys)[0] as string)}
-          className="w-full sm:w-48"
-          startContent={<HiOutlineFilter className="w-4 h-4" />}
-        >
-          <SelectItem key="all">Todas</SelectItem>
-                <SelectItem key="public">Públicas</SelectItem>
-                <SelectItem key="private">Privadas</SelectItem>
-        </Select>
-      </div>
-
-      {/* Lista de Organizações */}
-      {filteredOrganizations.length === 0 ? (
-        <div className="text-center py-12">
-          <HiOutlineGlobe className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-          <h3 className="text-xl font-semibold text-gray-700 mb-2">
-            {searchTerm ? 'Nenhuma organização encontrada' : 'Nenhuma organização disponível'}
-          </h3>
-          <p className="text-gray-500">
-            {searchTerm 
-              ? 'Tente ajustar os filtros de busca' 
-              : 'Não há organizações públicas disponíveis no momento'
-            }
-          </p>
+      <div className="space-y-6">
+        <div>
+          <h2 className="text-2xl font-bold ml-5 mt-3">Explorar Organizações</h2>
+          <p className="text-gray-600 ml-5">Descubra e junte-se a organizações da comunidade</p>
         </div>
-      ) : (
-        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-          {filteredOrganizations.map((org) => {
-            const isOwner = org.ownerId === user.uid;
-            // Verificar se é membro através dos memberships carregados
-            const membership = userMemberships[org.id];
-            const isMember = membership && membership.status === 'accepted';
-            const hasPendingRequest = membership && membership.status === 'pending';
-            
-            return (
-              <Card key={org.id} className="hover:shadow-lg transition-shadow ml-5 mb-5">
-                <CardHeader className="pb-2">
-                  <div className="flex items-center gap-3 w-full">
-                    <Avatar
-                      src={org.logoURL}
-                      name={org.name}
-                      size="md"
-                      className="flex-shrink-0"
-                    />
-                    <div className="flex-1 min-w-0">
-                      <h3 className="font-semibold text-lg truncate">{org.name}</h3>
-                      <div className="flex items-center gap-2">
-                        <Chip size="sm" variant="flat" color="primary">
-                          {org.tag}
-                        </Chip>
-                        <Chip 
-                          size="sm" 
-                          variant="dot" 
-                          color={org.visibility === 'public' ? 'success' : 'default'}
-                        >
-                          {org.visibility === 'public' ? 'Pública' : 'Privada'}
-                        </Chip>
+
+        <div className="flex flex-col sm:flex-row gap-4 ml-5 mr-5 -mt-3">
+          <Input
+            placeholder="Buscar por nome, tag ou descrição..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            startContent={<HiOutlineSearch className="w-4 h-4 text-gray-400" />}
+            className="flex-1"
+          />
+          <Select
+            placeholder="Filtrar por visibilidade"
+            selectedKeys={[visibilityFilter]}
+            onSelectionChange={(keys) => setVisibilityFilter(Array.from(keys)[0] as string)}
+            className="w-full sm:w-48"
+            startContent={<HiOutlineFilter className="w-4 h-4" />}
+          >
+            <SelectItem key="all">Todas</SelectItem>
+            <SelectItem key="public">Públicas</SelectItem>
+            <SelectItem key="private">Privadas</SelectItem>
+          </Select>
+        </div>
+
+        {filteredOrganizations.length === 0 ? (
+          <div className="text-center py-12">
+            <HiOutlineGlobe className="w-16 h-16 text-gray-400 mx-auto mb-4" />
+            <h3 className="text-xl font-semibold text-gray-700 mb-2">
+              {searchTerm ? 'Nenhuma organização encontrada' : 'Nenhuma organização disponível'}
+            </h3>
+            <p className="text-gray-500">
+              {searchTerm 
+                ? 'Tente ajustar os filtros de busca' 
+                : 'Não há organizações públicas disponíveis no momento'
+              }
+            </p>
+          </div>
+        ) : (
+          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+            {filteredOrganizations.map((org) => {
+              const isOwner = org.ownerId === user.uid;
+              const membership = userMemberships[org.id];
+              const isMember = membership && membership.status === 'accepted';
+              const hasPendingRequest = membership && membership.status === 'pending';
+              const isMemberOfAnyOrg = Object.values(userMemberships).some(m => m.status === 'accepted');
+
+              return (
+                <Card key={org.id} className="hover:shadow-lg transition-shadow ml-5 mb-5">
+                  <CardHeader className="pb-2">
+                    <div className="flex items-center gap-3 w-full">
+                      <Avatar
+                        src={org.logoURL}
+                        name={org.name}
+                        size="md"
+                        className="flex-shrink-0"
+                      />
+                      <div className="flex-1 min-w-0">
+                        <h3 className="font-semibold text-lg truncate">{org.name}</h3>
+                        <div className="flex items-center gap-2">
+                          <Chip size="sm" variant="flat" color="primary">
+                            {org.tag}
+                          </Chip>
+                          <Chip 
+                            size="sm" 
+                            variant="dot" 
+                            color={org.visibility === 'public' ? 'success' : 'default'}
+                          >
+                            {org.visibility === 'public' ? 'Pública' : 'Privada'}
+                          </Chip>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                </CardHeader>
-                
-                <CardBody className="pt-0">
-                  <div className="space-y-3">
-                    <p className="text-sm text-gray-600 line-clamp-3">
-                      {org.description || "Sem descrição disponível"}
-                    </p>
-                    
-                    <div className="flex items-center justify-between text-sm">
-                      <div className="flex items-center gap-1 text-gray-500">
-                        <HiOutlineUsers className="w-4 h-4" />
-                        <span>{org.memberCount || 1} membros</span>
+                  </CardHeader>
+                  
+                  <CardBody className="pt-0">
+                    <div className="space-y-3">
+                      <p className="text-sm text-gray-600 line-clamp-3">
+                        {org.description || "Sem descrição disponível"}
+                      </p>
+                      
+                      <div className="flex items-center justify-between text-sm">
+                        <div className="flex items-center gap-1 text-gray-500">
+                          <HiOutlineUsers className="w-4 h-4" />
+                          <span>{org.memberCount || 1} membros</span>
+                        </div>
                       </div>
-        
-                    </div>
-                                  <div className="text-xs text-gray-400">
+
+                      <div className="text-xs text-gray-400">
                         Criada em {new Date(org.createdAt?.toDate?.() || org.createdAt).toLocaleDateString()}
                       </div>
 
-                    <div className="pt-2">
-                      {isOwner ? (
-                        <Chip size="sm" color="warning" variant="flat" className="w-full">
-                          👑 Sua Organização
-                        </Chip>
-                      ) : isMember ? (
-                        <Chip size="sm" color="success" variant="flat" className="w-full">
-                          ✅ Você é membro
-                        </Chip>
-                      ) : hasPendingRequest ? (
-                        <Chip size="sm" color="default" variant="flat" className="w-full">
-                          ⏳ Solicitação pendente
-                        </Chip>
-                      ) : (
-                        <Button 
-                          size="sm" 
-                          color="primary"
-                          variant="flat"
-                          startContent={<HiOutlineUserAdd className="w-3 h-3" />}
-                          onClick={() => handleRequestToJoin(org.id)}
-                          isLoading={requesting === org.id}
-                          disabled={requesting === org.id}
-                          className="w-full"
-                        >
-                          {requesting === org.id ? 'Enviando...' : 'Solicitar Entrada'}
-                        </Button>
-                      )}
+                      <div className="pt-2">
+                        {isOwner ? (
+                          <Chip size="sm" color="warning" variant="flat" className="w-full">
+                            👑 Sua Organização
+                          </Chip>
+                        ) : isMember ? (
+                          <Chip size="sm" color="success" variant="flat" className="w-full">
+                            ✅ Você é membro
+                          </Chip>
+                        ) : hasPendingRequest ? (
+                          <Chip size="sm" color="default" variant="flat" className="w-full">
+                            ⏳ Solicitação pendente
+                          </Chip>
+                        ) : !isMemberOfAnyOrg ? (
+                          <Button
+                            size="sm"
+                            color="primary"
+                            variant="flat"
+                            startContent={<HiOutlineUserAdd className="w-3 h-3" />}
+                            onClick={() => handleRequestToJoin(org.id)}
+                            isLoading={requesting === org.id}
+                            className="w-full"
+                          >
+                            {requesting === org.id ? 'Enviando...' : 'Solicitar Entrada'}
+                          </Button>
+                        ) : (
+                          <Button
+                            size="sm"
+                            color="secondary"
+                            variant="flat"
+                            onClick={() => openMembersModal(org.id, org.name)}
+                            className="w-full"
+                          >
+                            Ver Membros
+                          </Button>
+                        )}
+                      </div>
                     </div>
-                  </div>
-                </CardBody>
-              </Card>
-            );
-          })}
-        </div>
-      )}
-    </div>
+                  </CardBody>
+                </Card>
+              );
+            })}
+          </div>
+        )}
+      </div>
     </Card>
+
+    {modalOpen && (
+      <Modal isOpen={modalOpen} onClose={() => setModalOpen(false)}>
+  <ModalContent>
+    <ModalHeader>{`Membros de ${modalOrgName}`}</ModalHeader>
+    <ModalBody className="space-y-2 max-h-96 overflow-y-auto">
+      {modalMembers.length === 0 ? (
+        <p className="text-gray-500">Nenhum membro encontrado</p>
+      ) : (
+        modalMembers.map((m) => (
+          <div key={m.userId} className="flex items-center gap-3">
+            <Avatar size="sm" name={m.userId} />
+            <span>{m.userId} - {m.role}</span>
+            {m.status === 'pending' &&  <Chip 
+                            size="sm" 
+                            variant="dot" 
+                            color={'default'}
+                          >Pendente</Chip>}
+            {m.status === 'accepted' &&  <Chip 
+                            size="sm" 
+                            variant="dot" 
+                            color={'success'}
+                          >Aceito</Chip>}
+          </div>
+        ))
+      )}
+    </ModalBody>
+    <ModalFooter>
+      <Button onClick={() => setModalOpen(false)} color="primary">Fechar</Button>
+    </ModalFooter>
+  </ModalContent>
+</Modal>
+    )}
+    </>
   );
 };
 
