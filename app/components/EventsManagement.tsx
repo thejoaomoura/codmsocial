@@ -33,7 +33,7 @@ import { collection, addDoc, serverTimestamp, onSnapshot, query, where, orderBy,
 import { db } from '../firebase';
 import { I18nProvider } from "@react-aria/i18n";
 import { DatePicker } from "@heroui/date-picker";
-import dayjs, { Dayjs } from 'dayjs';
+// dayjs import removed – not used in this component
 
 interface EventsManagementProps {
   organization: Organization;

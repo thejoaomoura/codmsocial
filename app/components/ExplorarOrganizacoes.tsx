@@ -26,7 +26,8 @@ import {
   setDoc,
   query,
   where,
-  getDocs
+  getDocs,
+  getDoc
 } from 'firebase/firestore';
 import { db } from '../firebase';
 import { Organization, Membership, MembershipStatus } from '../types';
@@ -52,6 +53,8 @@ const ExplorarOrganizacoes: React.FC<ExplorarOrganizacoesProps> = ({
   const [modalOpen, setModalOpen] = useState(false);
   const [modalMembers, setModalMembers] = useState<Membership[]>([]);
   const [modalOrgName, setModalOrgName] = useState('');
+  const [modalMemberFilter, setModalMemberFilter] = useState('');
+  const [modalMembersWithUserData, setModalMembersWithUserData] = useState<(Membership & { displayName?: string; photoURL?: string })[]>([]);
 
   // Verificar memberships do usuário
   const checkUserMemberships = async () => {
@@ -143,7 +146,9 @@ const ExplorarOrganizacoes: React.FC<ExplorarOrganizacoesProps> = ({
         updatedAt: serverTimestamp() as any,
         invitedBy: user.uid,
         invitedAt: serverTimestamp() as any,
-        roleHistory: []
+        roleHistory: [],
+        displayName: user.displayName || user.email || 'Usuário',
+        photoURL: user.photoURL || ''
       };
 
       await setDoc(doc(db, `organizations/${orgId}/memberships`, user.uid), membershipData);
@@ -179,8 +184,51 @@ const ExplorarOrganizacoes: React.FC<ExplorarOrganizacoesProps> = ({
     try {
       const membersSnap = await getDocs(collection(db, `organizations/${orgId}/memberships`));
       const membersData: Membership[] = membersSnap.docs.map(doc => doc.data() as Membership);
+      
+      // Buscar dados dos usuários para cada membro
+      const membersWithUserData = await Promise.all(
+        membersData.map(async (member) => {
+          try {
+            // Primeiro tenta buscar no documento do membership
+            if (member.displayName && member.photoURL) {
+              return {
+                ...member,
+                displayName: member.displayName,
+                photoURL: member.photoURL
+              };
+            }
+            
+            const userDoc = await getDoc(doc(db, 'users', member.userId));
+            if (userDoc.exists()) {
+              const userData = userDoc.data();
+              return {
+                ...member,
+                displayName: userData.displayName || userData.name || userData.email || 'Usuário',
+                photoURL: userData.photoURL || userData.avatar || ''
+              };
+            }
+            
+            // Fallback se não encontrar o usuário
+            return {
+              ...member,
+              displayName: member.userId,
+              photoURL: ''
+            };
+          } catch (error) {
+            console.error(`Erro ao buscar dados do usuário ${member.userId}:`, error);
+            return {
+              ...member,
+              displayName: member.userId,
+              photoURL: ''
+            };
+          }
+        })
+      );
+      
       setModalMembers(membersData);
+      setModalMembersWithUserData(membersWithUserData);
       setModalOrgName(orgName);
+      setModalMemberFilter('');
       setModalOpen(true);
     } catch (error) {
       console.error('Erro ao buscar membros da organização:', error);
@@ -349,36 +397,84 @@ const ExplorarOrganizacoes: React.FC<ExplorarOrganizacoesProps> = ({
     </Card>
 
     {modalOpen && (
-      <Modal isOpen={modalOpen} onClose={() => setModalOpen(false)}>
-  <ModalContent>
-    <ModalHeader>{`Membros de ${modalOrgName}`}</ModalHeader>
-    <ModalBody className="space-y-2 max-h-96 overflow-y-auto">
-      {modalMembers.length === 0 ? (
-        <p className="text-gray-500">Nenhum membro encontrado</p>
-      ) : (
-        modalMembers.map((m) => (
-          <div key={m.userId} className="flex items-center gap-3">
-            <Avatar size="sm" name={m.userId} />
-            <span>{m.userId} - {m.role}</span>
-            {m.status === 'pending' &&  <Chip 
+      <Modal isOpen={modalOpen} onClose={() => setModalOpen(false)} size="lg">
+        <ModalContent>
+          <ModalHeader className="flex flex-col gap-1">
+            <h3>{`Membros de ${modalOrgName}`}</h3>
+            <Input
+              placeholder="Filtrar membros por nome..."
+              value={modalMemberFilter}
+              onChange={(e) => setModalMemberFilter(e.target.value)}
+              startContent={<HiOutlineSearch className="w-4 h-4 text-default-400" />}
+              size="sm"
+              className="mt-2"
+            />
+          </ModalHeader>
+          <ModalBody className="space-y-3 max-h-96 overflow-y-auto">
+            {modalMembersWithUserData.length === 0 ? (
+              <p className="text-default-500 text-center py-4">Nenhum membro encontrado</p>
+            ) : (
+              modalMembersWithUserData
+                .filter(member => 
+                  !modalMemberFilter || 
+                  (member.displayName || '').toLowerCase().includes(modalMemberFilter.toLowerCase())
+                )
+                .map((member) => (
+                  <div key={member.userId} className="flex items-center justify-between p-3 bg-default-100 dark:bg-default-50 rounded-lg border border-default-200 dark:border-default-100">
+                    <div className="flex items-center gap-3">
+                      <Avatar 
+                        src={member.photoURL} 
+                        name={member.displayName || member.userId}
+                        size="md"
+                      />
+                      <div className="flex flex-col">
+                        <span className="font-medium text-sm text-default-900 dark:text-default-800">
+                          {member.displayName || member.userId}
+                        </span>
+                        <div className="flex items-center gap-2 mt-1">
+                          <Chip 
+                            size="sm" 
+                            variant="flat" 
+                            color={
+                              member.role === 'owner' ? 'warning' :
+                              member.role === 'manager' ? 'secondary' :
+                              member.role === 'pro' ? 'primary' : 'default'
+                            }
+                          >
+                            {member.role === 'owner' ? '👑 Owner' :
+                             member.role === 'manager' ? '⚡ Manager' :
+                             member.role === 'pro' ? '🌟 Pro Player' : '🎮 Ranked'}
+                          </Chip>
+                          <Chip 
                             size="sm" 
                             variant="dot" 
-                            color={'default'}
-                          >Pendente</Chip>}
-            {m.status === 'accepted' &&  <Chip 
-                            size="sm" 
-                            variant="dot" 
-                            color={'success'}
-                          >Aceito</Chip>}
-          </div>
-        ))
-      )}
-    </ModalBody>
-    <ModalFooter>
-      <Button onClick={() => setModalOpen(false)} color="primary">Fechar</Button>
-    </ModalFooter>
-  </ModalContent>
-</Modal>
+                            color={member.status === 'accepted' ? 'success' : 'default'}
+                          >
+                            {member.status === 'accepted' ? 'Aceito' : 
+                             member.status === 'pending' ? 'Pendente' : member.status}
+                          </Chip>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ))
+            )}
+            {modalMembersWithUserData.filter(member => 
+              !modalMemberFilter || 
+              (member.displayName || '').toLowerCase().includes(modalMemberFilter.toLowerCase())
+            ).length === 0 && modalMemberFilter && (
+              <p className="text-default-500 text-center py-4">
+                Nenhum membro encontrado com o nome "{modalMemberFilter}"
+              </p>
+            )}
+          </ModalBody>
+          <ModalFooter>
+            <Button onClick={() => setModalOpen(false)} color="primary">
+              Fechar
+            </Button>
+          </ModalFooter>
+        </ModalContent>
+      </Modal>
     )}
     </>
   );

@@ -114,6 +114,8 @@ export interface Membership {
   invitedBy: string; // userId de quem convidou
   invitedAt?: any; // Timestamp de quando foi convidado
   roleHistory: RoleHistoryEntry[];
+  displayName?: string; // Nome de exibição do usuário
+  photoURL?: string; // URL da foto do usuário
 }
 
 // ===== EVENTOS E COMPETIÇÕES (FASE 2) =====
