@@ -56,7 +56,7 @@ const MercadoOrganizacao = () => {
   if (logs.length === 0) return <p>Nenhum log encontrado.</p>;
 
   return (
-  <Card className="space-y-6">
+<Card className="space-y-6" style={{ maxHeight: "600px", overflowY: "auto", position: "relative" }}>
 
      <div className="mb-6 ml-12">
   <h2 className="text-2xl font-bold ml-5 mt-3">
