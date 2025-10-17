@@ -55,6 +55,7 @@ interface InviteSystemProps {
   organizationId: string;
   currentUserRole: OrganizationRole;
   currentUserId: string;
+  currentUserName?: string;
   organizationName?: string;
   organizationLogo?: string;
 }
@@ -68,6 +69,7 @@ interface InviteModalProps {
   organizationName?: string;
   organizationLogo?: string;
   currentUserId?: string;
+  currentUserName?: string;
 }
 
 interface PendingInvitesProps {
@@ -93,6 +95,7 @@ const InviteModal: React.FC<InviteModalProps> = ({
   organizationName,
   organizationLogo,
   currentUserId,
+  currentUserName,
 }) => {
   const [email, setEmail] = useState("");
   const [message, setMessage] = useState("");
@@ -193,7 +196,7 @@ const InviteModal: React.FC<InviteModalProps> = ({
             invitedEmail: email.toLowerCase().trim(),
             organizationName: organizationName || "uma organização",
             organizationLogo: organizationLogo || "",
-            inviterName: currentUserId || "Um membro",
+            inviterName: currentUserName || "Um membro",
             message: message.trim(),
             inviteUrl: typeof window !== "undefined" ? window.location.origin : "",
           }),
@@ -782,6 +785,7 @@ const InviteSystem: React.FC<InviteSystemProps> = ({
   organizationId,
   currentUserRole,
   currentUserId,
+  currentUserName,
   organizationName,
   organizationLogo,
 }) => {
@@ -836,6 +840,7 @@ const InviteSystem: React.FC<InviteSystemProps> = ({
       <InviteModal
         currentUserRole={currentUserRole}
         currentUserId={currentUserId}
+        currentUserName={currentUserName}
         isOpen={isInviteModalOpen}
         organizationId={organizationId}
         organizationLogo={organizationLogo}

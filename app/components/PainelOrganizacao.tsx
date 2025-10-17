@@ -758,6 +758,7 @@ const PainelOrganizacao: React.FC<PainelOrganizacaoProps> = ({
           >
             <InviteSystem
               currentUserId={user.uid}
+              currentUserName={user.displayName || user.email || "Usuário"}
               currentUserRole={userMembership.role}
               organizationId={userOrg.id}
               organizationLogo={userOrg.logoURL}

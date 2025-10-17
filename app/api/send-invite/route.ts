@@ -95,7 +95,7 @@ export async function POST(req: NextRequest) {
                   <tr>
                     <td style="background-color: #f8f9fa; padding: 30px; text-align: center; border-top: 1px solid #e2e8f0;">
                       <p style="color: #718096; margin: 0 0 10px 0; font-size: 14px;">
-                        <strong>CODM Social</strong> - Plataforma de Organizações
+                        <strong>CODM Social</strong> - Sua rede Social Gamer
                       </p>
                       <p style="color: #a0aec0; margin: 0; font-size: 12px;">
                         Este é um e-mail automático, por favor não responda.
@@ -121,22 +121,33 @@ export async function POST(req: NextRequest) {
     `;
 
     // Enviar e-mail usando Resend
-    const data = await resend.emails.send({
+    const { data, error } = await resend.emails.send({
       from: process.env.RESEND_FROM_EMAIL || "CODM Social <onboarding@resend.dev>",
-      to: invitedEmail,
+      to: [invitedEmail],
       subject: `🎉 Você foi convidado para ${organizationName}!`,
       html: emailHtml,
     });
 
+    // Verificar se houve erro no envio
+    if (error) {
+      console.error("Erro do Resend:", error);
+      return NextResponse.json(
+        { error: "Erro ao enviar e-mail de convite", details: error },
+        { status: 400 }
+      );
+    }
+
+    console.log("✅ E-mail enviado com sucesso:", data);
+
     return NextResponse.json({ 
       success: true, 
-      messageId: data.id 
+      messageId: data?.id 
     });
 
   } catch (error) {
     console.error("Erro ao enviar e-mail:", error);
     return NextResponse.json(
-      { error: "Erro ao enviar e-mail de convite" },
+      { error: "Erro ao enviar e-mail de convite", details: error },
       { status: 500 }
     );
   }
