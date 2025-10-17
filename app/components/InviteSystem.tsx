@@ -132,6 +132,22 @@ const InviteModal: React.FC<InviteModalProps> = ({
     try {
       setLoading(true);
 
+      // Verificar se o e-mail já está cadastrado na plataforma
+      const usersQuery = query(
+        collection(db, "Users"),
+        where("email", "==", email.toLowerCase().trim()),
+      );
+
+      const usersSnapshot = await getDocs(usersQuery);
+      let existingUserId: string | null = null;
+
+      if (!usersSnapshot.empty) {
+        existingUserId = usersSnapshot.docs[0].id;
+        //console.log("✅ Usuário já cadastrado na plataforma:", existingUserId);
+      } else {
+        console.log("ℹ️ Novo usuário - será criado ao aceitar o convite");
+      }
+
       // Verificar se já existe convite pendente para este email
       const existingInviteQuery = query(
         collection(db, "organizationInvites"),
@@ -174,7 +190,7 @@ const InviteModal: React.FC<InviteModalProps> = ({
       // Criar convite
       const inviteData: Omit<OrganizationInvite, "id"> = {
         organizationId,
-        invitedUserId: "", // será preenchido quando o usuário aceitar o convite
+        invitedUserId: existingUserId || "", // preenche se usuário já existe
         invitedEmail: email.toLowerCase().trim(),
         invitedBy: currentUserRole,
         message: message.trim() || null,
@@ -204,16 +220,19 @@ const InviteModal: React.FC<InviteModalProps> = ({
 
         if (!response.ok) {
           console.error("Erro ao enviar e-mail, mas convite foi salvo");
-          // Não mostra erro ao usuário, pois o convite foi salvo com sucesso
         }
       } catch (emailError) {
         console.error("Erro ao enviar e-mail:", emailError);
-        // Não mostra erro ao usuário, pois o convite foi salvo com sucesso
       }
+
+      // Mensagem personalizada baseada no status do usuário
+      const successMessage = existingUserId
+        ? `Convite enviado para ${email}. O usuário já está cadastrado e receberá uma notificação.`
+        : `Convite enviado para ${email}. Um e-mail foi enviado com as instruções de cadastro.`;
 
       addToast({
         title: "Convite enviado!",
-        description: `Convite enviado para ${email}. Um e-mail foi enviado com as instruções.`,
+        description: successMessage,
         color: "success",
       });
 

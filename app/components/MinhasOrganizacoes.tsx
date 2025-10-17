@@ -274,7 +274,9 @@ const MinhasOrganizacoes: React.FC<MinhasOrganizacoesProps> = ({
                     <div className="flex items-center justify-between text-sm">
                       <div className="flex items-center gap-1 text-gray-500">
                         <HiOutlineUsers className="w-4 h-4" />
-                        <span>{org.memberCount || 1} membros</span>
+                        <span>
+                          {org.memberCount || 1} {(org.memberCount || 1) === 1 ? 'membro' : 'membros'}
+                        </span>
                       </div>
                       <Chip
                         color={

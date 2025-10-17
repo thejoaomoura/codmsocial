@@ -400,7 +400,9 @@ const PainelOrganizacao: React.FC<PainelOrganizacaoProps> = ({
               <div className="flex items-center gap-4 text-sm text-gray-500">
                 <div className="flex items-center gap-1">
                   <HiOutlineUsers className="w-4 h-4" />
-                  <span>{userOrg.memberCount || 1} membros</span>
+                  <span>
+                    {userOrg.memberCount || 1} {(userOrg.memberCount || 1) === 1 ? 'membro' : 'membros'}
+                  </span>
                 </div>
                 <div className="flex items-center gap-1">
                   <HiOutlineCalendar className="w-4 h-4" />
@@ -511,7 +513,7 @@ const PainelOrganizacao: React.FC<PainelOrganizacaoProps> = ({
                         variant="flat"
                         onClick={() => setActiveTab("members")}
                       >
-                        Ver todos os {members.length} membros
+                        Ver {members.length === 1 ? 'o' : 'todos os'} {members.length} {members.length === 1 ? 'membro' : 'membros'}
                       </Button>
                     )}
                   </div>

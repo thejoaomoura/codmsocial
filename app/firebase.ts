@@ -4,12 +4,12 @@ import { getFirestore } from "firebase/firestore";
 import { getAuth, GoogleAuthProvider } from "firebase/auth";
 
 const firebaseConfig = {
-  apiKey: "AIzaSyB3LeSAftV91bja13PSOQkTTsIrg4faMBk",
-  authDomain: "codmsocial-f8015.firebaseapp.com",
-  projectId: "codmsocial-f8015",
-  storageBucket: "codmsocial-f8015.firebasestorage.app",
-  messagingSenderId: "391686792657",
-  appId: "1:391686792657:web:a5809f64ef1c9a61ecacf0",
+  apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
+  authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
+  projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
+  storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
+  appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
 };
 
 const app = initializeApp(firebaseConfig);
@@ -20,7 +20,7 @@ export const provider = new GoogleAuthProvider();
 
 // Configurações para email link authentication
 export const actionCodeSettings = {
-  // URL para redirecionamento após autenticação - deve estar na lista de domínios autorizados do Firebase Console
+  // URL para redirecionamento após autenticação - deve estar na lista de domínios autorizados do Firebase
   url:
     typeof window !== "undefined"
       ? window.location.origin + "/login"
