@@ -103,7 +103,7 @@ const navigation = [
     icon: <HiOutlineShieldCheck className="w-5 h-5" />,
   },
     {
-    label: "Mercado das Organização",
+    label: "Atividades Recentes",
     icon: <HiOutlineBuildingStorefront className="w-5 h-5" />,
   },
 ];
@@ -117,7 +117,7 @@ export default function Home() {
     | "Explorar Organizações"
     | "Criar Organização"
     | "Painel da Organização"
-    | "Mercado das Organização"
+    | "Atividades Recentes"
   >("Feed");
   const [posts, setPosts] = useState<Post[]>([]);
   const [text, setText] = useState("");
@@ -834,7 +834,7 @@ export default function Home() {
                           | "Explorar Organizações"
                           | "Criar Organização"
                           | "Painel da Organização"
-                          | "Mercado das Organização",
+                          | "Atividades Recentes",
                       )
                     }
                   >
@@ -881,7 +881,7 @@ export default function Home() {
                           | "Explorar Organizações"
                           | "Criar Organização"
                           | "Painel da Organização"
-                          | "Mercado das Organização",
+                          | "Atividades Recentes",
                       )
                     }
                   >
@@ -1092,6 +1092,10 @@ export default function Home() {
               unread: c.unread ?? false,
             }))}
             currentUserId={user.uid}
+            deleteConversa={(id: string) => {
+              // Implementar lógica de deletar conversa se necessário
+              console.log('Deletar conversa:', id);
+            }}
             handleComment={handleComment}
             handleDeleteComment={handleDeleteComment}
             handlePost={handlePost}
@@ -1102,7 +1106,6 @@ export default function Home() {
               lastMessage: showChatWith.lastMessage ?? "",
               unread: showChatWith.unread ?? false,
             } : null}
-            // @ts-expect-error: Type mismatch due to different ChatOverview imports, but runtime shape is compatible
             posts={posts}
             sendMessage={sendMessage}
             setChatText={setChatText}
@@ -1126,7 +1129,6 @@ export default function Home() {
               lastMessage: showChatWith.lastMessage ?? "",
               unread: showChatWith.unread ?? false,
             } : null}
-            // @ts-expect-error: Type mismatch due to different ChatOverview imports, but runtime shape is compatible
             chatText={chatText}
             conversas={conversas.map(c => ({
               ...c,
@@ -1183,7 +1185,7 @@ export default function Home() {
           />
         )}
 
-         {activeTab === "Mercado das Organização" && (
+         {activeTab === "Atividades Recentes" && (
           <MercadoOrganizacao
           />
         )}

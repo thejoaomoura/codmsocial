@@ -12,11 +12,25 @@ import {
   HiOutlineCog,
   HiOutlineEye,
   HiOutlineCheck,
+  HiOutlineLogout,
 } from "react-icons/hi";
 import { User } from "firebase/auth";
+import {
+  doc,
+  writeBatch,
+  serverTimestamp,
+  collection,
+  query,
+  where,
+  getDocs,
+  deleteField,
+  addDoc,
+} from "firebase/firestore";
+import { addToast } from "@heroui/toast";
 
 import { Organization } from "../types";
 import { useRoleManagement } from "../hooks/useRoleManagement";
+import { db } from "../firebase";
 
 interface MinhasOrganizacoesProps {
   user: User | null;
@@ -34,6 +48,93 @@ const MinhasOrganizacoes: React.FC<MinhasOrganizacoesProps> = ({
   onSelectOrganization,
 }) => {
   const { getRoleName, getRoleEmoji } = useRoleManagement();
+
+  // Função para sair da organização
+  const handleLeaveOrganization = async (org: Organization) => {
+    if (!user) return;
+
+    // Verificar se é o owner
+    if (org.ownerId === user.uid) {
+      addToast({
+        title: "Ação Não Permitida",
+        description: "Você é o dono da organização e não pode sair. Transfira a propriedade primeiro.",
+        color: "danger",
+      });
+      return;
+    }
+
+    // Confirmar ação
+    if (!confirm(`Tem certeza que deseja sair de ${org.name}?`)) {
+      return;
+    }
+
+    try {
+      const batch = writeBatch(db);
+
+      // Remove da subcoleção da organização
+      const orgMembershipRef = doc(
+        db,
+        `organizations/${org.id}/memberships`,
+        user.uid,
+      );
+      batch.delete(orgMembershipRef);
+
+      // Remove da coleção global "memberships"
+      const globalMembershipsQuery = query(
+        collection(db, "memberships"),
+        where("userId", "==", user.uid),
+        where("organizationId", "==", org.id),
+      );
+      const globalMembershipsSnapshot = await getDocs(globalMembershipsQuery);
+      globalMembershipsSnapshot.forEach((docSnap) => batch.delete(docSnap.ref));
+
+      // Atualiza contador da organização
+      const orgRef = doc(db, "organizations", org.id);
+      batch.update(orgRef, {
+        memberCount: (org.memberCount || 0) - 1,
+        updatedAt: serverTimestamp(),
+      });
+
+      //  Remove o campo organizationTag do documento do usuário
+      const userRef = doc(db, "Users", user.uid);
+      batch.set(
+        userRef,
+        {
+          organizationTag: deleteField(),
+          updatedAt: serverTimestamp(),
+        },
+        { merge: true }
+      );
+
+      // Executa o batch
+      await batch.commit();
+
+      // Adiciona log às Atividades Recentes
+      await addDoc(collection(db, "logMercado"), {
+        displayName: user.displayName || "Usuário",
+        photoURL: user.photoURL || "",
+        status: "Saiu",
+        organizationName: org.name,
+        organizationLogo: org.logoURL || "",
+        createdAt: serverTimestamp(),
+      });
+
+      console.log("✅ Saiu da organização com sucesso");
+
+      addToast({
+        title: "Saída Concluída",
+        description: `Você saiu de ${org.name} com sucesso`,
+        color: "success",
+      });
+    } catch (error) {
+      console.error("❌ Erro ao sair da organização:", error);
+      addToast({
+        title: "Erro",
+        description: "Erro ao sair da organização. Tente novamente.",
+        color: "danger",
+      });
+    }
+  };
 
   if (!user) {
     return (
@@ -112,8 +213,6 @@ const MinhasOrganizacoes: React.FC<MinhasOrganizacoesProps> = ({
               Gerencie suas organizações e veja seu status
             </p>
           </div>
-
-          {/* Botão "Nova Organização" removido - usuários que já são membros não devem criar novas organizações */}
         </div>
 
         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3 ml-5 mr-5 mb-10">
@@ -206,6 +305,20 @@ const MinhasOrganizacoes: React.FC<MinhasOrganizacoesProps> = ({
                       >
                         Gerenciar
                       </Button>
+                      {org.ownerId !== user.uid && (
+                        <Button
+                          color="danger"
+                          size="sm"
+                          startContent={<HiOutlineLogout className="w-3 h-3" />}
+                          variant="flat"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleLeaveOrganization(org);
+                          }}
+                        >
+                          Sair
+                        </Button>
+                      )}
                     </div>
                   </div>
                 </CardBody>

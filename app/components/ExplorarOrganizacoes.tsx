@@ -224,7 +224,7 @@ const ExplorarOrganizacoes: React.FC<ExplorarOrganizacoesProps> = ({
     const orgSnap = await getDoc(orgRef);
     const orgData = orgSnap.exists() ? orgSnap.data() : null;
 
-    // Criar log na coleção logMercado
+    // Criar log nas Atividades Recentes
     if (orgData) {
       await addDoc(collection(db, "logMercado"), {
         displayName: user.displayName || user.email || "Usuário",

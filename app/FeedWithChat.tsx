@@ -46,8 +46,8 @@ import {
 import { Chip } from "@heroui/chip";
 
 import { db } from "./firebase";
-import { Post, PostReaction } from "./types";
-import Chat, { ChatOverview, ChatMessage } from "./Chat";
+import { Post, PostReaction, ChatOverview, ChatMessage } from "./types";
+import Chat from "./Chat";
 
 interface FeedProps {
   posts: Post[];

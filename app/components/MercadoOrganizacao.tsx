@@ -12,12 +12,12 @@ import { db } from "../firebase";
 import { Avatar } from "@heroui/avatar";
 import { Card, CardHeader, CardBody } from "@heroui/card";
 import { Chip } from "@heroui/chip";
-import { HiOutlineCheck, HiOutlineX, HiOutlineClock } from "react-icons/hi";
+import { HiOutlineCheck, HiOutlineX, HiOutlineClock, HiOutlineLogout } from "react-icons/hi";
 
 interface LogMercado {
   displayName: string;
   photoURL?: string;
-  status: "Aceitou" | "Recusou" | "Solicitou";
+  status: "Aceitou" | "Recusou" | "Solicitou" | "Saiu";
   organizationName?: string;
   organizationLogo?: string;
   createdAt?: any;
@@ -59,13 +59,13 @@ const MercadoOrganizacao = () => {
 <Card className="space-y-6" style={{ maxHeight: "600px", overflowY: "auto", position: "relative" }}>
 
      <div className="mb-6 ml-12">
-  <h2 className="text-2xl font-bold ml-5 mt-3">
-    Mercado das Organizações
-  </h2>
-  <p className="text-gray-600 ml-5">
-    Descubra como estão as organizações e transferências de players
-  </p>
-</div>
+      <h2 className="text-2xl font-bold ml-5 mt-3">
+        Atividades Recentes
+      </h2>
+      <p className="text-gray-600 ml-5">
+        Acompanhe as movimentações e atividades das organizações
+      </p>
+    </div>
 
       {/* Linha vertical */}
       <div className="absolute top-0 left-10 w-[2px] h-full bg-gray-300"></div>
@@ -80,6 +80,8 @@ const MercadoOrganizacao = () => {
                   ? "border-green-500 bg-green-500"
                   : log.status === "Recusou"
                   ? "border-red-500 bg-red-500"
+                  : log.status === "Saiu"
+                  ? "border-orange-500 bg-orange-500"
                   : "border-blue-500 bg-blue-500"
               } z-10`}
             ></div>
@@ -89,36 +91,38 @@ const MercadoOrganizacao = () => {
           <Card className="w-full shadow-md mr-5 ml-5">
 
         <CardBody className="-mt-1">
-  {log.status === "Aceitou" || log.status === "Recusou" ? (
-    <>
-      {/* Organização em cima */}
-      {log.organizationName && (
-        <div className="flex flex-col gap-1 mb-2">
-          <div className="flex items-center gap-3">
-            {log.organizationLogo && (
-              <Avatar
-                src={log.organizationLogo}
-                alt={log.organizationName}
-                size="sm"
-              />
+        {log.status === "Aceitou" || log.status === "Recusou" || log.status === "Saiu" ? (
+          <>
+            {/* Organização em cima */}
+            {log.organizationName && (
+              <div className="flex flex-col gap-1 mb-2">
+                <div className="flex items-center gap-3">
+                  {log.organizationLogo && (
+                    <Avatar
+                      src={log.organizationLogo}
+                      alt={log.organizationName}
+                      size="sm"
+                    />
+                  )}
+                  <p className="font-medium">{log.organizationName}</p>
+                </div>
+              </div>
             )}
-            <p className="font-medium">{log.organizationName}</p>
-          </div>
-        </div>
-      )}
 
       {/* Chip no meio */}
       <Chip
         className="text-xs px-2 py-[2px] self-start ml-10 mb-2"
        startContent={
-  log.status === "Aceitou" ? (
-    <HiOutlineCheck className="w-4 h-4 text-green-600" />
-  ) : log.status === "Recusou" ? (
-    <HiOutlineX className="w-4 h-4 text-red-600" />
-  ) : (
-    <HiOutlineClock className="w-4 h-4 text-blue-600" />
-  )
-}
+        log.status === "Aceitou" ? (
+          <HiOutlineCheck className="w-4 h-4 text-green-600" />
+        ) : log.status === "Recusou" ? (
+          <HiOutlineX className="w-4 h-4 text-red-600" />
+        ) : log.status === "Saiu" ? (
+          <HiOutlineLogout className="w-4 h-4 text-orange-600" />
+        ) : (
+          <HiOutlineClock className="w-4 h-4 text-blue-600" />
+        )
+      }
         
         variant="faded"
       >
