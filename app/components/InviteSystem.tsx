@@ -55,6 +55,8 @@ interface InviteSystemProps {
   organizationId: string;
   currentUserRole: OrganizationRole;
   currentUserId: string;
+  organizationName?: string;
+  organizationLogo?: string;
 }
 
 interface InviteModalProps {
@@ -63,6 +65,9 @@ interface InviteModalProps {
   organizationId: string;
   currentUserRole: OrganizationRole;
   onInviteSent: () => void;
+  organizationName?: string;
+  organizationLogo?: string;
+  currentUserId?: string;
 }
 
 interface PendingInvitesProps {
@@ -85,6 +90,9 @@ const InviteModal: React.FC<InviteModalProps> = ({
   organizationId,
   currentUserRole,
   onInviteSent,
+  organizationName,
+  organizationLogo,
+  currentUserId,
 }) => {
   const [email, setEmail] = useState("");
   const [message, setMessage] = useState("");
@@ -174,9 +182,35 @@ const InviteModal: React.FC<InviteModalProps> = ({
 
       await addDoc(collection(db, "organizationInvites"), inviteData);
 
+      // Enviar e-mail via API
+      try {
+        const response = await fetch("/api/send-invite", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            invitedEmail: email.toLowerCase().trim(),
+            organizationName: organizationName || "uma organização",
+            organizationLogo: organizationLogo || "",
+            inviterName: currentUserId || "Um membro",
+            message: message.trim(),
+            inviteUrl: typeof window !== "undefined" ? window.location.origin : "",
+          }),
+        });
+
+        if (!response.ok) {
+          console.error("Erro ao enviar e-mail, mas convite foi salvo");
+          // Não mostra erro ao usuário, pois o convite foi salvo com sucesso
+        }
+      } catch (emailError) {
+        console.error("Erro ao enviar e-mail:", emailError);
+        // Não mostra erro ao usuário, pois o convite foi salvo com sucesso
+      }
+
       addToast({
         title: "Convite enviado!",
-        description: `Convite enviado para ${email}`,
+        description: `Convite enviado para ${email}. Um e-mail foi enviado com as instruções.`,
         color: "success",
       });
 
@@ -454,7 +488,7 @@ const PendingRequests: React.FC<PendingRequestsProps> = ({
         }),
       );
 
-      setRequests(requestsWithUserData);
+      setRequests(requestsWithUserData as (Membership & { userData: User })[]);
     } catch (error) {
       console.error("Erro ao carregar solicitações:", error);
     } finally {
@@ -530,7 +564,7 @@ const handleAcceptRequest = async (
       });
     }
 
-    // Criar log na coleção logMercado
+    // Criar log nas Atividades Recentes
     if (orgData) {
       const logRef = doc(collection(db, "logMercado"));
       batch.set(logRef, {
@@ -605,7 +639,7 @@ const handleRejectRequest = async (
     const orgSnap = await getDoc(orgRef);
     const orgData = orgSnap.exists() ? orgSnap.data() : null;
 
-    // Criar log na coleção logMercado
+    // Criar log nas Atividades Recentes
     if (orgData) {
       const logRef = doc(collection(db, "logMercado"));
       batch.set(logRef, {
@@ -748,6 +782,8 @@ const InviteSystem: React.FC<InviteSystemProps> = ({
   organizationId,
   currentUserRole,
   currentUserId,
+  organizationName,
+  organizationLogo,
 }) => {
   const [isInviteModalOpen, setIsInviteModalOpen] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
@@ -799,8 +835,11 @@ const InviteSystem: React.FC<InviteSystemProps> = ({
       {/* Modal de convite */}
       <InviteModal
         currentUserRole={currentUserRole}
+        currentUserId={currentUserId}
         isOpen={isInviteModalOpen}
         organizationId={organizationId}
+        organizationLogo={organizationLogo}
+        organizationName={organizationName}
         onClose={() => setIsInviteModalOpen(false)}
         onInviteSent={handleInviteProcessed}
       />

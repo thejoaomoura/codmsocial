@@ -23,24 +23,7 @@ import { Input } from "@heroui/input";
 import { HiArrowRight, HiOutlineSearch } from "react-icons/hi";
 
 import TypingIndicator from "./components/TypingIndicator";
-
-export interface ChatMessage {
-  id?: string;
-  senderId: string;
-  senderName: string;
-  senderAvatar: string;
-  text: string;
-  createdAt: any;
-}
-
-export interface ChatOverview {
-  id: string;
-  otherUserId: string;
-  otherUserName: string;
-  otherUserAvatar?: string;
-  lastMessage: string;
-  unread: boolean;
-}
+import { ChatMessage, ChatOverview } from "./types";
 
 interface ChatProps {
   userId: string;
