@@ -8,30 +8,31 @@
 export const formatDate = (date: Date | string | any): string => {
   try {
     let dateObj: Date;
-    
+
     if (date instanceof Date) {
       dateObj = date;
-    } else if (typeof date === 'string') {
+    } else if (typeof date === "string") {
       dateObj = new Date(date);
-    } else if (date?.toDate && typeof date.toDate === 'function') {
+    } else if (date?.toDate && typeof date.toDate === "function") {
       // Firestore Timestamp
       dateObj = date.toDate();
     } else if (date?.seconds) {
       // Firestore Timestamp object
       dateObj = new Date(date.seconds * 1000);
     } else {
-      throw new Error('Formato de data inválido');
+      throw new Error("Formato de data inválido");
     }
 
     // Verificar se a data é válida
     if (isNaN(dateObj.getTime())) {
-      return 'Data inválida';
+      return "Data inválida";
     }
 
-    return dateObj.toLocaleDateString('pt-BR');
+    return dateObj.toLocaleDateString("pt-BR");
   } catch (error) {
-    console.error('Erro ao formatar data:', error);
-    return 'Data inválida';
+    console.error("Erro ao formatar data:", error);
+
+    return "Data inválida";
   }
 };
 
@@ -41,30 +42,31 @@ export const formatDate = (date: Date | string | any): string => {
 export const formatDateTime = (date: Date | string | any): string => {
   try {
     let dateObj: Date;
-    
+
     if (date instanceof Date) {
       dateObj = date;
-    } else if (typeof date === 'string') {
+    } else if (typeof date === "string") {
       dateObj = new Date(date);
-    } else if (date?.toDate && typeof date.toDate === 'function') {
+    } else if (date?.toDate && typeof date.toDate === "function") {
       // Firestore Timestamp
       dateObj = date.toDate();
     } else if (date?.seconds) {
       // Firestore Timestamp object
       dateObj = new Date(date.seconds * 1000);
     } else {
-      throw new Error('Formato de data inválido');
+      throw new Error("Formato de data inválido");
     }
 
     // Verificar se a data é válida
     if (isNaN(dateObj.getTime())) {
-      return 'Data inválida';
+      return "Data inválida";
     }
 
-    return dateObj.toLocaleString('pt-BR');
+    return dateObj.toLocaleString("pt-BR");
   } catch (error) {
-    console.error('Erro ao formatar data e hora:', error);
-    return 'Data inválida';
+    console.error("Erro ao formatar data e hora:", error);
+
+    return "Data inválida";
   }
 };
 
@@ -74,12 +76,12 @@ export const formatDateTime = (date: Date | string | any): string => {
 export const isValidDate = (date: any): boolean => {
   try {
     let dateObj: Date;
-    
+
     if (date instanceof Date) {
       dateObj = date;
-    } else if (typeof date === 'string') {
+    } else if (typeof date === "string") {
       dateObj = new Date(date);
-    } else if (date?.toDate && typeof date.toDate === 'function') {
+    } else if (date?.toDate && typeof date.toDate === "function") {
       dateObj = date.toDate();
     } else if (date?.seconds) {
       dateObj = new Date(date.seconds * 1000);
@@ -99,8 +101,9 @@ export const isValidDate = (date: any): boolean => {
 export const parseDateTime = (dateTimeString: string): Date | null => {
   try {
     if (!dateTimeString) return null;
-    
+
     const date = new Date(dateTimeString);
+
     return isNaN(date.getTime()) ? null : date;
   } catch {
     return null;
@@ -113,32 +116,32 @@ export const parseDateTime = (dateTimeString: string): Date | null => {
 export const formatForDateTimeInput = (date: Date | string | any): string => {
   try {
     let dateObj: Date;
-    
+
     if (date instanceof Date) {
       dateObj = date;
-    } else if (typeof date === 'string') {
+    } else if (typeof date === "string") {
       dateObj = new Date(date);
-    } else if (date?.toDate && typeof date.toDate === 'function') {
+    } else if (date?.toDate && typeof date.toDate === "function") {
       dateObj = date.toDate();
     } else if (date?.seconds) {
       dateObj = new Date(date.seconds * 1000);
     } else {
-      return '';
+      return "";
     }
 
     if (isNaN(dateObj.getTime())) {
-      return '';
+      return "";
     }
 
     // Formato YYYY-MM-DDTHH:mm para datetime-local
     const year = dateObj.getFullYear();
-    const month = String(dateObj.getMonth() + 1).padStart(2, '0');
-    const day = String(dateObj.getDate()).padStart(2, '0');
-    const hours = String(dateObj.getHours()).padStart(2, '0');
-    const minutes = String(dateObj.getMinutes()).padStart(2, '0');
+    const month = String(dateObj.getMonth() + 1).padStart(2, "0");
+    const day = String(dateObj.getDate()).padStart(2, "0");
+    const hours = String(dateObj.getHours()).padStart(2, "0");
+    const minutes = String(dateObj.getMinutes()).padStart(2, "0");
 
     return `${year}-${month}-${day}T${hours}:${minutes}`;
   } catch {
-    return '';
+    return "";
   }
 };

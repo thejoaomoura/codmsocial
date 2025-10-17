@@ -1,17 +1,17 @@
-import { useState, useEffect } from 'react';
-import { 
-  collection, 
-  query, 
-  where, 
-  onSnapshot, 
-  doc, 
+import { useState, useEffect } from "react";
+import {
+  collection,
+  query,
+  where,
+  onSnapshot,
+  doc,
   getDoc,
   getDocs,
-  orderBy,
-  limit
-} from 'firebase/firestore';
+  limit,
+} from "firebase/firestore";
+
 import { db } from "../firebase";
-import { Organization, Membership, User } from '../types';
+import { Organization, Membership } from "../types";
 
 export const useOrganizations = () => {
   const [organizations, setOrganizations] = useState<Organization[]>([]);
@@ -20,14 +20,16 @@ export const useOrganizations = () => {
 
   useEffect(() => {
     const q = query(
-      collection(db, 'organizations'),
-      where('visibility', '==', 'public'),
-      limit(50)
+      collection(db, "organizations"),
+      where("visibility", "==", "public"),
+      limit(50),
     );
 
-    const unsubscribe = onSnapshot(q, 
+    const unsubscribe = onSnapshot(
+      q,
       (snapshot) => {
         const orgs: Organization[] = [];
+
         snapshot.forEach((doc) => {
           orgs.push({ id: doc.id, ...doc.data() } as Organization);
         });
@@ -35,10 +37,10 @@ export const useOrganizations = () => {
         setLoading(false);
       },
       (err) => {
-        console.error('Erro ao carregar organizações:', err);
-        setError('Falha ao carregar organizações');
+        console.error("Erro ao carregar organizações:", err);
+        setError("Falha ao carregar organizações");
         setLoading(false);
-      }
+      },
     );
 
     return () => unsubscribe();
@@ -48,17 +50,20 @@ export const useOrganizations = () => {
 };
 
 export const useUserOrganizations = (userId: string | null) => {
-  const [userOrganizations, setUserOrganizations] = useState<Organization[]>([]);
+  const [userOrganizations, setUserOrganizations] = useState<Organization[]>(
+    [],
+  );
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    console.log('useUserOrganizations - userId:', userId);
-    
+    console.log("useUserOrganizations - userId:", userId);
+
     if (!userId) {
-      console.log('useUserOrganizations - No userId, setting empty array');
+      console.log("useUserOrganizations - No userId, setting empty array");
       setUserOrganizations([]);
       setLoading(false);
+
       return;
     }
 
@@ -66,57 +71,84 @@ export const useUserOrganizations = (userId: string | null) => {
       try {
         //console.log('useUserOrganizations - Starting to load organizations for userId:', userId);
         setLoading(true);
-        
+
         // Buscar organizações onde o usuário é owner
         const ownerQuery = query(
-          collection(db, 'organizations'),
-          where('ownerId', '==', userId)
+          collection(db, "organizations"),
+          where("ownerId", "==", userId),
         );
-        
+
         const ownerSnapshot = await getDocs(ownerQuery);
-        
+
         const ownerOrgs: Organization[] = [];
+
         ownerSnapshot.forEach((doc) => {
           ownerOrgs.push({ id: doc.id, ...doc.data() } as Organization);
         });
 
         // Buscar organizações onde o usuário é membro (via coleção global memberships)
         //console.log('useUserOrganizations - Searching for memberships where user is member');
-        
+
         const membershipsQuery = query(
-          collection(db, 'memberships'),
-          where('userId', '==', userId),
-          where('status', '==', 'accepted')
+          collection(db, "memberships"),
+          where("userId", "==", userId),
+          where("status", "==", "accepted"),
         );
-        
+
         const membershipsSnapshot = await getDocs(membershipsQuery);
-        console.log('useUserOrganizations - Found memberships:', membershipsSnapshot.size);
-        
+
+        console.log(
+          "useUserOrganizations - Found memberships:",
+          membershipsSnapshot.size,
+        );
+
         const memberOrgs: Organization[] = [];
-        
+
         // Para cada membership, buscar a organização correspondente
         for (const membershipDoc of membershipsSnapshot.docs) {
           const membershipData = membershipDoc.data() as Membership;
-          console.log('useUserOrganizations - Processing membership for org:', membershipData.organizationId);
-          
+
+          console.log(
+            "useUserOrganizations - Processing membership for org:",
+            membershipData.organizationId,
+          );
+
           try {
-            const orgDoc = await getDoc(doc(db, 'organizations', membershipData.organizationId));
+            const orgDoc = await getDoc(
+              doc(db, "organizations", membershipData.organizationId),
+            );
+
             if (orgDoc.exists()) {
-              const orgData = { id: orgDoc.id, ...orgDoc.data() } as Organization;
+              const orgData = {
+                id: orgDoc.id,
+                ...orgDoc.data(),
+              } as Organization;
+
               memberOrgs.push(orgData);
-              console.log('useUserOrganizations - Added member organization:', orgData.name);
+              console.log(
+                "useUserOrganizations - Added member organization:",
+                orgData.name,
+              );
             } else {
-              console.warn('useUserOrganizations - Organization not found:', membershipData.organizationId);
+              console.warn(
+                "useUserOrganizations - Organization not found:",
+                membershipData.organizationId,
+              );
             }
           } catch (orgError) {
-            console.error('useUserOrganizations - Error fetching organization:', membershipData.organizationId, orgError);
+            console.error(
+              "useUserOrganizations - Error fetching organization:",
+              membershipData.organizationId,
+              orgError,
+            );
           }
         }
 
         // Combinar organizações (owner + member) e remover duplicatas
         const allOrgs = [...ownerOrgs, ...memberOrgs];
-        const uniqueOrgs = allOrgs.filter((org, index, self) => 
-          index === self.findIndex(o => o.id === org.id)
+        const uniqueOrgs = allOrgs.filter(
+          (org, index, self) =>
+            index === self.findIndex((o) => o.id === org.id),
         );
 
         //console.log('useUserOrganizations - Final organizations (owner + member):', uniqueOrgs.length);
@@ -124,8 +156,11 @@ export const useUserOrganizations = (userId: string | null) => {
         setUserOrganizations(uniqueOrgs);
         setLoading(false);
       } catch (err) {
-        console.error('useUserOrganizations - Erro ao carregar organizações do usuário:', err);
-        setError('Falha ao carregar suas organizações');
+        console.error(
+          "useUserOrganizations - Erro ao carregar organizações do usuário:",
+          err,
+        );
+        setError("Falha ao carregar suas organizações");
         setLoading(false);
       }
     };
@@ -145,25 +180,26 @@ export const useOrganization = (orgId: string | null) => {
     if (!orgId) {
       setOrganization(null);
       setLoading(false);
+
       return;
     }
 
     const unsubscribe = onSnapshot(
-      doc(db, 'organizations', orgId),
+      doc(db, "organizations", orgId),
       (doc) => {
         if (doc.exists()) {
           setOrganization({ id: doc.id, ...doc.data() } as Organization);
         } else {
           setOrganization(null);
-          setError('Organização não encontrada');
+          setError("Organização não encontrada");
         }
         setLoading(false);
       },
       (err) => {
-        console.error('Erro ao carregar organização:', err);
-        setError('Falha ao carregar organização');
+        console.error("Erro ao carregar organização:", err);
+        setError("Falha ao carregar organização");
         setLoading(false);
-      }
+      },
     );
 
     return () => unsubscribe();
@@ -181,31 +217,34 @@ export const useOrganizationBySlug = (slug: string | null) => {
     if (!slug) {
       setOrganization(null);
       setLoading(false);
+
       return;
     }
 
     const q = query(
-      collection(db, 'organizations'),
-      where('slug', '==', slug),
-      limit(1)
+      collection(db, "organizations"),
+      where("slug", "==", slug),
+      limit(1),
     );
 
-    const unsubscribe = onSnapshot(q,
+    const unsubscribe = onSnapshot(
+      q,
       (snapshot) => {
         if (!snapshot.empty) {
           const doc = snapshot.docs[0];
+
           setOrganization({ id: doc.id, ...doc.data() } as Organization);
         } else {
           setOrganization(null);
-          setError('Organização não encontrada');
+          setError("Organização não encontrada");
         }
         setLoading(false);
       },
       (err) => {
-        console.error('Erro ao carregar organização por slug:', err);
-        setError('Falha ao carregar organização');
+        console.error("Erro ao carregar organização por slug:", err);
+        setError("Falha ao carregar organização");
         setLoading(false);
-      }
+      },
     );
 
     return () => unsubscribe();

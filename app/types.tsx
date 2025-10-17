@@ -36,7 +36,7 @@ export interface Post {
 export interface User {
   uid: string;
   name: string;
-  tag: string;
+  organizationTag: string;
   avatar: string;
   createdAt?: Date;
   displayName?: string;
@@ -53,8 +53,8 @@ export interface ChatOverview {
   otherUserId: string;
   otherUserName: string;
   otherUserAvatar?: string; // pode ser undefined
-  lastMessage?: string;     // pode ser undefined
-  unread?: boolean;         // opcional
+  lastMessage?: string; // pode ser undefined
+  unread?: boolean; // opcional
 }
 
 export interface ChatMessage {
@@ -67,7 +67,12 @@ export interface ChatMessage {
 
 // ===== SISTEMA DE CARGOS E ORGANIZAÇÕES =====
 
-export type OrganizationRole = "owner" | "moderator" | "manager" | "pro" | "ranked";
+export type OrganizationRole =
+  | "owner"
+  | "moderator"
+  | "manager"
+  | "pro"
+  | "ranked";
 
 export type MembershipStatus = "pending" | "accepted" | "removed" | "banned";
 
@@ -88,6 +93,7 @@ export interface Organization {
   tag: string; // tag única da organização
   slug: string; // único globalmente
   ownerId: string;
+  hasPendingRequest?: boolean;
   createdAt: any; // Timestamp
   updatedAt: any; // Timestamp
   logoURL?: string;
@@ -126,7 +132,11 @@ export type EventStatus = "draft" | "open" | "closed" | "finished";
 
 export type GameMode = "BR" | "MP";
 
-export type RegistrationState = "pending" | "approved" | "rejected" | "withdrawn";
+export type RegistrationState =
+  | "pending"
+  | "approved"
+  | "rejected"
+  | "withdrawn";
 
 export interface Event {
   id: string;

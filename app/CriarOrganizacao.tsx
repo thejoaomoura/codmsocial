@@ -1,7 +1,6 @@
 "use client";
 
 import React, { useState } from "react";
-import { db, auth } from "./firebase";
 import {
   collection,
   addDoc,
@@ -21,19 +20,21 @@ import { Input as Textarea } from "@heroui/input";
 import { HiOutlineSave, HiOutlinePlus } from "react-icons/hi";
 import { addToast } from "@heroui/toast";
 import { Card, CardBody, CardHeader } from "@heroui/card";
-import { 
-  Organization, 
-  Membership, 
-  OrganizationVisibility
-} from "./types";
-import { validateOrganizationCreation, validateTagFormat } from './utils/validation';
+
+import { db, auth } from "./firebase";
+import { Organization, Membership, OrganizationVisibility } from "./types";
+import {
+  validateOrganizationCreation,
+  validateTagFormat,
+} from "./utils/validation";
 
 export default function CriarOrganizacao() {
   const [user] = useAuthState(auth);
   const [nome, setNome] = useState("");
   const [tag, setTag] = useState("");
   const [descricao, setDescricao] = useState("");
-  const [visibilidade, setVisibilidade] = useState<OrganizationVisibility>("public");
+  const [visibilidade, setVisibilidade] =
+    useState<OrganizationVisibility>("public");
   const [isCreating, setIsCreating] = useState(false);
 
   // Criar organização
@@ -41,9 +42,11 @@ export default function CriarOrganizacao() {
     if (!user) {
       addToast({
         title: "Erro",
-        description: "Usuário não autenticado. Faça login para criar uma organização.",
-        color: "danger"
+        description:
+          "Usuário não autenticado. Faça login para criar uma organização.",
+        color: "danger",
       });
+
       return;
     }
 
@@ -51,26 +54,29 @@ export default function CriarOrganizacao() {
     const orgValidation = validateOrganizationCreation({
       name: nome,
       tag: tag,
-      description: descricao
+      description: descricao,
     });
 
     if (!orgValidation.valid) {
       addToast({
         title: "Erro de Validação",
         description: orgValidation.reason,
-        color: "danger"
+        color: "danger",
       });
+
       return;
     }
 
     // Validar formato da tag
     const tagValidation = validateTagFormat(tag);
+
     if (!tagValidation.valid) {
       addToast({
         title: "Erro na Tag",
         description: tagValidation.reason,
-        color: "danger"
+        color: "danger",
       });
+
       return;
     }
 
@@ -80,7 +86,7 @@ export default function CriarOrganizacao() {
       // Verificar se a tag já existe
       const tagQuery = query(
         collection(db, "organizations"),
-        where("tag", "==", tag.toLowerCase().trim())
+        where("tag", "==", tag),
       );
       const tagSnapshot = await getDocs(tagQuery);
 
@@ -88,29 +94,37 @@ export default function CriarOrganizacao() {
         addToast({
           title: "Tag Indisponível",
           description: "Esta tag já está em uso. Escolha outra.",
-          color: "danger"
+          color: "danger",
         });
         setIsCreating(false);
+
         return;
       }
 
-      const slug = nome.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
+      const slug = nome
+        .toLowerCase()
+        .replace(/\s+/g, "-")
+        .replace(/[^a-z0-9-]/g, "");
 
       // Validar campos obrigatórios antes de enviar para Firebase
-      if (!visibilidade || (visibilidade !== 'public' && visibilidade !== 'private')) {
+      if (
+        !visibilidade ||
+        (visibilidade !== "public" && visibilidade !== "private")
+      ) {
         addToast({
           title: "Erro de Validação",
           description: "Visibilidade deve ser 'public' ou 'private'",
-          color: "danger"
+          color: "danger",
         });
         setIsCreating(false);
+
         return;
       }
 
       // Criar organização
-      const orgData: Omit<Organization, 'id'> = {
+      const orgData: Omit<Organization, "id"> = {
         name: nome.trim(),
-        tag: tag.toLowerCase().trim(),
+        tag: tag,
         slug,
         description: descricao.trim() || undefined,
         visibility: visibilidade as OrganizationVisibility,
@@ -120,52 +134,60 @@ export default function CriarOrganizacao() {
         memberCount: 1,
         maxMembers: 50,
         region: "BR", // Padrão para Brasil
-        game: "CODM", // Padrão 
+        game: "CODM", // Padrão
         settings: {
-          allowPublicJoin: visibilidade === 'public',
-          requireApproval: true
-        }
+          allowPublicJoin: visibilidade === "public",
+          requireApproval: true,
+        },
       };
 
-      console.log('🔧 Criando nova organização:', orgData);
+      console.log("🔧 Criando nova organização:", orgData);
       const orgRef = await addDoc(collection(db, "organizations"), orgData);
-      console.log('✅ Organização criada com ID:', orgRef.id);
+
+      console.log("✅ Organização criada com ID:", orgRef.id);
 
       // Criar membership para o owner
-      const membershipData: Omit<Membership, 'id'> = {
+      const membershipData: Omit<Membership, "id"> = {
         organizationId: orgRef.id,
         userId: user.uid,
-        role: 'owner',
-        status: 'accepted',
+        role: "owner",
+        status: "accepted",
         joinedAt: serverTimestamp() as any,
         updatedAt: serverTimestamp() as any,
         invitedBy: user.uid,
         invitedAt: serverTimestamp() as any,
-        roleHistory: []
+        roleHistory: [],
       };
 
       // Criar membership na subcoleção da organização usando setDoc para definir o ID
-      console.log('🔧 Criando membership na subcoleção:', `organizations/${orgRef.id}/memberships/${user.uid}`);
-      await setDoc(doc(db, `organizations/${orgRef.id}/memberships`, user.uid), membershipData);
-      console.log('✅ Membership criado na subcoleção com sucesso');
+      console.log(
+        "🔧 Criando membership na subcoleção:",
+        `organizations/${orgRef.id}/memberships/${user.uid}`,
+      );
+      await setDoc(
+        doc(db, `organizations/${orgRef.id}/memberships`, user.uid),
+        membershipData,
+      );
+      console.log("✅ Membership criado na subcoleção com sucesso");
 
       // Também criar na coleção global de memberships para consultas gerais
-      console.log('🔧 Criando membership na coleção global...');
+      console.log("🔧 Criando membership na coleção global...");
       await addDoc(collection(db, "memberships"), membershipData);
-      console.log('✅ Membership criado na coleção global com sucesso');
+      console.log("✅ Membership criado na coleção global com sucesso");
 
       // Atualizar perfil do usuário
       const userRef = doc(db, "Users", user.uid);
+
       await updateDoc(userRef, {
-        organizationTag: tag.toLowerCase().trim(),
-        organizationRole: 'owner',
-        updatedAt: serverTimestamp()
+        organizationTag: tag,
+        organizationRole: "owner",
+        updatedAt: serverTimestamp(),
       });
 
       addToast({
         title: "Organização Criada!",
         description: `"${nome}" foi criada com sucesso! Você agora é o proprietário.`,
-        color: "success"
+        color: "success",
       });
 
       // Limpar formulário
@@ -173,13 +195,13 @@ export default function CriarOrganizacao() {
       setTag("");
       setDescricao("");
       setVisibilidade("public");
-
     } catch (error) {
       console.error("Erro ao criar organização:", error);
       addToast({
         title: "Erro Interno",
-        description: "Erro ao criar organização. Verifique sua conexão e tente novamente.",
-        color: "danger"
+        description:
+          "Erro ao criar organização. Verifique sua conexão e tente novamente.",
+        color: "danger",
       });
     } finally {
       setIsCreating(false);
@@ -193,7 +215,9 @@ export default function CriarOrganizacao() {
         <Card>
           <CardBody className="text-center py-12">
             <HiOutlinePlus className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-            <h2 className="text-xl font-semibold mb-2">Faça Login para Criar uma Organização</h2>
+            <h2 className="text-xl font-semibold mb-2">
+              Faça Login para Criar uma Organização
+            </h2>
             <p className="text-gray-600">
               Você precisa estar logado para criar uma nova organização.
             </p>
@@ -220,52 +244,57 @@ export default function CriarOrganizacao() {
         </CardHeader>
         <CardBody className="space-y-4">
           <div className="bg-gray-800 border border-gray-700 rounded-lg p-4 mb-4">
-            <h3 className="font-semibold text-gray-200 mb-2">📋 Regras de Criação</h3>
+            <h3 className="font-semibold text-gray-200 mb-2">
+              📋 Regras de Criação
+            </h3>
             <ul className="text-sm text-gray-300 space-y-1">
               <li>• Qualquer usuário autenticado pode criar organizações</li>
               <li>• Você se tornará automaticamente o Owner da organização</li>
-              <li>• Seu cargo atual em outras organizações não interfere aqui</li>
+              <li>
+                • Seu cargo atual em outras organizações não interfere aqui
+              </li>
               <li>• Você pode criar múltiplas organizações</li>
             </ul>
           </div>
 
           <Input
+            isRequired
+            isDisabled={isCreating}
             label="Nome da Organização"
             placeholder="Digite o nome da sua organização"
             value={nome}
             onChange={(e) => setNome(e.target.value)}
-            isRequired
-            isDisabled={isCreating}
           />
 
           <Input
+            isRequired
+            description="Apenas letras minúsculas, números e hífens. Esta será a identificação única da sua organização."
+            isDisabled={isCreating}
             label="Tag da Organização"
             placeholder="tag-unica"
             value={tag}
-            onChange={(e) => setTag(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ''))}
-            description="Apenas letras minúsculas, números e hífens. Esta será a identificação única da sua organização."
-            isRequired
-            isDisabled={isCreating}
+            onChange={(e) => setTag(e.target.value)}
           />
 
           <Textarea
+            isDisabled={isCreating}
             label="Descrição (opcional)"
             placeholder="Descreva sua organização..."
             value={descricao}
             onChange={(e) => setDescricao(e.target.value)}
-            isDisabled={isCreating}
           />
 
           <Select
+            isRequired
+            isDisabled={isCreating}
             label="Visibilidade"
             placeholder="Selecione a visibilidade"
             selectedKeys={new Set([visibilidade])}
             onSelectionChange={(keys) => {
               const selected = Array.from(keys)[0] as OrganizationVisibility;
+
               setVisibilidade(selected);
             }}
-            isDisabled={isCreating}
-            isRequired
           >
             <SelectItem key="public" textValue="Pública">
               <div className="flex items-center gap-2">
@@ -273,7 +302,8 @@ export default function CriarOrganizacao() {
                 <div>
                   <div className="font-medium">Pública</div>
                   <div className="text-xs text-gray-500">
-                    Visível para todos usuários autenticados. Lista e página da organização são públicas.
+                    Visível para todos usuários autenticados. Lista e página da
+                    organização são públicas.
                   </div>
                 </div>
               </div>
@@ -292,13 +322,15 @@ export default function CriarOrganizacao() {
           </Select>
 
           <div className="flex gap-3 pt-4">
-            <Button 
-              color="primary" 
-              onPress={handleCreate}
+            <Button
+              className="flex-1"
+              color="primary"
               isDisabled={!nome.trim() || !tag.trim() || isCreating}
               isLoading={isCreating}
-              startContent={!isCreating && <HiOutlineSave className="w-4 h-4" />}
-              className="flex-1"
+              startContent={
+                !isCreating && <HiOutlineSave className="w-4 h-4" />
+              }
+              onPress={handleCreate}
             >
               {isCreating ? "Criando..." : "Criar Organização"}
             </Button>
@@ -306,8 +338,9 @@ export default function CriarOrganizacao() {
 
           <div className="text-xs text-gray-500 mt-4">
             <p>
-              <strong>Nota:</strong> Após criar a organização, você poderá gerenciá-la através do 
-              painel "Minhas Organizações" ou "Painel da Organização".
+              <strong>Nota:</strong> Após criar a organização, você poderá
+              gerenciá-la através do painel "Minhas Organizações" ou "Painel da
+              Organização".
             </p>
           </div>
         </CardBody>

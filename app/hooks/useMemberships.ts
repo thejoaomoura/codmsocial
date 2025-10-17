@@ -1,16 +1,15 @@
-import { useState, useEffect } from 'react';
-import { 
-  collection, 
-  query, 
-  where, 
-  onSnapshot, 
-  doc, 
+import { useState, useEffect } from "react";
+import {
+  collection,
+  query,
+  where,
+  onSnapshot,
+  doc,
   getDoc,
-  getDocs,
-  orderBy
-} from 'firebase/firestore';
-import { db } from '../firebase';
-import { Membership, User, OrganizationRole } from '../types';
+} from "firebase/firestore";
+
+import { db } from "../firebase";
+import { Membership, User } from "../types";
 
 export const useMemberships = (orgId: string | null) => {
   const [memberships, setMemberships] = useState<Membership[]>([]);
@@ -21,17 +20,20 @@ export const useMemberships = (orgId: string | null) => {
     if (!orgId) {
       setMemberships([]);
       setLoading(false);
+
       return;
     }
 
     const q = query(
       collection(db, `organizations/${orgId}/memberships`),
-      where('status', '==', 'accepted')
+      where("status", "==", "accepted"),
     );
 
-    const unsubscribe = onSnapshot(q,
+    const unsubscribe = onSnapshot(
+      q,
       (snapshot) => {
         const members: Membership[] = [];
+
         snapshot.forEach((doc) => {
           members.push({ ...doc.data() } as Membership);
         });
@@ -39,10 +41,10 @@ export const useMemberships = (orgId: string | null) => {
         setLoading(false);
       },
       (err) => {
-        console.error('Erro ao carregar memberships:', err);
-        setError('Falha ao carregar membros');
+        console.error("Erro ao carregar memberships:", err);
+        setError("Falha ao carregar membros");
         setLoading(false);
-      }
+      },
     );
 
     return () => unsubscribe();
@@ -51,18 +53,22 @@ export const useMemberships = (orgId: string | null) => {
   return { membersWithData: memberships, loading, error };
 };
 
-export const useUserMembership = (orgId: string | null, userId: string | null) => {
+export const useUserMembership = (
+  orgId: string | null,
+  userId: string | null,
+) => {
   const [membership, setMembership] = useState<Membership | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     //console.log('useUserMembership - orgId:', orgId, 'userId:', userId);
-    
+
     if (!orgId || !userId) {
       //console.log('useUserMembership - Missing orgId or userId, setting null');
       setMembership(null);
       setLoading(false);
+
       return;
     }
 
@@ -76,6 +82,7 @@ export const useUserMembership = (orgId: string | null, userId: string | null) =
         //console.log('useUserMembership - Document snapshot received, exists:', doc.exists());
         if (doc.exists()) {
           const membershipData = { ...doc.data() } as Membership;
+
           //console.log('useUserMembership - Membership data:', membershipData);
           setMembership(membershipData);
         } else {
@@ -85,10 +92,13 @@ export const useUserMembership = (orgId: string | null, userId: string | null) =
         setLoading(false);
       },
       (err) => {
-        console.error('useUserMembership - Erro ao carregar membership do usuário:', err);
-        setError('Falha ao carregar informações de membro');
+        console.error(
+          "useUserMembership - Erro ao carregar membership do usuário:",
+          err,
+        );
+        setError("Falha ao carregar informações de membro");
         setLoading(false);
-      }
+      },
     );
 
     return () => unsubscribe();
@@ -98,7 +108,9 @@ export const useUserMembership = (orgId: string | null, userId: string | null) =
 };
 
 export const usePendingMemberships = (orgId: string | null) => {
-  const [pendingMemberships, setPendingMemberships] = useState<Membership[]>([]);
+  const [pendingMemberships, setPendingMemberships] = useState<Membership[]>(
+    [],
+  );
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -106,17 +118,20 @@ export const usePendingMemberships = (orgId: string | null) => {
     if (!orgId) {
       setPendingMemberships([]);
       setLoading(false);
+
       return;
     }
 
     const q = query(
       collection(db, `organizations/${orgId}/memberships`),
-      where('status', '==', 'pending')
+      where("status", "==", "pending"),
     );
 
-    const unsubscribe = onSnapshot(q,
+    const unsubscribe = onSnapshot(
+      q,
       (snapshot) => {
         const pending: Membership[] = [];
+
         snapshot.forEach((doc) => {
           pending.push({ ...doc.data() } as Membership);
         });
@@ -124,10 +139,10 @@ export const usePendingMemberships = (orgId: string | null) => {
         setLoading(false);
       },
       (err) => {
-        console.error('Erro ao carregar memberships pendentes:', err);
-        setError('Falha ao carregar solicitações pendentes');
+        console.error("Erro ao carregar memberships pendentes:", err);
+        setError("Falha ao carregar solicitações pendentes");
         setLoading(false);
-      }
+      },
     );
 
     return () => unsubscribe();
@@ -137,8 +152,14 @@ export const usePendingMemberships = (orgId: string | null) => {
 };
 
 export const useMembersWithUserData = (orgId: string | null) => {
-  const { membersWithData: memberships, loading: membershipsLoading, error: membershipsError } = useMemberships(orgId);
-  const [membersWithData, setMembersWithData] = useState<(Membership & { userData: User })[]>([]);
+  const {
+    membersWithData: memberships,
+    loading: membershipsLoading,
+    error: membershipsError,
+  } = useMemberships(orgId);
+  const [membersWithData, setMembersWithData] = useState<
+    (Membership & { userData: User })[]
+  >([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -147,44 +168,51 @@ export const useMembersWithUserData = (orgId: string | null) => {
     if (membershipsError) {
       setError(membershipsError);
       setLoading(false);
+
       return;
     }
 
     const loadUserData = async () => {
       try {
         setLoading(true);
-        
+
         const membersWithUserData = await Promise.all(
           memberships.map(async (membership) => {
-            const userDoc = await getDoc(doc(db, 'Users', membership.userId));
-            const userData = userDoc.exists() ? { uid: userDoc.id, ...userDoc.data() } as User : null;
-            
+            const userDoc = await getDoc(doc(db, "Users", membership.userId));
+            const userData = userDoc.exists()
+              ? ({ uid: userDoc.id, ...userDoc.data() } as User)
+              : null;
+
             return {
               ...membership,
               userData: userData || {
                 uid: membership.userId,
-                name: 'Usuário não encontrado',
-                tag: '',
-                avatar: '',
-                displayName: 'Usuário não encontrado',
-                email: ''
-              }
+                name: "Usuário não encontrado",
+                tag: "",
+                avatar: "",
+                displayName: "Usuário não encontrado",
+                email: "",
+              },
             };
-          })
+          }),
         );
 
         // Ordenar: Owner primeiro, depois por data de entrada
         membersWithUserData.sort((a, b) => {
-          if (a.role === 'owner') return -1;
-          if (b.role === 'owner') return 1;
-          return new Date(a.joinedAt?.toDate()).getTime() - new Date(b.joinedAt?.toDate()).getTime();
+          if (a.role === "owner") return -1;
+          if (b.role === "owner") return 1;
+
+          return (
+            new Date(a.joinedAt?.toDate()).getTime() -
+            new Date(b.joinedAt?.toDate()).getTime()
+          );
         });
 
         setMembersWithData(membersWithUserData);
         setLoading(false);
       } catch (err) {
-        console.error('Erro ao carregar dados dos usuários:', err);
-        setError('Falha ao carregar dados dos membros');
+        console.error("Erro ao carregar dados dos usuários:", err);
+        setError("Falha ao carregar dados dos membros");
         setLoading(false);
       }
     };

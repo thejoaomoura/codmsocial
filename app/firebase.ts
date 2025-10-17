@@ -9,7 +9,7 @@ const firebaseConfig = {
   projectId: "codmsocial-f8015",
   storageBucket: "codmsocial-f8015.firebasestorage.app",
   messagingSenderId: "391686792657",
-  appId: "1:391686792657:web:a5809f64ef1c9a61ecacf0"
+  appId: "1:391686792657:web:a5809f64ef1c9a61ecacf0",
 };
 
 const app = initializeApp(firebaseConfig);
@@ -21,17 +21,20 @@ export const provider = new GoogleAuthProvider();
 // Configurações para email link authentication
 export const actionCodeSettings = {
   // URL para redirecionamento após autenticação - deve estar na lista de domínios autorizados do Firebase Console
-  url: typeof window !== 'undefined' ? window.location.origin + '/login' : 'http://localhost:3000/login',
+  url:
+    typeof window !== "undefined"
+      ? window.location.origin + "/login"
+      : "http://localhost:3000/login",
   // Deve ser sempre true para concluir o processo de login no app
   handleCodeInApp: true,
   iOS: {
-    bundleId: 'com.codmsocial.app'
+    bundleId: "com.codmsocial.app",
   },
   // Configurações para Android
   android: {
-    packageName: 'com.codmsocial.app',
+    packageName: "com.codmsocial.app",
     installApp: true,
-    minimumVersion: '12'
+    minimumVersion: "12",
   },
   // Domínio personalizado (se configurado no Firebase Hosting)
   // linkDomain: 'codmsocial.com' // Descomentar quanto tiver domínio próprio

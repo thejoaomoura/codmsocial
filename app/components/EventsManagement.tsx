@@ -1,38 +1,63 @@
 "use client";
 
-import React, { useState } from 'react';
-import { Card, CardBody, CardHeader } from '@heroui/card';
-import { Chip } from '@heroui/chip';
-import { Avatar } from '@heroui/avatar';
-import { Button } from '@heroui/button';
-import { Badge } from '@heroui/badge';
-import { Modal, ModalContent, ModalHeader, ModalBody, ModalFooter } from '@heroui/modal';
-import { Checkbox } from '@heroui/checkbox';
-import { Divider } from '@heroui/divider';
-import { Input } from '@heroui/input';
-import { Select, SelectItem } from '@heroui/select';
-import { Switch } from '@heroui/switch';
-import { addToast } from '@heroui/toast';
-import { 
-  HiOutlineCalendar, 
+import React, { useState } from "react";
+import { Card, CardBody, CardHeader } from "@heroui/card";
+import { Chip } from "@heroui/chip";
+import { Avatar } from "@heroui/avatar";
+import { Button } from "@heroui/button";
+import { Badge } from "@heroui/badge";
+import {
+  Modal,
+  ModalContent,
+  ModalHeader,
+  ModalBody,
+  ModalFooter,
+} from "@heroui/modal";
+import { Checkbox } from "@heroui/checkbox";
+import { Divider } from "@heroui/divider";
+import { Input } from "@heroui/input";
+import { Select, SelectItem } from "@heroui/select";
+import { Switch } from "@heroui/switch";
+import { addToast } from "@heroui/toast";
+import {
+  HiOutlineCalendar,
   HiOutlineStar,
   HiOutlineUsers,
   HiOutlineClock,
   HiOutlineCheck,
-  HiOutlineX,
   HiOutlineEye,
   HiOutlineExternalLink,
   HiOutlinePlus,
-  HiOutlinePencil
-} from 'react-icons/hi';
-import { Event, EventRegistration, Organization, Membership, User, OrganizationRole, EventType, GameMode, EventStatus } from '../types';
-import { useRoleManagement } from '../hooks/useRoleManagement';
-import { useEventRegistrations } from '../hooks/useEventRegistrations';
-import { formatDate, formatDateTime, isValidDate, parseDateTime } from '../utils/dateUtils';
-import { collection, addDoc, serverTimestamp, onSnapshot, query, where, orderBy, Timestamp, doc, updateDoc } from 'firebase/firestore';
-import { db } from '../firebase';
+  HiOutlinePencil,
+} from "react-icons/hi";
+import {
+  collection,
+  addDoc,
+  serverTimestamp,
+  onSnapshot,
+  query,
+  orderBy,
+  Timestamp,
+  doc,
+  updateDoc,
+} from "firebase/firestore";
 import { I18nProvider } from "@react-aria/i18n";
-import { DatePicker } from "@heroui/date-picker";
+
+import {
+  Event,
+  EventRegistration,
+  Organization,
+  Membership,
+  User,
+  OrganizationRole,
+  EventType,
+  GameMode,
+  EventStatus,
+} from "../types";
+import { useRoleManagement } from "../hooks/useRoleManagement";
+import { useEventRegistrations } from "../hooks/useEventRegistrations";
+import { db } from "../firebase";
+
 // dayjs import removed – not used in this component
 
 interface EventsManagementProps {
@@ -46,7 +71,7 @@ const EventsManagement: React.FC<EventsManagementProps> = ({
   organization,
   currentUserRole,
   members,
-  currentUserId
+  currentUserId,
 }) => {
   const [selectedEvent, setSelectedEvent] = useState<Event | null>(null);
   const [showRosterModal, setShowRosterModal] = useState(false);
@@ -58,125 +83,139 @@ const EventsManagement: React.FC<EventsManagementProps> = ({
   const [loading, setLoading] = useState(true);
   const [createEventLoading, setCreateEventLoading] = useState(false);
   const { getRolePermissions } = useRoleManagement();
-  const { registerForEvent, loading: registrationLoading } = useEventRegistrations();
-const [date, setDate] = useState(''); // YYYY-MM-DD
+  const { registerForEvent, loading: registrationLoading } =
+    useEventRegistrations();
+  const [date, setDate] = useState(""); // YYYY-MM-DD
 
-const [time, setTime] = useState(''); // HH:mm
-const [dateText, setDateText] = useState(''); // DD/MM/YYYY
-const [timeText, setTimeText] = useState(''); // HH:mm
+  const [time, setTime] = useState(""); // HH:mm
+  const [dateText, setDateText] = useState(""); // DD/MM/YYYY
+  const [timeText, setTimeText] = useState(""); // HH:mm
 
-const handleDateChange = (value: string) => {
-  let numbers = value.replace(/\D/g, ''); // remove tudo que não é número
-  if (numbers.length > 8) numbers = numbers.slice(0, 8);
+  const handleDateChange = (value: string) => {
+    let numbers = value.replace(/\D/g, ""); // remove tudo que não é número
 
-  let masked = '';
-  if (numbers.length >= 1) masked += numbers.slice(0, 2);
-  if (numbers.length >= 3) masked += '/' + numbers.slice(2, 4);
-  if (numbers.length >= 5) masked += '/' + numbers.slice(4, 8);
+    if (numbers.length > 8) numbers = numbers.slice(0, 8);
 
-  setDateText(masked);
-};
+    let masked = "";
 
-const handleTimeChange = (value: string) => {
-  let numbers = value.replace(/\D/g, '');
-  if (numbers.length > 4) numbers = numbers.slice(0, 4);
+    if (numbers.length >= 1) masked += numbers.slice(0, 2);
+    if (numbers.length >= 3) masked += "/" + numbers.slice(2, 4);
+    if (numbers.length >= 5) masked += "/" + numbers.slice(4, 8);
 
-  let masked = '';
-  if (numbers.length >= 1) masked += numbers.slice(0, 2);
-  if (numbers.length >= 3) masked += ':' + numbers.slice(2, 4);
+    setDateText(masked);
+  };
 
-  setTimeText(masked);
-};
+  const handleTimeChange = (value: string) => {
+    let numbers = value.replace(/\D/g, "");
 
+    if (numbers.length > 4) numbers = numbers.slice(0, 4);
 
-const combineDateAndTimeFromText = (dateStr: string, timeStr: string): string | null => {
-  if (!dateStr || !timeStr) return null;
+    let masked = "";
 
-  const dateMatch = dateStr.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
-  const timeMatch = timeStr.match(/^(\d{2}):(\d{2})$/);
+    if (numbers.length >= 1) masked += numbers.slice(0, 2);
+    if (numbers.length >= 3) masked += ":" + numbers.slice(2, 4);
 
-  if (!dateMatch || !timeMatch) return null;
+    setTimeText(masked);
+  };
 
-  const [, dayStr, monthStr, yearStr] = dateMatch;
-  const [, hoursStr, minutesStr] = timeMatch;
+  const combineDateAndTimeFromText = (
+    dateStr: string,
+    timeStr: string,
+  ): string | null => {
+    if (!dateStr || !timeStr) return null;
 
-  const day = parseInt(dayStr, 10);
-  const month = parseInt(monthStr, 10);
-  const year = parseInt(yearStr, 10);
-  const hours = parseInt(hoursStr, 10);
-  const minutes = parseInt(minutesStr, 10);
+    const dateMatch = dateStr.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+    const timeMatch = timeStr.match(/^(\d{2}):(\d{2})$/);
 
-  const jsDate = new Date(year, month - 1, day, hours, minutes, 0); // horário local
-  return jsDate.toISOString();
-};
+    if (!dateMatch || !timeMatch) return null;
+
+    const [, dayStr, monthStr, yearStr] = dateMatch;
+    const [, hoursStr, minutesStr] = timeMatch;
+
+    const day = parseInt(dayStr, 10);
+    const month = parseInt(monthStr, 10);
+    const year = parseInt(yearStr, 10);
+    const hours = parseInt(hoursStr, 10);
+    const minutes = parseInt(minutesStr, 10);
+
+    const jsDate = new Date(year, month - 1, day, hours, minutes, 0); // horário local
+
+    return jsDate.toISOString();
+  };
 
   // Estado do formulário de criação de evento
   const [eventForm, setEventForm] = useState({
-    name: '',
-    description: '',
-    type: 'scrim' as EventType,
-    gameMode: 'BR' as GameMode,
+    name: "",
+    description: "",
+    type: "scrim" as EventType,
+    gameMode: "BR" as GameMode,
     teamSize: 4,
     rosterMin: 4,
     rosterMax: 6,
-    startsAt: '',
+    startsAt: "",
     checkinWindow: 30,
     maxTeams: undefined as number | undefined,
-    prizePool: '',
-    prizeCurrency: 'BRL' as 'BRL' | 'USD',
-    rulesURL: ''
+    prizePool: "",
+    prizeCurrency: "BRL" as "BRL" | "USD",
+    rulesURL: "",
   });
 
   // Função para formatar valor da premiação
-  const formatPrizeValue = (value: string, currency: 'BRL' | 'USD'): string => {
+  const formatPrizeValue = (value: string, currency: "BRL" | "USD"): string => {
     // Remove caracteres não numéricos exceto vírgula e ponto
-    const cleanValue = value.replace(/[^\d.,]/g, '');
-    
-    if (!cleanValue) return '';
-    
+    const cleanValue = value.replace(/[^\d.,]/g, "");
+
+    if (!cleanValue) return "";
+
     // Converte vírgula para ponto para processamento
-    const normalizedValue = cleanValue.replace(',', '.');
+    const normalizedValue = cleanValue.replace(",", ".");
     const numericValue = parseFloat(normalizedValue);
-    
-    if (isNaN(numericValue)) return '';
-    
+
+    if (isNaN(numericValue)) return "";
+
     // Formata conforme a moeda
-    if (currency === 'BRL') {
-      return new Intl.NumberFormat('pt-BR', {
-        style: 'currency',
-        currency: 'BRL'
+    if (currency === "BRL") {
+      return new Intl.NumberFormat("pt-BR", {
+        style: "currency",
+        currency: "BRL",
       }).format(numericValue);
     } else {
-      return new Intl.NumberFormat('en-US', {
-        style: 'currency',
-        currency: 'USD'
+      return new Intl.NumberFormat("en-US", {
+        style: "currency",
+        currency: "USD",
       }).format(numericValue);
     }
   };
 
   // Função para extrair valor numérico da string formatada
   const extractNumericValue = (formattedValue: string): string => {
-    return formattedValue.replace(/[^\d.,]/g, '').replace(',', '.');
+    return formattedValue.replace(/[^\d.,]/g, "").replace(",", ".");
   };
 
   const permissions = getRolePermissions(currentUserRole);
+
   React.useEffect(() => {
     const eventsQuery = query(
-      collection(db, 'events'),
-      orderBy('createdAt', 'desc')
+      collection(db, "events"),
+      orderBy("createdAt", "desc"),
     );
 
-    const unsubscribe = onSnapshot(eventsQuery, (snapshot) => {
-      const eventsData: Event[] = [];
-      snapshot.forEach((doc) => {
-        eventsData.push({ id: doc.id, ...doc.data() } as Event);
-      });
-      setEvents(eventsData);
-      setLoading(false);
-    }, (error) => {
-      console.error('Erro ao carregar eventos:', error);
-      setLoading(false);
-    });
+    const unsubscribe = onSnapshot(
+      eventsQuery,
+      (snapshot) => {
+        const eventsData: Event[] = [];
+
+        snapshot.forEach((doc) => {
+          eventsData.push({ id: doc.id, ...doc.data() } as Event);
+        });
+        setEvents(eventsData);
+        setLoading(false);
+      },
+      (error) => {
+        console.error("Erro ao carregar eventos:", error);
+        setLoading(false);
+      },
+    );
 
     return () => unsubscribe();
   }, []);
@@ -184,32 +223,35 @@ const combineDateAndTimeFromText = (dateStr: string, timeStr: string): string | 
   // Resetar formulário
   const resetEventForm = () => {
     setEventForm({
-      name: '',
-      description: '',
-      type: 'scrim' as EventType,
-      gameMode: 'BR' as GameMode,
+      name: "",
+      description: "",
+      type: "scrim" as EventType,
+      gameMode: "BR" as GameMode,
       teamSize: 4,
       rosterMin: 4,
       rosterMax: 6,
-      startsAt: '',
+      startsAt: "",
       checkinWindow: 30,
       maxTeams: undefined,
-      prizePool: '',
-      prizeCurrency: 'BRL' as 'BRL' | 'USD',
-      rulesURL: ''
+      prizePool: "",
+      prizeCurrency: "BRL" as "BRL" | "USD",
+      rulesURL: "",
     });
   };
 
   const populateEventForm = (event: Event) => {
-    const startsAtDate = event.startsAt instanceof Timestamp 
-      ? event.startsAt.toDate() 
-      : new Date(event.startsAt);
-    
+    const startsAtDate =
+      event.startsAt instanceof Timestamp
+        ? event.startsAt.toDate()
+        : new Date(event.startsAt);
+
     const formattedDate = startsAtDate.toISOString().slice(0, 16);
-    
-    const prizeValue = event.prizePool ? extractNumericValue(event.prizePool) : '';
-    const currency = event.prizePool?.includes('$') ? 'USD' : 'BRL';
-    
+
+    const prizeValue = event.prizePool
+      ? extractNumericValue(event.prizePool)
+      : "";
+    const currency = event.prizePool?.includes("$") ? "USD" : "BRL";
+
     setEventForm({
       name: event.name,
       description: event.description,
@@ -223,158 +265,180 @@ const combineDateAndTimeFromText = (dateStr: string, timeStr: string): string | 
       maxTeams: event.maxTeams,
       prizePool: prizeValue,
       prizeCurrency: currency,
-      rulesURL: event.rulesURL || ''
+      rulesURL: event.rulesURL || "",
     });
   };
 
-
-// Criar evento
-const handleCreateEvent = async () => {
-  if (!eventForm.name.trim() || !eventForm.description.trim() || !eventForm.startsAt) {
-    addToast({
-      title: 'Campos obrigatórios',
-      description: 'Preencha todos os campos obrigatórios',
-      color: 'danger'
-    });
-    return;
-  }
-
-  // ✅ Validação simples e robusta de data
-  const jsDate = new Date(eventForm.startsAt);
-  const now = new Date();
-
-  if (isNaN(jsDate.getTime())) {
-    addToast({
-      title: 'Data inválida',
-      description: 'Por favor, selecione uma data e hora válidas',
-      color: 'danger'
-    });
-    return;
-  }
-
-  if (jsDate <= now) {
-    addToast({
-      title: 'Data inválida',
-      description: 'A data deve ser no futuro',
-      color: 'danger'
-    });
-    return;
-  }
-
-  if (eventForm.rosterMin > eventForm.rosterMax) {
-    addToast({
-      title: 'Erro de validação',
-      description: 'O roster mínimo não pode ser maior que o máximo',
-      color: 'danger'
-    });
-    return;
-  }
-
-  if (!eventForm.type || !eventForm.gameMode) {
-    addToast({
-      title: 'Campos obrigatórios',
-      description: 'Selecione o tipo de evento e modo de jogo',
-      color: 'danger'
-    });
-    return;
-  }
-
-  setCreateEventLoading(true);
-
-  try {
-    const eventData: Omit<Event, 'id'> = {
-      type: eventForm.type,
-      hostOrgId: organization.id,
-      name: eventForm.name.trim(),
-      description: eventForm.description.trim(),
-      gameMode: eventForm.gameMode,
-      teamSize: eventForm.teamSize,
-      rosterMin: eventForm.rosterMin,
-      rosterMax: eventForm.rosterMax,
-      startsAt: jsDate.toISOString(),
-      checkinWindow: eventForm.checkinWindow,
-      status: 'open' as EventStatus,
-      createdBy: currentUserId || '',
-      createdAt: serverTimestamp(),
-      region: organization.region,
-      ...(eventForm.maxTeams && { maxTeams: eventForm.maxTeams }),
-      ...(eventForm.prizePool.trim() && { 
-        prizePool: formatPrizeValue(eventForm.prizePool, eventForm.prizeCurrency)
-      }),
-      ...(eventForm.rulesURL.trim() && { rulesURL: eventForm.rulesURL.trim() })
-    };
-
-    console.log('Dados do evento antes de enviar:', eventData);
-
-    await addDoc(collection(db, 'events'), eventData);
-
-    addToast({
-      title: 'Evento criado',
-      description: 'O evento foi criado com sucesso!',
-      color: 'success'
-    });
-
-    setShowCreateEventModal(false);
-    resetEventForm();
-  } catch (error) {
-    console.error('Erro ao criar evento:', error);
-    addToast({
-      title: 'Erro',
-      description: 'Erro ao criar evento. Tente novamente.',
-      color: 'danger'
-    });
-  } finally {
-    setCreateEventLoading(false);
-  }
-};
-
-
-  const handleUpdateEvent = async () => {
-    if (!selectedEvent || !eventForm.name.trim() || !eventForm.description.trim() || !eventForm.startsAt) {
+  // Criar evento
+  const handleCreateEvent = async () => {
+    if (
+      !eventForm.name.trim() ||
+      !eventForm.description.trim() ||
+      !eventForm.startsAt
+    ) {
       addToast({
-        title: 'Campos obrigatórios',
-        description: 'Preencha todos os campos obrigatórios',
-        color: 'danger'
+        title: "Campos obrigatórios",
+        description: "Preencha todos os campos obrigatórios",
+        color: "danger",
       });
+
       return;
     }
 
-const jsDate = new Date(eventForm.startsAt);
-const now = new Date();
+    // ✅ Validação simples e robusta de data
+    const jsDate = new Date(eventForm.startsAt);
+    const now = new Date();
 
-if (isNaN(jsDate.getTime())) {
-  addToast({
-    title: 'Data inválida',
-    description: 'Por favor, selecione uma data e hora válidas',
-    color: 'danger'
-  });
-  return;
-}
+    if (isNaN(jsDate.getTime())) {
+      addToast({
+        title: "Data inválida",
+        description: "Por favor, selecione uma data e hora válidas",
+        color: "danger",
+      });
 
-if (jsDate <= now) {
-  addToast({
-    title: 'Data inválida',
-    description: 'A data deve ser no futuro',
-    color: 'danger'
-  });
-  return;
-}
+      return;
+    }
+
+    if (jsDate <= now) {
+      addToast({
+        title: "Data inválida",
+        description: "A data deve ser no futuro",
+        color: "danger",
+      });
+
+      return;
+    }
 
     if (eventForm.rosterMin > eventForm.rosterMax) {
       addToast({
-        title: 'Erro de validação',
-        description: 'O roster mínimo não pode ser maior que o máximo',
-        color: 'danger'
+        title: "Erro de validação",
+        description: "O roster mínimo não pode ser maior que o máximo",
+        color: "danger",
       });
+
       return;
     }
 
     if (!eventForm.type || !eventForm.gameMode) {
       addToast({
-        title: 'Campos obrigatórios',
-        description: 'Selecione o tipo de evento e modo de jogo',
-        color: 'danger'
+        title: "Campos obrigatórios",
+        description: "Selecione o tipo de evento e modo de jogo",
+        color: "danger",
       });
+
+      return;
+    }
+
+    setCreateEventLoading(true);
+
+    try {
+      const eventData: Omit<Event, "id"> = {
+        type: eventForm.type,
+        hostOrgId: organization.id,
+        name: eventForm.name.trim(),
+        description: eventForm.description.trim(),
+        gameMode: eventForm.gameMode,
+        teamSize: eventForm.teamSize,
+        rosterMin: eventForm.rosterMin,
+        rosterMax: eventForm.rosterMax,
+        startsAt: jsDate.toISOString(),
+        checkinWindow: eventForm.checkinWindow,
+        status: "open" as EventStatus,
+        createdBy: currentUserId || "",
+        createdAt: serverTimestamp(),
+        region: organization.region,
+        ...(eventForm.maxTeams && { maxTeams: eventForm.maxTeams }),
+        ...(eventForm.prizePool.trim() && {
+          prizePool: formatPrizeValue(
+            eventForm.prizePool,
+            eventForm.prizeCurrency,
+          ),
+        }),
+        ...(eventForm.rulesURL.trim() && {
+          rulesURL: eventForm.rulesURL.trim(),
+        }),
+      };
+
+      console.log("Dados do evento antes de enviar:", eventData);
+
+      await addDoc(collection(db, "events"), eventData);
+
+      addToast({
+        title: "Evento criado",
+        description: "O evento foi criado com sucesso!",
+        color: "success",
+      });
+
+      setShowCreateEventModal(false);
+      resetEventForm();
+    } catch (error) {
+      console.error("Erro ao criar evento:", error);
+      addToast({
+        title: "Erro",
+        description: "Erro ao criar evento. Tente novamente.",
+        color: "danger",
+      });
+    } finally {
+      setCreateEventLoading(false);
+    }
+  };
+
+  const handleUpdateEvent = async () => {
+    if (
+      !selectedEvent ||
+      !eventForm.name.trim() ||
+      !eventForm.description.trim() ||
+      !eventForm.startsAt
+    ) {
+      addToast({
+        title: "Campos obrigatórios",
+        description: "Preencha todos os campos obrigatórios",
+        color: "danger",
+      });
+
+      return;
+    }
+
+    const jsDate = new Date(eventForm.startsAt);
+    const now = new Date();
+
+    if (isNaN(jsDate.getTime())) {
+      addToast({
+        title: "Data inválida",
+        description: "Por favor, selecione uma data e hora válidas",
+        color: "danger",
+      });
+
+      return;
+    }
+
+    if (jsDate <= now) {
+      addToast({
+        title: "Data inválida",
+        description: "A data deve ser no futuro",
+        color: "danger",
+      });
+
+      return;
+    }
+
+    if (eventForm.rosterMin > eventForm.rosterMax) {
+      addToast({
+        title: "Erro de validação",
+        description: "O roster mínimo não pode ser maior que o máximo",
+        color: "danger",
+      });
+
+      return;
+    }
+
+    if (!eventForm.type || !eventForm.gameMode) {
+      addToast({
+        title: "Campos obrigatórios",
+        description: "Selecione o tipo de evento e modo de jogo",
+        color: "danger",
+      });
+
       return;
     }
 
@@ -389,21 +453,26 @@ if (jsDate <= now) {
         teamSize: eventForm.teamSize,
         rosterMin: eventForm.rosterMin,
         rosterMax: eventForm.rosterMax,
-         startsAt: jsDate.toISOString(), 
+        startsAt: jsDate.toISOString(),
         checkinWindow: eventForm.checkinWindow,
         ...(eventForm.maxTeams && { maxTeams: eventForm.maxTeams }),
-        ...(eventForm.prizePool.trim() && { 
-          prizePool: formatPrizeValue(eventForm.prizePool, eventForm.prizeCurrency)
+        ...(eventForm.prizePool.trim() && {
+          prizePool: formatPrizeValue(
+            eventForm.prizePool,
+            eventForm.prizeCurrency,
+          ),
         }),
-        ...(eventForm.rulesURL.trim() && { rulesURL: eventForm.rulesURL.trim() })
+        ...(eventForm.rulesURL.trim() && {
+          rulesURL: eventForm.rulesURL.trim(),
+        }),
       };
 
-      await updateDoc(doc(db, 'events', selectedEvent.id), updateData);
+      await updateDoc(doc(db, "events", selectedEvent.id), updateData);
 
       addToast({
-        title: 'Evento atualizado',
-        description: 'O evento foi atualizado com sucesso!',
-        color: 'success'
+        title: "Evento atualizado",
+        description: "O evento foi atualizado com sucesso!",
+        color: "success",
       });
 
       setShowCreateEventModal(false);
@@ -411,11 +480,11 @@ if (jsDate <= now) {
       setSelectedEvent(null);
       resetEventForm();
     } catch (error) {
-      console.error('Erro ao atualizar evento:', error);
+      console.error("Erro ao atualizar evento:", error);
       addToast({
-        title: 'Erro',
-        description: 'Erro ao atualizar evento. Tente novamente.',
-        color: 'danger'
+        title: "Erro",
+        description: "Erro ao atualizar evento. Tente novamente.",
+        color: "danger",
       });
     } finally {
       setCreateEventLoading(false);
@@ -425,73 +494,75 @@ if (jsDate <= now) {
   // Mock data para demonstração / Remover em produção
   const mockEvents: Event[] = [
     {
-      id: '1',
-      type: 'scrim',
+      id: "1",
+      type: "scrim",
       hostOrgId: organization.id,
-      name: 'Scrim Semanal - BR',
-      description: 'Treino competitivo semanal para melhorar coordenação da equipe',
-      gameMode: 'BR',
+      name: "Scrim Semanal - BR",
+      description:
+        "Treino competitivo semanal para melhorar coordenação da equipe",
+      gameMode: "BR",
       teamSize: 4,
       rosterMin: 4,
       rosterMax: 6,
       startsAt: new Date(Date.now() + 86400000), // Amanhã
       checkinWindow: 30,
-      status: 'open',
+      status: "open",
       createdBy: organization.ownerId,
       createdAt: new Date(),
-      region: 'BR',
-      rulesURL: 'https://example.com/rules'
+      region: "BR",
+      rulesURL: "https://example.com/rules",
     },
     {
-      id: '2',
-      type: 'tournament',
-      hostOrgId: 'other-org',
-      name: 'Copa Nacional CODM',
-      description: 'Torneio nacional com premiação em dinheiro. Evento aberto para todas as organizações qualificadas.',
-      gameMode: 'MP',
+      id: "2",
+      type: "tournament",
+      hostOrgId: "other-org",
+      name: "Copa Nacional CODM",
+      description:
+        "Torneio nacional com premiação em dinheiro. Evento aberto para todas as organizações qualificadas.",
+      gameMode: "MP",
       teamSize: 5,
       rosterMin: 5,
       rosterMax: 7,
       startsAt: new Date(Date.now() + 604800000), // Próxima semana
       checkinWindow: 60,
-      status: 'open',
-      createdBy: 'other-user',
+      status: "open",
+      createdBy: "other-user",
       createdAt: new Date(),
       maxTeams: 32,
-      prizePool: 'R$ 5.000',
-      region: 'BR',
-      rulesURL: 'https://example.com/tournament-rules'
+      prizePool: "R$ 5.000",
+      region: "BR",
+      rulesURL: "https://example.com/tournament-rules",
     },
     {
-      id: '3',
-      type: 'scrim',
-      hostOrgId: 'private-org',
-      name: 'Scrim Privado - Elite',
-      description: 'Treino exclusivo para organizações convidadas',
-      gameMode: 'BR',
+      id: "3",
+      type: "scrim",
+      hostOrgId: "private-org",
+      name: "Scrim Privado - Elite",
+      description: "Treino exclusivo para organizações convidadas",
+      gameMode: "BR",
       teamSize: 4,
       rosterMin: 4,
       rosterMax: 6,
-      startsAt: new Date(Date.now() + 172800000), 
-      status: 'closed',
-      createdBy: 'private-user',
+      startsAt: new Date(Date.now() + 172800000),
+      status: "closed",
+      createdBy: "private-user",
       createdAt: new Date(),
-      region: 'BR'
-    }
+      region: "BR",
+    },
   ];
 
   // Mock data para registrations
   const mockRegistrations: EventRegistration[] = [
     {
-      eventId: '2',
+      eventId: "2",
       orgId: organization.id,
       managerId: organization.ownerId,
-      roster: [currentUserId || '', 'user2', 'user3', 'user4', 'user5'],
-      substitutes: ['user6'],
+      roster: [currentUserId || "", "user2", "user3", "user4", "user5"],
+      substitutes: ["user6"],
       createdAt: new Date(),
       updatedAt: new Date(),
-      state: 'approved'
-    }
+      state: "approved",
+    },
   ];
 
   // Função para verificar se o usuário pode ver um evento
@@ -507,28 +578,34 @@ if (jsDate <= now) {
     }
 
     // Para eventos de outras organizações, verificar se é público ou se a org está inscrita
-    const isRegistered = mockRegistrations.some(reg => reg.eventId === event.id && reg.orgId === organization.id);
-    
-    return event.status === 'open' || isRegistered;
+    const isRegistered = mockRegistrations.some(
+      (reg) => reg.eventId === event.id && reg.orgId === organization.id,
+    );
+
+    return event.status === "open" || isRegistered;
   };
 
   // Função para obter o status da inscrição da organização
   const getRegistrationStatus = (eventId: string) => {
-    return mockRegistrations.find(reg => reg.eventId === eventId && reg.orgId === organization.id);
+    return mockRegistrations.find(
+      (reg) => reg.eventId === eventId && reg.orgId === organization.id,
+    );
   };
 
   // Função para verificar se o usuário atual está no roster
   const getUserRosterStatus = (eventId: string) => {
     const registration = getRegistrationStatus(eventId);
+
     if (!registration || !currentUserId) return null;
 
     if (registration.roster.includes(currentUserId)) {
-      return 'titular';
+      return "titular";
     }
     if (registration.substitutes?.includes(currentUserId)) {
-      return 'reserva';
+      return "reserva";
     }
-    return 'não incluído';
+
+    return "não incluído";
   };
 
   const handleRegisterForEvent = (event: Event) => {
@@ -548,26 +625,31 @@ if (jsDate <= now) {
         setSelectedRoster([...selectedRoster, userId]);
       }
     } else {
-      setSelectedRoster(selectedRoster.filter(id => id !== userId));
+      setSelectedRoster(selectedRoster.filter((id) => id !== userId));
     }
   };
 
   const handleConfirmRegistration = async () => {
-    if (!selectedEvent || selectedRoster.length < (selectedEvent.rosterMin || 0)) {
+    if (
+      !selectedEvent ||
+      selectedRoster.length < (selectedEvent.rosterMin || 0)
+    ) {
       addToast({
-        title: 'Roster Insuficiente',
+        title: "Roster Insuficiente",
         description: `Selecione pelo menos ${selectedEvent?.rosterMin} jogadores`,
-        color: 'danger'
+        color: "danger",
       });
+
       return;
     }
 
     if (selectedRoster.length > (selectedEvent.rosterMax || 0)) {
       addToast({
-        title: 'Roster Excedido',
+        title: "Roster Excedido",
         description: `Máximo de ${selectedEvent?.rosterMax} jogadores permitido`,
-        color: 'danger'
+        color: "danger",
       });
+
       return;
     }
 
@@ -576,9 +658,9 @@ if (jsDate <= now) {
       const success = await registerForEvent(
         selectedEvent.id,
         organization.id,
-        currentUserId || '',
+        currentUserId || "",
         selectedRoster,
-        [] // 
+        [], //
       );
 
       if (success) {
@@ -587,45 +669,59 @@ if (jsDate <= now) {
         setSelectedRoster([]);
       }
     } catch (error) {
-      console.error('Erro ao inscrever no evento:', error);
+      console.error("Erro ao inscrever no evento:", error);
       addToast({
-        title: 'Erro na Inscrição',
-        description: 'Erro ao inscrever no evento. Tente novamente.',
-        color: 'danger'
+        title: "Erro na Inscrição",
+        description: "Erro ao inscrever no evento. Tente novamente.",
+        color: "danger",
       });
     }
   };
 
   const getEventStatusColor = (status: string) => {
     switch (status) {
-      case 'open': return 'success';
-      case 'closed': return 'warning';
-      case 'finished': return 'default';
-      default: return 'primary';
+      case "open":
+        return "success";
+      case "closed":
+        return "warning";
+      case "finished":
+        return "default";
+      default:
+        return "primary";
     }
   };
 
   const getEventTypeIcon = (type: string) => {
-    return type === 'tournament' ? HiOutlineStar : HiOutlineCalendar;
+    return type === "tournament" ? HiOutlineStar : HiOutlineCalendar;
   };
 
   const getRegistrationStatusColor = (state: string) => {
     switch (state) {
-      case 'approved': return 'success';
-      case 'pending': return 'warning';
-      case 'rejected': return 'danger';
-      case 'withdrawn': return 'default';
-      default: return 'primary';
+      case "approved":
+        return "success";
+      case "pending":
+        return "warning";
+      case "rejected":
+        return "danger";
+      case "withdrawn":
+        return "default";
+      default:
+        return "primary";
     }
   };
 
   const getRegistrationStatusText = (state: string) => {
     switch (state) {
-      case 'approved': return 'Aprovado';
-      case 'pending': return 'Pendente';
-      case 'rejected': return 'Rejeitado';
-      case 'withdrawn': return 'Retirado';
-      default: return state;
+      case "approved":
+        return "Aprovado";
+      case "pending":
+        return "Pendente";
+      case "rejected":
+        return "Rejeitado";
+      case "withdrawn":
+        return "Retirado";
+      default:
+        return state;
     }
   };
 
@@ -649,6 +745,7 @@ if (jsDate <= now) {
       return `${day}/${month}/${year} às ${hours}:${minutes}`;
     } catch (error) {
       console.error("Erro ao formatar a data:", error);
+
       return "";
     }
   };
@@ -659,7 +756,7 @@ if (jsDate <= now) {
     return (
       <div className="flex justify-center items-center py-8">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-2"></div>
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-2" />
           <p className="text-default-600">Carregando eventos...</p>
         </div>
       </div>
@@ -672,39 +769,41 @@ if (jsDate <= now) {
         <h3 className="text-xl font-semibold">Eventos Disponíveis</h3>
         {permissions.canCreateEvents && (
           <Button
-          startContent={<HiOutlinePlus className="w-4 h-4" />}
-          onClick={() => setShowCreateEventModal(true)}
-          style={{
-            background: "rgba(219, 16, 87, 0.25)",
-            border: "1px solid rgba(219, 16, 87, 0.4)",
-            backdropFilter: "blur(10px)",
-            WebkitBackdropFilter: "blur(10px)",
-            color: "#fff",
-            fontWeight: 500,
-            transition: "all 0.3s ease",
-          }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.background = "rgba(219, 16, 87, 0.4)";
-            e.currentTarget.style.border = "1px solid rgba(219, 16, 87, 0.6)";
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.background = "rgba(219, 16, 87, 0.25)";
-            e.currentTarget.style.border = "1px solid rgba(219, 16, 87, 0.4)";
-          }}
-        >
-          Criar Evento
-        </Button>
+            startContent={<HiOutlinePlus className="w-4 h-4" />}
+            style={{
+              background: "rgba(219, 16, 87, 0.25)",
+              border: "1px solid rgba(219, 16, 87, 0.4)",
+              backdropFilter: "blur(10px)",
+              WebkitBackdropFilter: "blur(10px)",
+              color: "#fff",
+              fontWeight: 500,
+              transition: "all 0.3s ease",
+            }}
+            onClick={() => setShowCreateEventModal(true)}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = "rgba(219, 16, 87, 0.4)";
+              e.currentTarget.style.border = "1px solid rgba(219, 16, 87, 0.6)";
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = "rgba(219, 16, 87, 0.25)";
+              e.currentTarget.style.border = "1px solid rgba(219, 16, 87, 0.4)";
+            }}
+          >
+            Criar Evento
+          </Button>
         )}
       </div>
 
       {/* Informação sobre permissões para Ranked/Pro */}
-      {(currentUserRole === 'ranked' || currentUserRole === 'pro') && (
+      {(currentUserRole === "ranked" || currentUserRole === "pro") && (
         <Card className="bg-blue-50 border-blue-200">
           <CardBody className="py-3">
             <div className="flex items-center gap-2">
               <HiOutlineEye className="w-5 h-5 text-blue-600" />
               <p className="text-sm text-blue-800">
-                <strong>Modo Visualização:</strong> Você pode ver informações dos eventos, mas não pode inscrever a organização ou editar rosters.
+                <strong>Modo Visualização:</strong> Você pode ver informações
+                dos eventos, mas não pode inscrever a organização ou editar
+                rosters.
               </p>
             </div>
           </CardBody>
@@ -712,212 +811,264 @@ if (jsDate <= now) {
       )}
 
       <div className="grid gap-4">
-     {visibleEvents.filter(event => event.hostOrgId === organization.id).length === 0 ? (
-  <div className="text-center py-6 text-default-500">
-    Nenhum evento encontrado para sua organização.
-  </div>
-) : (
-  visibleEvents
-    .filter(event => event.hostOrgId === organization.id)
-    .map((event) => {
-      const EventIcon = getEventTypeIcon(event.type);
-      const canRegister = permissions.canRegisterForEvents && event.status === 'open';
-      const registration = getRegistrationStatus(event.id);
-      const userRosterStatus = getUserRosterStatus(event.id);
+        {visibleEvents.filter((event) => event.hostOrgId === organization.id)
+          .length === 0 ? (
+          <div className="text-center py-6 text-default-500">
+            Nenhum evento encontrado para sua organização.
+          </div>
+        ) : (
+          visibleEvents
+            .filter((event) => event.hostOrgId === organization.id)
+            .map((event) => {
+              const EventIcon = getEventTypeIcon(event.type);
+              const canRegister =
+                permissions.canRegisterForEvents && event.status === "open";
+              const registration = getRegistrationStatus(event.id);
+              const userRosterStatus = getUserRosterStatus(event.id);
 
-      return (
-        <Card key={event.id} className="hover:shadow-md transition-shadow">
-          <CardHeader className="pb-2">
-            <div className="flex justify-between items-start w-full">
-              <div className="flex items-center gap-3">
-                {React.createElement(EventIcon, { className: "w-6 h-6 text-primary" })}
-                <div>
-                  <h4 className="font-semibold">{event.name}</h4>
-                  <div className="flex items-center gap-2 mt-1 flex-wrap">
-                    <Chip size="sm" variant="flat" color={getEventStatusColor(event.status)}>
-                      {event.status === 'open' ? 'Aberto' : 
-                       event.status === 'closed' ? 'Fechado' : 
-                       event.status === 'finished' ? 'Finalizado' : 'Rascunho'}
-                    </Chip>
-                    <Chip size="sm" variant="dot" color="primary">
-                      {event.type === 'tournament' ? 'Torneio' : 'Scrim'}
-                    </Chip>
-                    <Chip size="sm" variant="bordered">
-                      {event.gameMode}
-                    </Chip>
-                    {event.hostOrgId === organization.id && (
-                      <Chip size="sm" variant="flat" color="secondary">
-                        Própria Org
-                      </Chip>
-                    )}
-                  </div>
-                </div>
-              </div>
-              <div className="flex gap-2">
-                <Button 
-                  color="default" 
-                  variant="flat"
-                  size="sm"
-                  startContent={<HiOutlineEye className="w-4 h-4" />}
-                  onClick={() => handleViewEventDetails(event)}
+              return (
+                <Card
+                  key={event.id}
+                  className="hover:shadow-md transition-shadow"
                 >
-                  Detalhes
-                </Button>
+                  <CardHeader className="pb-2">
+                    <div className="flex justify-between items-start w-full">
+                      <div className="flex items-center gap-3">
+                        {React.createElement(EventIcon, {
+                          className: "w-6 h-6 text-primary",
+                        })}
+                        <div>
+                          <h4 className="font-semibold">{event.name}</h4>
+                          <div className="flex items-center gap-2 mt-1 flex-wrap">
+                            <Chip
+                              color={getEventStatusColor(event.status)}
+                              size="sm"
+                              variant="flat"
+                            >
+                              {event.status === "open"
+                                ? "Aberto"
+                                : event.status === "closed"
+                                  ? "Fechado"
+                                  : event.status === "finished"
+                                    ? "Finalizado"
+                                    : "Rascunho"}
+                            </Chip>
+                            <Chip color="primary" size="sm" variant="dot">
+                              {event.type === "tournament"
+                                ? "Torneio"
+                                : "Scrim"}
+                            </Chip>
+                            <Chip size="sm" variant="bordered">
+                              {event.gameMode}
+                            </Chip>
+                            {event.hostOrgId === organization.id && (
+                              <Chip color="secondary" size="sm" variant="flat">
+                                Própria Org
+                              </Chip>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                      <div className="flex gap-2">
+                        <Button
+                          color="default"
+                          size="sm"
+                          startContent={<HiOutlineEye className="w-4 h-4" />}
+                          variant="flat"
+                          onClick={() => handleViewEventDetails(event)}
+                        >
+                          Detalhes
+                        </Button>
 
-                {/* Botão de edição - apenas para o criador do evento */}
-                {event.createdBy === currentUserId && (
-                  <Button 
-                    color="primary" 
-                    variant="flat"
-                    size="sm"
-                    isIconOnly
-                    startContent={<HiOutlinePencil className="w-4 h-4" />}
-                    onClick={() => {
-                      setSelectedEvent(event);
-                      populateEventForm(event);
-                      setIsEditMode(true);
-                      setShowCreateEventModal(true);
-                    }}
-                  />
-                )}
+                        {/* Botão de edição - apenas para o criador do evento */}
+                        {event.createdBy === currentUserId && (
+                          <Button
+                            isIconOnly
+                            color="primary"
+                            size="sm"
+                            startContent={
+                              <HiOutlinePencil className="w-4 h-4" />
+                            }
+                            variant="flat"
+                            onClick={() => {
+                              setSelectedEvent(event);
+                              populateEventForm(event);
+                              setIsEditMode(true);
+                              setShowCreateEventModal(true);
+                            }}
+                          />
+                        )}
 
-                {canRegister && !registration && (
-                  <Button 
-                    color="primary" 
-                    size="sm"
-                    onClick={() => handleRegisterForEvent(event)}
-                  >
-                    Inscrever
-                  </Button>
-                )}
-              </div>
-            </div>
-          </CardHeader>
-
-          <CardBody className="pt-0">
-            <p className="text-default-600 mb-3">{event.description}</p>
-
-            {/* Status da inscrição da organização */}
-            {registration && (
-              <div className="mb-3 p-3 bg-default-100 border border-default-200 rounded-lg">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm font-medium text-default-700">Status da Organização:</span>
-                    <Chip size="sm" color={getRegistrationStatusColor(registration.state)}>
-                      {getRegistrationStatusText(registration.state)}
-                    </Chip>
-                  </div>
-                  {permissions.canViewOwnRosterStatus && userRosterStatus && (
-                    <div className="flex items-center gap-2">
-                      <span className="text-sm text-default-600">Seu status:</span>
-                      <Chip size="sm" variant="bordered">
-                        {userRosterStatus}
-                      </Chip>
+                        {canRegister && !registration && (
+                          <Button
+                            color="primary"
+                            size="sm"
+                            onClick={() => handleRegisterForEvent(event)}
+                          >
+                            Inscrever
+                          </Button>
+                        )}
+                      </div>
                     </div>
-                  )}
-                </div>
-              </div>
-            )}
+                  </CardHeader>
 
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-              <div className="flex items-center gap-2">
-                <HiOutlineUsers className="w-4 h-4 text-default-500" />
-                <span className="text-default-700">Time: {event.teamSize}</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <HiOutlineUsers className="w-4 h-4 text-default-500" />
-                <span className="text-default-700">Roster: {event.rosterMin}-{event.rosterMax}</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <HiOutlineClock className="w-4 h-4 text-default-500" />
-                <span className="text-default-700">
-                  {formatEventDate(event.startsAt)}
-                </span>
-              </div>
-              <div className="flex items-center gap-2">
-                <span className="text-default-700">Região: {event.region}</span>
-              </div>
-            </div>
+                  <CardBody className="pt-0">
+                    <p className="text-default-600 mb-3">{event.description}</p>
 
-            {event.checkinWindow && (
-              <div className="mt-2 text-sm text-default-600">
-                <span>Check-in: {event.checkinWindow} min antes do início</span>
-              </div>
-            )}
+                    {/* Status da inscrição da organização */}
+                    {registration && (
+                      <div className="mb-3 p-3 bg-default-100 border border-default-200 rounded-lg">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <span className="text-sm font-medium text-default-700">
+                              Status da Organização:
+                            </span>
+                            <Chip
+                              color={getRegistrationStatusColor(
+                                registration.state,
+                              )}
+                              size="sm"
+                            >
+                              {getRegistrationStatusText(registration.state)}
+                            </Chip>
+                          </div>
+                          {permissions.canViewOwnRosterStatus &&
+                            userRosterStatus && (
+                              <div className="flex items-center gap-2">
+                                <span className="text-sm text-default-600">
+                                  Seu status:
+                                </span>
+                                <Chip size="sm" variant="bordered">
+                                  {userRosterStatus}
+                                </Chip>
+                              </div>
+                            )}
+                        </div>
+                      </div>
+                    )}
 
-            {event.prizePool && (
-              <div className="mt-3 p-2 bg-warning-50 border border-warning-200 rounded-lg">
-                <div className="flex items-center gap-2">
-                  <HiOutlineStar className="w-4 h-4 text-warning-600" />
-                  <span className="text-warning-800 font-medium">
-                    Premiação: {event.prizePool}
-                  </span>
-                </div>
-              </div>
-            )}
-          </CardBody>
-        </Card>
-      );
-    })
-)}
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                      <div className="flex items-center gap-2">
+                        <HiOutlineUsers className="w-4 h-4 text-default-500" />
+                        <span className="text-default-700">
+                          Time: {event.teamSize}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <HiOutlineUsers className="w-4 h-4 text-default-500" />
+                        <span className="text-default-700">
+                          Roster: {event.rosterMin}-{event.rosterMax}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <HiOutlineClock className="w-4 h-4 text-default-500" />
+                        <span className="text-default-700">
+                          {formatEventDate(event.startsAt)}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-default-700">
+                          Região: {event.region}
+                        </span>
+                      </div>
+                    </div>
+
+                    {event.checkinWindow && (
+                      <div className="mt-2 text-sm text-default-600">
+                        <span>
+                          Check-in: {event.checkinWindow} min antes do início
+                        </span>
+                      </div>
+                    )}
+
+                    {event.prizePool && (
+                      <div className="mt-3 p-2 bg-warning-50 border border-warning-200 rounded-lg">
+                        <div className="flex items-center gap-2">
+                          <HiOutlineStar className="w-4 h-4 text-warning-600" />
+                          <span className="text-warning-800 font-medium">
+                            Premiação: {event.prizePool}
+                          </span>
+                        </div>
+                      </div>
+                    )}
+                  </CardBody>
+                </Card>
+              );
+            })
+        )}
       </div>
 
       {visibleEvents.length === 0 && (
-         <Card>
-           <CardBody className="text-center py-8">
-             <HiOutlineCalendar className="w-12 h-12 text-default-400 mx-auto mb-4" />
-             <p className="text-default-600">Nenhum evento disponível no momento.</p>
-           </CardBody>
-         </Card>
-       )}
+        <Card>
+          <CardBody className="text-center py-8">
+            <HiOutlineCalendar className="w-12 h-12 text-default-400 mx-auto mb-4" />
+            <p className="text-default-600">
+              Nenhum evento disponível no momento.
+            </p>
+          </CardBody>
+        </Card>
+      )}
 
       {/* Modal de Seleção de Roster */}
-      <Modal 
-        isOpen={showRosterModal} 
-        onClose={() => setShowRosterModal(false)}
-        size="2xl"
+      <Modal
+        isOpen={showRosterModal}
         scrollBehavior="inside"
+        size="2xl"
+        onClose={() => setShowRosterModal(false)}
       >
         <ModalContent>
           <ModalHeader>
             <div className="flex flex-col">
               <h3 className="text-lg font-semibold">Seleção de Roster</h3>
               <p className="text-sm text-default-600 font-normal">
-                {selectedEvent?.name} - Selecione {selectedEvent?.rosterMin} a {selectedEvent?.rosterMax} jogadores
+                {selectedEvent?.name} - Selecione {selectedEvent?.rosterMin} a{" "}
+                {selectedEvent?.rosterMax} jogadores
               </p>
             </div>
           </ModalHeader>
           <ModalBody>
             <div className="space-y-4">
               <div className="flex items-center justify-between">
-                <span className="text-sm font-medium">Jogadores Selecionados:</span>
-                <Badge content={selectedRoster.length} color="primary">
+                <span className="text-sm font-medium">
+                  Jogadores Selecionados:
+                </span>
+                <Badge color="primary" content={selectedRoster.length}>
                   <div className="w-6 h-6" />
                 </Badge>
               </div>
-              
+
               <div className="space-y-2 max-h-96 overflow-y-auto">
                 {members
-                  .filter(member => member.status === 'accepted')
+                  .filter((member) => member.status === "accepted")
                   .map((member) => (
-                    <div key={member.userId} className="flex items-center justify-between p-3 border rounded-lg hover:bg-default-50">
+                    <div
+                      key={member.userId}
+                      className="flex items-center justify-between p-3 border rounded-lg hover:bg-default-50"
+                    >
                       <div className="flex items-center gap-3">
-                        <Avatar 
-                          src={member.userData.avatar} 
+                        <Avatar
                           name={member.userData.displayName}
                           size="sm"
+                          src={member.userData.avatar}
                         />
                         <div>
-                          <p className="font-medium">{member.userData.displayName}</p>
-                          <p className="text-sm text-default-600">@{member.userData.tag}</p>
+                          <p className="font-medium">
+                            {member.userData.displayName}
+                          </p>
+                          <p className="text-sm text-default-600">
+                            @{member.userData.tag}
+                          </p>
                         </div>
                       </div>
                       <Checkbox
-                        isSelected={selectedRoster.includes(member.userId)}
-                        onValueChange={(checked) => handleRosterSelection(member.userId, checked)}
                         isDisabled={
-                          !selectedRoster.includes(member.userId) && 
-                          selectedRoster.length >= (selectedEvent?.rosterMax || 0)
+                          !selectedRoster.includes(member.userId) &&
+                          selectedRoster.length >=
+                            (selectedEvent?.rosterMax || 0)
+                        }
+                        isSelected={selectedRoster.includes(member.userId)}
+                        onValueChange={(checked) =>
+                          handleRosterSelection(member.userId, checked)
                         }
                       />
                     </div>
@@ -926,18 +1077,20 @@ if (jsDate <= now) {
             </div>
           </ModalBody>
           <ModalFooter>
-            <Button 
-              color="danger" 
-              variant="light" 
+            <Button
+              color="danger"
+              variant="light"
               onClick={() => setShowRosterModal(false)}
             >
               Cancelar
             </Button>
-            <Button 
-              color="primary" 
-              onClick={handleConfirmRegistration}
-              isDisabled={selectedRoster.length < (selectedEvent?.rosterMin || 0)}
+            <Button
+              color="primary"
+              isDisabled={
+                selectedRoster.length < (selectedEvent?.rosterMin || 0)
+              }
               isLoading={registrationLoading}
+              onClick={handleConfirmRegistration}
             >
               Confirmar Inscrição
             </Button>
@@ -946,28 +1099,37 @@ if (jsDate <= now) {
       </Modal>
 
       {/* Modal de Detalhes do Evento */}
-      <Modal 
-        isOpen={showEventDetailsModal} 
-        onClose={() => setShowEventDetailsModal(false)}
-        size="3xl"
+      <Modal
+        isOpen={showEventDetailsModal}
         scrollBehavior="inside"
+        size="3xl"
+        onClose={() => setShowEventDetailsModal(false)}
       >
         <ModalContent>
           <ModalHeader>
             <div className="flex items-center gap-3">
-              {selectedEvent && React.createElement(getEventTypeIcon(selectedEvent.type), { 
-                className: "w-6 h-6 text-primary" 
-              })}
+              {selectedEvent &&
+                React.createElement(getEventTypeIcon(selectedEvent.type), {
+                  className: "w-6 h-6 text-primary",
+                })}
               <div>
                 <h3 className="text-lg font-semibold">{selectedEvent?.name}</h3>
                 <div className="flex items-center gap-2 mt-1">
-                  <Chip size="sm" variant="flat" color={getEventStatusColor(selectedEvent?.status || '')}>
-                    {selectedEvent?.status === 'open' ? 'Aberto' : 
-                     selectedEvent?.status === 'closed' ? 'Fechado' : 
-                     selectedEvent?.status === 'finished' ? 'Finalizado' : 'Rascunho'}
+                  <Chip
+                    color={getEventStatusColor(selectedEvent?.status || "")}
+                    size="sm"
+                    variant="flat"
+                  >
+                    {selectedEvent?.status === "open"
+                      ? "Aberto"
+                      : selectedEvent?.status === "closed"
+                        ? "Fechado"
+                        : selectedEvent?.status === "finished"
+                          ? "Finalizado"
+                          : "Rascunho"}
                   </Chip>
-                  <Chip size="sm" variant="dot" color="primary">
-                    {selectedEvent?.type === 'tournament' ? 'Torneio' : 'Scrim'}
+                  <Chip color="primary" size="sm" variant="dot">
+                    {selectedEvent?.type === "tournament" ? "Torneio" : "Scrim"}
                   </Chip>
                 </div>
               </div>
@@ -979,7 +1141,9 @@ if (jsDate <= now) {
                 {/* Descrição */}
                 <div>
                   <h4 className="font-semibold mb-2">Descrição</h4>
-                  <p className="text-default-600">{selectedEvent.description}</p>
+                  <p className="text-default-600">
+                    {selectedEvent.description}
+                  </p>
                 </div>
 
                 {/* Informações do Evento */}
@@ -990,21 +1154,23 @@ if (jsDate <= now) {
                       <div className="flex items-center gap-2">
                         <HiOutlineUsers className="w-4 h-4 text-default-500" />
                         <span className="text-sm text-default-700">
-                          <strong>Tamanho do Time:</strong> {selectedEvent.teamSize} jogadores
+                          <strong>Tamanho do Time:</strong>{" "}
+                          {selectedEvent.teamSize} jogadores
                         </span>
                       </div>
                       <div className="flex items-center gap-2">
                         <HiOutlineUsers className="w-4 h-4 text-default-500" />
                         <span className="text-sm text-default-700">
-                          <strong>Roster:</strong> {selectedEvent.rosterMin} - {selectedEvent.rosterMax} jogadores
+                          <strong>Roster:</strong> {selectedEvent.rosterMin} -{" "}
+                          {selectedEvent.rosterMax} jogadores
                         </span>
                       </div>
-                        <div className="flex items-center gap-2">
-                      <HiOutlineClock className="w-4 h-4 text-default-500" />
-                      <span className="text-default-700">
-                        {formatEventDate(selectedEvent.startsAt)}
-                      </span>
-                    </div>
+                      <div className="flex items-center gap-2">
+                        <HiOutlineClock className="w-4 h-4 text-default-500" />
+                        <span className="text-default-700">
+                          {formatEventDate(selectedEvent.startsAt)}
+                        </span>
+                      </div>
                     </div>
                     <div className="space-y-3">
                       <div className="text-sm">
@@ -1015,7 +1181,8 @@ if (jsDate <= now) {
                       </div>
                       {selectedEvent.checkinWindow && (
                         <div className="text-sm">
-                          <strong>Check-in:</strong> {selectedEvent.checkinWindow} min antes
+                          <strong>Check-in:</strong>{" "}
+                          {selectedEvent.checkinWindow} min antes
                         </div>
                       )}
                     </div>
@@ -1037,30 +1204,44 @@ if (jsDate <= now) {
                 {/* Status da Organização */}
                 {(() => {
                   const registration = getRegistrationStatus(selectedEvent.id);
-                  const userRosterStatus = getUserRosterStatus(selectedEvent.id);
-                  
+                  const userRosterStatus = getUserRosterStatus(
+                    selectedEvent.id,
+                  );
+
                   if (registration) {
                     return (
                       <div>
-                        <h4 className="font-semibold mb-3">Status da Sua Organização</h4>
+                        <h4 className="font-semibold mb-3">
+                          Status da Sua Organização
+                        </h4>
                         <div className="p-4 bg-default-100 border border-default-200 rounded-lg space-y-3">
                           <div className="flex items-center gap-2">
-                            <span className="text-sm font-medium">Status da Inscrição:</span>
-                            <Chip size="sm" color={getRegistrationStatusColor(registration.state)}>
+                            <span className="text-sm font-medium">
+                              Status da Inscrição:
+                            </span>
+                            <Chip
+                              color={getRegistrationStatusColor(
+                                registration.state,
+                              )}
+                              size="sm"
+                            >
                               {getRegistrationStatusText(registration.state)}
                             </Chip>
                           </div>
-                          
-                          {permissions.canViewOwnRosterStatus && userRosterStatus && (
-                            <div className="flex items-center gap-2">
-                              <span className="text-sm font-medium">Seu Status no Roster:</span>
-                              <Chip size="sm" variant="bordered">
-                                {userRosterStatus}
-                              </Chip>
-                            </div>
-                          )}
-                          
-                          {registration.state === 'approved' && (
+
+                          {permissions.canViewOwnRosterStatus &&
+                            userRosterStatus && (
+                              <div className="flex items-center gap-2">
+                                <span className="text-sm font-medium">
+                                  Seu Status no Roster:
+                                </span>
+                                <Chip size="sm" variant="bordered">
+                                  {userRosterStatus}
+                                </Chip>
+                              </div>
+                            )}
+
+                          {registration.state === "approved" && (
                             <div className="text-sm text-success-700">
                               <HiOutlineCheck className="w-4 h-4 inline mr-1" />
                               Sua organização está confirmada para este evento!
@@ -1070,6 +1251,7 @@ if (jsDate <= now) {
                       </div>
                     );
                   }
+
                   return null;
                 })()}
 
@@ -1079,13 +1261,15 @@ if (jsDate <= now) {
                     <h4 className="font-semibold mb-2">Regras do Evento</h4>
                     <Button
                       as="a"
-                      href={selectedEvent.rulesURL}
-                      target="_blank"
-                      rel="noopener noreferrer"
                       color="primary"
-                      variant="bordered"
+                      href={selectedEvent.rulesURL}
+                      rel="noopener noreferrer"
                       size="sm"
-                      startContent={<HiOutlineExternalLink className="w-4 h-4" />}
+                      startContent={
+                        <HiOutlineExternalLink className="w-4 h-4" />
+                      }
+                      target="_blank"
+                      variant="bordered"
                     >
                       Ver Regras Completas
                     </Button>
@@ -1093,16 +1277,22 @@ if (jsDate <= now) {
                 )}
 
                 {/* Informação sobre limitações para Ranked/Pro */}
-                {(currentUserRole === 'ranked' || currentUserRole === 'pro') && (
+                {(currentUserRole === "ranked" ||
+                  currentUserRole === "pro") && (
                   <div className="p-4 bg-primary-50 border border-primary-200 rounded-lg">
                     <div className="flex items-start gap-2">
                       <HiOutlineEye className="w-5 h-5 text-primary-600 mt-0.5" />
                       <div className="text-sm text-primary-800">
                         <p className="font-medium mb-1">Modo Visualização</p>
                         <p>
-                          Como {currentUserRole === 'ranked' ? 'Ranked Player' : 'Pro Player'}, você pode visualizar 
-                          todas as informações do evento, mas não pode inscrever a organização ou editar rosters. 
-                          Entre em contato com um Manager ou Owner para realizar inscrições.
+                          Como{" "}
+                          {currentUserRole === "ranked"
+                            ? "Ranked Player"
+                            : "Pro Player"}
+                          , você pode visualizar todas as informações do evento,
+                          mas não pode inscrever a organização ou editar
+                          rosters. Entre em contato com um Manager ou Owner para
+                          realizar inscrições.
                         </p>
                       </div>
                     </div>
@@ -1112,94 +1302,105 @@ if (jsDate <= now) {
             )}
           </ModalBody>
           <ModalFooter>
-            <Button 
-              color="default" 
-              variant="light" 
+            <Button
+              color="default"
+              variant="light"
               onClick={() => setShowEventDetailsModal(false)}
             >
               Fechar
             </Button>
-            {selectedEvent && permissions.canRegisterForEvents && 
-             selectedEvent.status === 'open' && 
-             !getRegistrationStatus(selectedEvent.id) && (
-              <Button 
-                color="primary" 
-                onClick={() => {
-                  setShowEventDetailsModal(false);
-                  handleRegisterForEvent(selectedEvent);
-                }}
-              >
-                Inscrever Organização
-              </Button>
-            )}
+            {selectedEvent &&
+              permissions.canRegisterForEvents &&
+              selectedEvent.status === "open" &&
+              !getRegistrationStatus(selectedEvent.id) && (
+                <Button
+                  color="primary"
+                  onClick={() => {
+                    setShowEventDetailsModal(false);
+                    handleRegisterForEvent(selectedEvent);
+                  }}
+                >
+                  Inscrever Organização
+                </Button>
+              )}
           </ModalFooter>
         </ModalContent>
       </Modal>
 
       {/* Modal de Criação de Evento */}
-      <Modal 
-        isOpen={showCreateEventModal} 
+      <Modal
+        isOpen={showCreateEventModal}
+        scrollBehavior="inside"
+        size="2xl"
         onClose={() => {
           setShowCreateEventModal(false);
           resetEventForm();
         }}
-        size="2xl"
-        scrollBehavior="inside"
       >
         <ModalContent>
           <ModalHeader className="flex flex-col gap-1">
             <h2 className="text-xl font-semibold">
-              {isEditMode ? 'Editar Evento' : 'Criar Novo Evento'}
+              {isEditMode ? "Editar Evento" : "Criar Novo Evento"}
             </h2>
             <p className="text-sm text-default-600">
-              {isEditMode ? 'Atualize as informações do evento' : 'Preencha as informações do evento'}
+              {isEditMode
+                ? "Atualize as informações do evento"
+                : "Preencha as informações do evento"}
             </p>
           </ModalHeader>
           <ModalBody className="gap-4">
             {/* Informações Básicas */}
             <div className="space-y-4">
               <h3 className="text-lg font-medium">Informações Básicas</h3>
-              
+
               <Input
+                isRequired
+                classNames={{
+                  input: "text-default-900",
+                  label: "text-default-700",
+                }}
                 label="Nome do Evento"
                 placeholder="Ex: Scrim Semanal - BR"
                 value={eventForm.name}
-                onChange={(e) => setEventForm({ ...eventForm, name: e.target.value })}
-                isRequired
                 variant="bordered"
-                classNames={{
-                  input: "text-default-900",
-                  label: "text-default-700"
-                }}
+                onChange={(e) =>
+                  setEventForm({ ...eventForm, name: e.target.value })
+                }
               />
 
               <Input
+                isRequired
+                classNames={{
+                  input: "text-default-900",
+                  label: "text-default-700",
+                }}
                 label="Descrição"
                 placeholder="Descreva o evento, objetivos e informações importantes..."
                 value={eventForm.description}
-                onChange={(e) => setEventForm({ ...eventForm, description: e.target.value })}
-                isRequired
                 variant="bordered"
-                classNames={{
-                  input: "text-default-900",
-                  label: "text-default-700"
-                }}
+                onChange={(e) =>
+                  setEventForm({ ...eventForm, description: e.target.value })
+                }
               />
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <Select
-                  label="Tipo de Evento"
-                  selectedKeys={[eventForm.type]}
-                  onSelectionChange={(keys) => {
-                    const selected = Array.from(keys)[0] as EventType;
-                    if (selected && (selected === 'scrim' || selected === 'tournament')) {
-                      setEventForm({ ...eventForm, type: selected });
-                    }
-                  }}
-                  variant="bordered"
                   classNames={{
                     trigger: "bg-default-100",
-                    label: "text-default-700"
+                    label: "text-default-700",
+                  }}
+                  label="Tipo de Evento"
+                  selectedKeys={[eventForm.type]}
+                  variant="bordered"
+                  onSelectionChange={(keys) => {
+                    const selected = Array.from(keys)[0] as EventType;
+
+                    if (
+                      selected &&
+                      (selected === "scrim" || selected === "tournament")
+                    ) {
+                      setEventForm({ ...eventForm, type: selected });
+                    }
                   }}
                 >
                   <SelectItem key="scrim">Scrim/Treino</SelectItem>
@@ -1207,18 +1408,19 @@ if (jsDate <= now) {
                 </Select>
 
                 <Select
-                  label="Modo de Jogo"
-                  selectedKeys={[eventForm.gameMode]}
-                  onSelectionChange={(keys) => {
-                    const selected = Array.from(keys)[0] as GameMode;
-                    if (selected && (selected === 'BR' || selected === 'MP')) {
-                      setEventForm({ ...eventForm, gameMode: selected });
-                    }
-                  }}
-                  variant="bordered"
                   classNames={{
                     trigger: "bg-default-100",
-                    label: "text-default-700"
+                    label: "text-default-700",
+                  }}
+                  label="Modo de Jogo"
+                  selectedKeys={[eventForm.gameMode]}
+                  variant="bordered"
+                  onSelectionChange={(keys) => {
+                    const selected = Array.from(keys)[0] as GameMode;
+
+                    if (selected && (selected === "BR" || selected === "MP")) {
+                      setEventForm({ ...eventForm, gameMode: selected });
+                    }
                   }}
                 >
                   <SelectItem key="BR">Battle Royale</SelectItem>
@@ -1231,48 +1433,63 @@ if (jsDate <= now) {
             {/* Configurações da Equipe */}
             <div className="space-y-4">
               <h3 className="text-lg font-medium">Configurações da Equipe</h3>
-              
+
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <Input
-                  type="number"
+                  classNames={{
+                    input: "text-default-900",
+                    label: "text-default-700",
+                  }}
                   label="Tamanho do Time"
-                  value={eventForm.teamSize.toString()}
-                  onChange={(e) => setEventForm({ ...eventForm, teamSize: parseInt(e.target.value) || 4 })}
-                  min={1}
                   max={10}
+                  min={1}
+                  type="number"
+                  value={eventForm.teamSize.toString()}
                   variant="bordered"
-                  classNames={{
-                    input: "text-default-900",
-                    label: "text-default-700"
-                  }}
+                  onChange={(e) =>
+                    setEventForm({
+                      ...eventForm,
+                      teamSize: parseInt(e.target.value) || 4,
+                    })
+                  }
                 />
 
                 <Input
-                  type="number"
+                  classNames={{
+                    input: "text-default-900",
+                    label: "text-default-700",
+                  }}
                   label="Roster Mínimo"
-                  value={eventForm.rosterMin.toString()}
-                  onChange={(e) => setEventForm({ ...eventForm, rosterMin: parseInt(e.target.value) || 4 })}
-                  min={1}
                   max={15}
+                  min={1}
+                  type="number"
+                  value={eventForm.rosterMin.toString()}
                   variant="bordered"
-                  classNames={{
-                    input: "text-default-900",
-                    label: "text-default-700"
-                  }}
+                  onChange={(e) =>
+                    setEventForm({
+                      ...eventForm,
+                      rosterMin: parseInt(e.target.value) || 4,
+                    })
+                  }
                 />
 
                 <Input
-                  type="number"
-                  label="Roster Máximo"
-                  value={eventForm.rosterMax.toString()}
-                  onChange={(e) => setEventForm({ ...eventForm, rosterMax: parseInt(e.target.value) || 6 })}
-                  min={1}
-                  max={15}
-                  variant="bordered"
                   classNames={{
                     input: "text-default-900",
-                    label: "text-default-700"
+                    label: "text-default-700",
                   }}
+                  label="Roster Máximo"
+                  max={15}
+                  min={1}
+                  type="number"
+                  value={eventForm.rosterMax.toString()}
+                  variant="bordered"
+                  onChange={(e) =>
+                    setEventForm({
+                      ...eventForm,
+                      rosterMax: parseInt(e.target.value) || 6,
+                    })
+                  }
                 />
               </div>
             </div>
@@ -1281,64 +1498,73 @@ if (jsDate <= now) {
             {/* Data e Horário */}
             <div className="space-y-4">
               <h3 className="text-lg font-medium">Data e Horário</h3>
-              
+
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-             
- <div className="w-full mx-auto">
-  <I18nProvider locale="pt-BR">
-{/* Input de Data */}
-<Input
-  isRequired
-    startContent={
-          <HiOutlineCalendar />
-          }
-  variant="bordered"
-  className="w-full mb-3"
-  type="text"
-  placeholder="Data (dd/mm/yyyy)"
-  value={dateText}
-  onChange={(e) => {
-    handleDateChange(e.target.value);
+                <div className="w-full mx-auto">
+                  <I18nProvider locale="pt-BR">
+                    {/* Input de Data */}
+                    <Input
+                      isRequired
+                      className="w-full mb-3"
+                      placeholder="Data (dd/mm/yyyy)"
+                      startContent={<HiOutlineCalendar />}
+                      type="text"
+                      value={dateText}
+                      variant="bordered"
+                      onChange={(e) => {
+                        handleDateChange(e.target.value);
 
-    const isoString = combineDateAndTimeFromText(e.target.value, timeText);
-    if (isoString) setEventForm({ ...eventForm, startsAt: isoString });
-  }}
-/>
+                        const isoString = combineDateAndTimeFromText(
+                          e.target.value,
+                          timeText,
+                        );
 
-{/* Input de Hora */}
-<Input
-  isRequired
-  startContent={
-          <HiOutlineClock />
-          }
-  variant="bordered"
-  className="w-full"
-  type="text"
-  placeholder="Horario (hh:mm)"
-  value={timeText}
-  onChange={(e) => {
-    handleTimeChange(e.target.value);
+                        if (isoString)
+                          setEventForm({ ...eventForm, startsAt: isoString });
+                      }}
+                    />
 
-    const isoString = combineDateAndTimeFromText(dateText, e.target.value);
-    if (isoString) setEventForm({ ...eventForm, startsAt: isoString });
-  }}
-/>
-</I18nProvider>
-    <div/>
-            
+                    {/* Input de Hora */}
+                    <Input
+                      isRequired
+                      className="w-full"
+                      placeholder="Horario (hh:mm)"
+                      startContent={<HiOutlineClock />}
+                      type="text"
+                      value={timeText}
+                      variant="bordered"
+                      onChange={(e) => {
+                        handleTimeChange(e.target.value);
+
+                        const isoString = combineDateAndTimeFromText(
+                          dateText,
+                          e.target.value,
+                        );
+
+                        if (isoString)
+                          setEventForm({ ...eventForm, startsAt: isoString });
+                      }}
+                    />
+                  </I18nProvider>
+                  <div />
                 </div>
                 <Input
-                  type="number"
-                  label="Check-in (minutos antes)"
-                  value={eventForm.checkinWindow.toString()}
-                  onChange={(e) => setEventForm({ ...eventForm, checkinWindow: parseInt(e.target.value) || 30 })}
-                  min={0}
-                  max={120}
-                  variant="bordered"
                   classNames={{
                     input: "text-default-900",
-                    label: "text-default-700"
+                    label: "text-default-700",
                   }}
+                  label="Check-in (minutos antes)"
+                  max={120}
+                  min={0}
+                  type="number"
+                  value={eventForm.checkinWindow.toString()}
+                  variant="bordered"
+                  onChange={(e) =>
+                    setEventForm({
+                      ...eventForm,
+                      checkinWindow: parseInt(e.target.value) || 30,
+                    })
+                  }
                 />
               </div>
             </div>
@@ -1348,88 +1574,104 @@ if (jsDate <= now) {
             {/* Configurações Adicionais */}
             <div className="space-y-4">
               <h3 className="text-lg font-medium">Configurações Adicionais</h3>
-              
+
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {eventForm.type === 'tournament' && (
+                {eventForm.type === "tournament" && (
                   <Input
-                    type="number"
-                    label="Máximo de Times"
-                    placeholder="Ex: 32"
-                    value={eventForm.maxTeams?.toString() || ''}
-                    onChange={(e) => setEventForm({ 
-                      ...eventForm, 
-                      maxTeams: e.target.value ? parseInt(e.target.value) : undefined 
-                    })}
-                    min={2}
-                    max={128}
-                    variant="bordered"
                     classNames={{
                       input: "text-default-900",
-                      label: "text-default-700"
+                      label: "text-default-700",
                     }}
+                    label="Máximo de Times"
+                    max={128}
+                    min={2}
+                    placeholder="Ex: 32"
+                    type="number"
+                    value={eventForm.maxTeams?.toString() || ""}
+                    variant="bordered"
+                    onChange={(e) =>
+                      setEventForm({
+                        ...eventForm,
+                        maxTeams: e.target.value
+                          ? parseInt(e.target.value)
+                          : undefined,
+                      })
+                    }
                   />
                 )}
 
                 <div className="space-y-2">
                   <div className="flex items-center justify-between">
-                    <label className="text-sm font-medium text-default-700">Premiação</label>
+                    <label className="text-sm font-medium text-default-700">
+                      Premiação
+                    </label>
                     <div className="flex items-center gap-2">
                       <span className="text-xs text-default-500">BRL</span>
                       <Switch
+                        classNames={{
+                          wrapper:
+                            "p-0 h-4 overflow-visible bg-default-200 group-data-[selected=true]:bg-default-300",
+                          thumb:
+                            "w-4 h-4 border-2 shadow-sm bg-white ml-0 group-data-[selected=true]:ml-4",
+                        }}
+                        isSelected={eventForm.prizeCurrency === "USD"}
                         size="sm"
-                        isSelected={eventForm.prizeCurrency === 'USD'}
-                        onValueChange={(isSelected) => 
-                          setEventForm({ 
-                            ...eventForm, 
-                            prizeCurrency: isSelected ? 'USD' : 'BRL' 
+                        onValueChange={(isSelected) =>
+                          setEventForm({
+                            ...eventForm,
+                            prizeCurrency: isSelected ? "USD" : "BRL",
                           })
                         }
-                        classNames={{
-                          wrapper: "p-0 h-4 overflow-visible bg-default-200 group-data-[selected=true]:bg-default-300",
-                          thumb: "w-4 h-4 border-2 shadow-sm bg-white ml-0 group-data-[selected=true]:ml-4"
-                        }}
                       />
                       <span className="text-xs text-default-500">USD</span>
                     </div>
                   </div>
                   <Input
-                    placeholder={eventForm.prizeCurrency === 'BRL' ? "Ex: 5000 ou 5000,50" : "Ex: 1000 or 1000.50"}
-                    value={eventForm.prizePool}
-                    onChange={(e) => setEventForm({ ...eventForm, prizePool: e.target.value })}
-                    variant="bordered"
+                    classNames={{
+                      input: "text-default-900",
+                      label: "text-default-700",
+                    }}
+                    description={`Valor será formatado automaticamente para ${eventForm.prizeCurrency === "BRL" ? "reais (R$)" : "dólares ($)"} ao salvar`}
+                    placeholder={
+                      eventForm.prizeCurrency === "BRL"
+                        ? "Ex: 5000 ou 5000,50"
+                        : "Ex: 1000 or 1000.50"
+                    }
                     startContent={
                       <div className="pointer-events-none flex items-center">
                         <span className="text-default-400 text-small">
-                          {eventForm.prizeCurrency === 'BRL' ? 'R$' : '$'}
+                          {eventForm.prizeCurrency === "BRL" ? "R$" : "$"}
                         </span>
                       </div>
                     }
-                    classNames={{
-                      input: "text-default-900",
-                      label: "text-default-700"
-                    }}
-                    description={`Valor será formatado automaticamente para ${eventForm.prizeCurrency === 'BRL' ? 'reais (R$)' : 'dólares ($)'} ao salvar`}
+                    value={eventForm.prizePool}
+                    variant="bordered"
+                    onChange={(e) =>
+                      setEventForm({ ...eventForm, prizePool: e.target.value })
+                    }
                   />
                 </div>
               </div>
 
               <Input
+                classNames={{
+                  input: "text-default-900",
+                  label: "text-default-700",
+                }}
                 label="URL das Regras"
                 placeholder="https://exemplo.com/regras"
                 value={eventForm.rulesURL}
-                onChange={(e) => setEventForm({ ...eventForm, rulesURL: e.target.value })}
                 variant="bordered"
-                classNames={{
-                  input: "text-default-900",
-                  label: "text-default-700"
-                }}
+                onChange={(e) =>
+                  setEventForm({ ...eventForm, rulesURL: e.target.value })
+                }
               />
             </div>
           </ModalBody>
           <ModalFooter>
-            <Button 
-              color="default" 
-              variant="light" 
+            <Button
+              color="default"
+              variant="light"
               onClick={() => {
                 setShowCreateEventModal(false);
                 setIsEditMode(false);
@@ -1439,19 +1681,34 @@ if (jsDate <= now) {
             >
               Cancelar
             </Button>
-           <Button
-            onClick={isEditMode ? handleUpdateEvent : handleCreateEvent}
-            isLoading={createEventLoading}
-            startContent={!createEventLoading ? (isEditMode ? <HiOutlinePencil className="w-4 h-4" /> : <HiOutlinePlus className="w-4 h-4" />) : null}
-            className="text-white font-medium transition-all duration-300
+            <Button
+              className="text-white font-medium transition-all duration-300
                       [background:rgba(219,16,87,0.25)]
                       [border:1px_solid_rgba(219,16,87,0.4)]
                       backdrop-blur-md hover:[background:rgba(219,16,87,0.4)]
                       hover:[border:1px_solid_rgba(219,16,87,0.6)]
                       active:[background:rgba(219,16,87,0.5)]
-                      rounded-xl">
-            {createEventLoading ? (isEditMode ? 'Atualizando...' : 'Criando...') : (isEditMode ? 'Atualizar Evento' : 'Criar Evento')}
-          </Button>
+                      rounded-xl"
+              isLoading={createEventLoading}
+              startContent={
+                !createEventLoading ? (
+                  isEditMode ? (
+                    <HiOutlinePencil className="w-4 h-4" />
+                  ) : (
+                    <HiOutlinePlus className="w-4 h-4" />
+                  )
+                ) : null
+              }
+              onClick={isEditMode ? handleUpdateEvent : handleCreateEvent}
+            >
+              {createEventLoading
+                ? isEditMode
+                  ? "Atualizando..."
+                  : "Criando..."
+                : isEditMode
+                  ? "Atualizar Evento"
+                  : "Criar Evento"}
+            </Button>
           </ModalFooter>
         </ModalContent>
       </Modal>

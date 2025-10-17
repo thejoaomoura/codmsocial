@@ -2,7 +2,8 @@ export type SiteConfig = typeof siteConfig;
 
 export const siteConfig = {
   name: "Gaming Social Network",
-  description: "Conecte-se com gamers, organize eventos e construa sua comunidade gaming.",
+  description:
+    "Conecte-se com gamers, organize eventos e construa sua comunidade gaming.",
   navItems: [
     {
       label: "Home",

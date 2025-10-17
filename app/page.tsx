@@ -1,21 +1,23 @@
 "use client";
 
 import React, { useEffect, useState, useRef } from "react";
-import FeedWithChat from "./FeedWithChat";
-import Chat from "./Chat";
-import Login from "./Login";
-import { Post, ChatOverview, ChatMessage } from "./types";
-
+import { Navbar, NavbarContent, NavbarItem } from "@heroui/navbar";
 import {
-  Navbar,
-  NavbarContent,
-  NavbarItem,
-} from "@heroui/navbar";
-
-import { Dropdown, DropdownTrigger, DropdownMenu, DropdownItem } from "@heroui/dropdown";
-import { Avatar } from "@heroui/avatar";
+  Dropdown,
+  DropdownTrigger,
+  DropdownMenu,
+  DropdownItem,
+} from "@heroui/dropdown";
 import { Button } from "@heroui/button";
-import { HiHome, HiOutlineHome, HiOutlineInbox, HiOutlineLogout, HiOutlineMenu, HiOutlineNewspaper, HiOutlinePencil, HiOutlineSave, HiOutlineTicket, HiOutlineUserGroup, HiOutlineViewList, HiOutlineX } from "react-icons/hi";
+import {
+  HiOutlineInbox,
+  HiOutlineLogout,
+  HiOutlineMenu,
+  HiOutlineNewspaper,
+  HiOutlinePencil,
+  HiOutlineSave,
+  HiOutlineX,
+} from "react-icons/hi";
 import {
   collection,
   addDoc,
@@ -32,18 +34,13 @@ import {
   arrayUnion,
   arrayRemove,
 } from "firebase/firestore";
-
 import {
   signInWithPopup,
-  GoogleAuthProvider,
   signOut,
   onAuthStateChanged,
   User,
   updateProfile,
 } from "firebase/auth";
-
-import { db, auth, provider } from "./firebase";
-
 import {
   Modal,
   ModalContent,
@@ -51,49 +48,86 @@ import {
   ModalBody,
   ModalFooter,
 } from "@heroui/modal";
-
-import { addToast, ToastProvider } from "@heroui/toast";
+import { addToast } from "@heroui/toast";
 import { Code } from "@heroui/code";
 import { Input } from "@heroui/input";
 import { Tooltip } from "@heroui/tooltip";
+
+import {
+  HiOutlineBriefcase,
+  HiOutlineGlobe,
+  HiOutlineCog,
+  HiOutlineShieldCheck,
+} from "react-icons/hi";
+import { db, auth, provider } from "./firebase";
+
+
+
 import CriarOrganizacao from "./CriarOrganizacao";
-import Organizacoes from "./Organizacoes";
-import { useUserOrganizations, useOrganizations } from "./hooks/useOrganizations";
+import {
+  useUserOrganizations,
+  useOrganizations,
+} from "./hooks/useOrganizations";
 import { useUserMembership } from "./hooks/useMemberships";
 import { useRoleManagement } from "./hooks/useRoleManagement";
-import { HiOutlineBriefcase, HiOutlineGlobe, HiOutlineCog, HiOutlineShieldCheck } from "react-icons/hi";
+
 
 // Componentes para as novas funcionalidades
 import MinhasOrganizacoes from "./components/MinhasOrganizacoes";
 import ExplorarOrganizacoes from "./components/ExplorarOrganizacoes";
 import PainelOrganizacao from "./components/PainelOrganizacao";
+
 import { Breadcrumbs, BreadcrumbItem } from "@heroui/breadcrumbs";
 
+import { Post, ChatOverview, ChatMessage } from "./types";
+import Login from "./Login";
+import Chat from "./Chat";
+import FeedWithChat from "./FeedWithChat";
 
 const navigation = [
   { label: "Feed", icon: <HiOutlineNewspaper className="w-5 h-5" /> },
   { label: "Conversas", icon: <HiOutlineInbox className="w-5 h-5" /> },
-  { label: "Minhas Organizações", icon: <HiOutlineBriefcase className="w-5 h-5" /> },
-  { label: "Explorar Organizações", icon: <HiOutlineGlobe className="w-5 h-5" /> },
+  {
+    label: "Minhas Organizações",
+    icon: <HiOutlineBriefcase className="w-5 h-5" />,
+  },
+  {
+    label: "Explorar Organizações",
+    icon: <HiOutlineGlobe className="w-5 h-5" />,
+  },
   { label: "Criar Organização", icon: <HiOutlineCog className="w-5 h-5" /> },
-  { label: "Painel da Organização", icon: <HiOutlineShieldCheck className="w-5 h-5" /> },
+  {
+    label: "Painel da Organização",
+    icon: <HiOutlineShieldCheck className="w-5 h-5" />,
+  },
 ];
-
 
 export default function Home() {
   const [user, setUser] = useState<User | null>(null);
-  const [activeTab, setActiveTab] = useState<"Feed" | "Conversas" | "Minhas Organizações" | "Explorar Organizações" | "Criar Organização" | "Painel da Organização">("Feed");
+  const [activeTab, setActiveTab] = useState<
+    | "Feed"
+    | "Conversas"
+    | "Minhas Organizações"
+    | "Explorar Organizações"
+    | "Criar Organização"
+    | "Painel da Organização"
+  >("Feed");
   const [posts, setPosts] = useState<Post[]>([]);
   const [text, setText] = useState("");
   const [conversas, setConversas] = useState<ChatOverview[]>([]);
-  const [activeChatOverview, setActiveChatOverview] = useState<ChatOverview | null>(null);
+  const [activeChatOverview, setActiveChatOverview] =
+    useState<ChatOverview | null>(null);
   const [showChatWith, setShowChatWith] = useState<ChatOverview | null>(null);
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
   const [chatText, setChatText] = useState("");
 
   // Estados para typing indicator
-  const [isTyping, setIsTyping] = useState<{ [chatId: string]: { userId: string, userName: string, timestamp: number } }>({});
-  const [typingTimeout, setTypingTimeout] = useState<NodeJS.Timeout | null>(null);
+  const [isTyping, setIsTyping] = useState<{
+    [chatId: string]: { userId: string; userName: string; timestamp: number };
+  }>({});
+  const [typingTimeout, setTypingTimeout] = useState<NodeJS.Timeout | null>(
+    null,
+  );
 
   // Ref para armazenar o unsubscribe do listener de mensagens atual
   const messagesUnsubscribeRef = useRef<(() => void) | null>(null);
@@ -120,7 +154,9 @@ export default function Home() {
   // Evento externo para abrir conversas
   useEffect(() => {
     const listener = () => setActiveTab("Conversas");
+
     window.addEventListener("goToConversas", listener);
+
     return () => window.removeEventListener("goToConversas", listener);
   }, []);
 
@@ -131,28 +167,33 @@ export default function Home() {
     };
 
     window.addEventListener("changeTab", handleTabChange as EventListener);
-    return () => window.removeEventListener("changeTab", handleTabChange as EventListener);
+
+    return () =>
+      window.removeEventListener("changeTab", handleTabChange as EventListener);
   }, []);
 
   const [profileNameTag, setProfileNameTag] = useState("");
 
   // Hooks para organizações - só executar se user estiver logado
-  const { userOrganizations, loading: userOrgsLoading } = useUserOrganizations(user?.uid || null);
-  const { userOrganizations: publicOrganizations, loading: publicOrgsLoading } = useOrganizations();
+  const { userOrganizations, loading: userOrgsLoading } = useUserOrganizations(
+    user?.uid || null,
+  );
+  const { userOrganizations: publicOrganizations, loading: publicOrgsLoading } =
+    useOrganizations();
   const { getRoleName, getRoleEmoji } = useRoleManagement();
 
   // Estado para organização selecionada no painel
-  const [selectedOrgId, setSelectedOrgId] = useState<string | undefined>(undefined);
+  const [selectedOrgId, setSelectedOrgId] = useState<string | undefined>(
+    undefined,
+  );
 
   // Pegar a organização selecionada ou a primeira disponível
   const userOrg = selectedOrgId
-    ? userOrganizations?.find(org => org.id === selectedOrgId) || null
+    ? userOrganizations?.find((org) => org.id === selectedOrgId) || null
     : userOrganizations?.[0] || null;
 
-  const { membership: userMembership, loading: membershipLoading } = useUserMembership(
-    userOrg?.id || null,
-    user?.uid || null
-  );
+  const { membership: userMembership, loading: membershipLoading } =
+    useUserMembership(userOrg?.id || null, user?.uid || null);
 
   // Atualizar organização selecionada quando as organizações carregarem
   useEffect(() => {
@@ -162,17 +203,19 @@ export default function Home() {
   }, [userOrganizations, selectedOrgId]);
 
   useEffect(() => {
-    console.log('Setting up auth listener...');
+    console.log("Setting up auth listener...");
     const unsub = onAuthStateChanged(auth, async (u) => {
       //console.log('Auth state changed:', u ? `User logged in: ${u.uid}` : 'User logged out');
       setUser(u);
       if (u) {
         const userDocRef = doc(db, "Users", u.uid);
         const userDocSnap = await getDoc(userDocRef);
+
         if (userDocSnap.exists()) {
           const userData = userDocSnap.data();
+
           setProfileName(userData.displayName || "");
-          setProfileNameTag(userData.tag || ""); // nova state para a tag
+          setProfileNameTag(userData.organizationTag || ""); // nova state para a tag
           setProfilePhoto(userData.photoURL || "");
         } else {
           setProfileName(u.displayName || "");
@@ -181,6 +224,7 @@ export default function Home() {
         }
       }
     });
+
     return () => unsub();
   }, []);
 
@@ -188,9 +232,11 @@ export default function Home() {
   useEffect(() => {
     const q = query(collection(db, "Posts"), orderBy("createdAt", "desc"));
     const unsub = onSnapshot(q, (snap) => {
-      const docs = snap.docs.map((d) => ({ id: d.id, ...d.data() } as Post));
+      const docs = snap.docs.map((d) => ({ id: d.id, ...d.data() }) as Post);
+
       setPosts(docs);
     });
+
     return () => unsub();
   }, []);
 
@@ -204,9 +250,13 @@ export default function Home() {
 
       snap.forEach((docSnap) => {
         const data = docSnap.data() as any;
+
         if (!data.participants?.includes(user.uid)) return;
 
-        const otherUid = data.participants.find((uid: string) => uid !== user.uid);
+        const otherUid = data.participants.find(
+          (uid: string) => uid !== user.uid,
+        );
+
         if (!otherUid || seenIds.has(docSnap.id)) return; // Evitar duplicatas
 
         seenIds.add(docSnap.id);
@@ -229,6 +279,7 @@ export default function Home() {
       list.sort((a, b) => {
         if (a.unread && !b.unread) return -1;
         if (!a.unread && b.unread) return 1;
+
         return 0;
       });
 
@@ -240,16 +291,17 @@ export default function Home() {
 
   const handleGoogleLogin = async () => {
     try {
-      console.log('handleGoogleLogin - Iniciando login com Google...');
+      console.log("handleGoogleLogin - Iniciando login com Google...");
       const result = await signInWithPopup(auth, provider);
       const user = result.user;
-      console.log('handleGoogleLogin - Login bem-sucedido, usuário:', user.uid);
+
+      console.log("handleGoogleLogin - Login bem-sucedido, usuário:", user.uid);
 
       const userRef = doc(db, "Users", user.uid);
       const userSnap = await getDoc(userRef);
 
       if (!userSnap.exists()) {
-        console.log('handleGoogleLogin - Novo usuário, criando documento...');
+        console.log("handleGoogleLogin - Novo usuário, criando documento...");
         // Novo usuário: salva createdAt
         await setDoc(userRef, {
           displayName: user.displayName,
@@ -257,95 +309,42 @@ export default function Home() {
           photoURL: user.photoURL,
           createdAt: serverTimestamp(), // <-- timestamp para 24h
         });
-        console.log('handleGoogleLogin - Documento do usuário criado');
+        console.log("handleGoogleLogin - Documento do usuário criado");
       } else {
-        console.log('handleGoogleLogin - Usuário existente, atualizando dados...');
+        console.log(
+          "handleGoogleLogin - Usuário existente, atualizando dados...",
+        );
         // Usuário já existe: atualiza dados sem alterar createdAt
         await updateDoc(userRef, {
           displayName: user.displayName,
           email: user.email,
           photoURL: user.photoURL,
         });
-        console.log('handleGoogleLogin - Dados do usuário atualizados');
+        console.log("handleGoogleLogin - Dados do usuário atualizados");
       }
     } catch (error: any) {
       // Tratar erros de popup cancelado pelo usuário sem mostrar erro
-      if (error.code === 'auth/popup-closed-by-user' || error.code === 'auth/cancelled-popup-request') {
+      if (
+        error.code === "auth/popup-closed-by-user" ||
+        error.code === "auth/cancelled-popup-request"
+      ) {
         // Usuário cancelou o login voluntariamente, não mostrar erro
-        console.log('Login cancelado pelo usuário');
+        console.log("Login cancelado pelo usuário");
+
         return;
       }
 
       // Para outros erros, mostrar mensagem
-      console.error('Erro no login:', error);
+      console.error("Erro no login:", error);
       addToast({
         title: "Erro no Login",
         description: "Erro ao fazer login. Tente novamente.",
-        color: "danger"
-      });
-    }
-  };
-
-  const handleSubmitTag = async () => {
-    // Validação básica da tag
-    if (newTag.trim() && !/^[a-zA-Z0-9]{1,5}$/.test(newTag.trim())) {
-      return addToast({
-        title: "Erro",
-        description: "Tag deve conter apenas letras e números (máximo 5 caracteres)",
-        color: "danger",
-      });
-    }
-
-    // Verifica se a tag já está em uso (apenas se não estiver vazia)
-    if (newTag.trim()) {
-      const q = query(collection(db, "Users"), where("tag", "==", newTag.trim()));
-      const snap = await getDocs(q);
-
-      if (!snap.empty) {
-        return addToast({
-          title: "Erro",
-          description: "Esta tag já está em uso.",
-          color: "danger",
-        });
-      }
-    }
-
-    try {
-      const userRef = doc(db, "Users", user!.uid);
-      
-      // Verifica se o documento do usuário existe
-      const userDocSnap = await getDoc(userRef);
-      
-      if (userDocSnap.exists()) {
-        await updateDoc(userRef, { tag: newTag.trim() });
-      } else {
-        // Documento não existe, cria um novo com setDoc
-        await setDoc(userRef, {
-          displayName: user!.displayName || "",
-          photoURL: user!.photoURL || "",
-          tag: newTag.trim(),
-          createdAt: serverTimestamp()
-        });
-      }
-
-      setProfileNameTag(newTag.trim());
-      setShowTagModal(false);
-
-      addToast({
-        title: "Sucesso",
-        description: "Tag atualizada com sucesso!",
-        color: "success",
-      });
-    } catch (error) {
-      console.error("Erro ao atualizar tag:", error);
-      addToast({
-        title: "Erro",
-        description: "Erro ao atualizar tag. Tente novamente.",
         color: "danger",
       });
     }
   };
 
+ 
 
   const handleLogout = async () => await signOut(auth);
 
@@ -357,8 +356,9 @@ export default function Home() {
     const userData = userDocSnap.exists() ? userDocSnap.data() : {};
 
     await addDoc(collection(db, "Posts"), {
-      authorName: userData.displayName || user.displayName || user.email?.split("@")[0],
-      authorTag: userData.tag || null, // envia tag separada se existir
+      authorName:
+        userData.displayName || user.displayName || user.email?.split("@")[0],
+      authorTag: userData.organizationTag || null, // envia tag separada se existir
       authorId: user.uid,
       authorAvatar: userData.photoURL || user.photoURL || "",
       text: text.trim(),
@@ -369,7 +369,6 @@ export default function Home() {
     setText("");
   };
 
-
   const handleComment = async (postId: string, commentText: string) => {
     if (!user || !commentText.trim()) return;
 
@@ -377,11 +376,13 @@ export default function Home() {
 
     // Carrega a tag do usuário (se existir)
     let userTag = "";
+
     try {
       const userRef = doc(db, "Users", user.uid);
       const userSnap = await getDoc(userRef);
+
       if (userSnap.exists()) {
-        userTag = userSnap.data().tag || "";
+        userTag = userSnap.data().organizationTag || "";
       }
     } catch (error) {
       console.error("Erro ao buscar tag do usuário:", error);
@@ -389,7 +390,11 @@ export default function Home() {
 
     const newComment = {
       authorId: user.uid,
-      authorName: profileName || user.displayName || user.email?.split("@")[0] || "Anonymous",
+      authorName:
+        profileName ||
+        user.displayName ||
+        user.email?.split("@")[0] ||
+        "Anonymous",
       authorAvatar: profilePhoto || user.photoURL || "",
       authorTag: userTag || "", // ✅ adiciona tag se existir
       text: commentText.trim(),
@@ -406,7 +411,6 @@ export default function Home() {
     }
   };
 
-
   // Função para deletar comentário
   const handleDeleteComment = async (postId: string, comment: any) => {
     if (!user) return;
@@ -414,6 +418,7 @@ export default function Home() {
     // Só permite deletar se for o autor do comentário
     if (comment.authorId !== user.uid) {
       alert("Você só pode deletar seus próprios comentários.");
+
       return;
     }
 
@@ -429,8 +434,10 @@ export default function Home() {
     }
   };
 
-
-  const toggleReaction = async (post: Post, reaction?: { name: string; emoji: string }) => {
+  const toggleReaction = async (
+    post: Post,
+    reaction?: { name: string; emoji: string },
+  ) => {
     if (!user || !post.id) return;
 
     const pRef = doc(db, "Posts", post.id);
@@ -454,7 +461,6 @@ export default function Home() {
     await updateDoc(pRef, { reactions });
   };
 
-
   // Função para atualizar status de digitação
   const updateTypingStatus = async (isTypingNow: boolean) => {
     if (!user || !showChatWith) return;
@@ -476,7 +482,7 @@ export default function Home() {
         });
       }
     } catch (error) {
-      console.error('Erro ao atualizar status de digitação:', error);
+      console.error("Erro ao atualizar status de digitação:", error);
     }
   };
 
@@ -527,31 +533,42 @@ export default function Home() {
     const messagesUnsubscribe = onSnapshot(
       query(chatCol, orderBy("createdAt", "asc")),
       (snap) => {
-        console.log('Mensagens recebidas:', snap.docs.length);
+        console.log("Mensagens recebidas:", snap.docs.length);
         const msgs = snap.docs.map((d) => {
           const data = d.data() as ChatMessage;
-          console.log('Mensagem:', data);
+
+          console.log("Mensagem:", data);
+
           return { ...data, id: d.id }; // Adicionar ID do documento
         });
+
         setChatMessages(msgs);
       },
       (error) => {
-        console.error('Erro no listener de mensagens:', error);
-      }
+        console.error("Erro no listener de mensagens:", error);
+      },
     );
 
     // Configurar listener para status de digitação
     const typingUnsubscribe = onSnapshot(typingCol, (snap) => {
-      const typingData: { [userId: string]: { userId: string, userName: string, timestamp: number } } = {};
+      const typingData: {
+        [userId: string]: {
+          userId: string;
+          userName: string;
+          timestamp: number;
+        };
+      } = {};
 
       snap.forEach((doc) => {
         const data = doc.data();
+
         if (data.isTyping && data.userId !== user.uid) {
           // Verificar se o timestamp não é muito antigo (mais de 2 minutos)
           const now = Date.now();
           const typingTime = data.timestamp?.toDate?.()?.getTime() || 0;
 
-          if (now - typingTime < 120000) { // 2 minutos
+          if (now - typingTime < 120000) {
+            // 2 minutos
             typingData[data.userId] = {
               userId: data.userId,
               userName: data.userName,
@@ -561,13 +578,15 @@ export default function Home() {
         }
       });
 
-      setIsTyping(prev => {
+      setIsTyping((prev) => {
         const newState = { ...prev };
+
         if (Object.keys(typingData).length > 0) {
           newState[chatId] = Object.values(typingData)[0];
         } else {
           delete newState[chatId];
         }
+
         return newState;
       });
     });
@@ -583,17 +602,21 @@ export default function Home() {
 
     // Marcar mensagens como lidas imediatamente
     const chatDoc = doc(db, "Chats", chatId);
+
     getDoc(chatDoc).then((snap) => {
       if (!snap.exists()) return;
       const data = snap.data() as any;
+
       if (data.unreadBy?.includes(user.uid)) {
         updateDoc(chatDoc, {
           unreadBy: data.unreadBy.filter((uid: string) => uid !== user.uid),
         }).then(() => {
           // Atualizar o estado local imediatamente para feedback visual
-          setConversas(prev => prev.map(conv =>
-            conv.id === c.id ? { ...conv, unread: false } : conv
-          ));
+          setConversas((prev) =>
+            prev.map((conv) =>
+              conv.id === c.id ? { ...conv, unread: false } : conv,
+            ),
+          );
         });
       }
     });
@@ -609,7 +632,7 @@ export default function Home() {
     const chatCol = collection(db, "Chats", chatId, "Messages");
 
     try {
-      console.log('Enviando mensagem para chatId:', chatId);
+      console.log("Enviando mensagem para chatId:", chatId);
 
       // Parar de mostrar "digitando" antes de enviar
       updateTypingStatus(false);
@@ -629,7 +652,7 @@ export default function Home() {
         createdAt: serverTimestamp(),
       });
 
-      console.log('Mensagem enviada com sucesso');
+      console.log("Mensagem enviada com sucesso");
 
       // Atualizar documento principal do chat
       await setDoc(
@@ -648,17 +671,17 @@ export default function Home() {
           unreadBy: [showChatWith.otherUserId],
           updatedAt: serverTimestamp(),
         },
-        { merge: true }
+        { merge: true },
       );
 
-      console.log('Documento do chat atualizado');
+      console.log("Documento do chat atualizado");
       setChatText("");
     } catch (error) {
-      console.error('Erro ao enviar mensagem:', error);
+      console.error("Erro ao enviar mensagem:", error);
       addToast({
         title: "Erro",
         description: "Erro ao enviar mensagem. Tente novamente.",
-        color: "danger"
+        color: "danger",
       });
     }
   };
@@ -672,11 +695,13 @@ export default function Home() {
 
     // Verifica se o nome já existe
     const nameExists = snap.docs.some(
-      (docSnap) => docSnap.data().displayName?.toLowerCase() === newName.toLowerCase()
+      (docSnap) =>
+        docSnap.data().displayName?.toLowerCase() === newName.toLowerCase(),
     );
 
     if (nameExists) {
       alert("Esse nome já está em uso, escolha outro.");
+
       return;
     }
 
@@ -685,7 +710,7 @@ export default function Home() {
       await setDoc(
         doc(db, "Users", user.uid),
         { displayName: newName, photoURL: profilePhoto || "" },
-        { merge: true }
+        { merge: true },
       );
 
       // Atualiza o estado local
@@ -703,10 +728,6 @@ export default function Home() {
     setShowNameModal(true);
   };
 
-  const handleEditTag = () => {
-    setNewTag(profileNameTag);
-    setShowTagModal(true);
-  };
 
   const handleSubmitName = async () => {
     if (!newName.trim()) {
@@ -717,7 +738,10 @@ export default function Home() {
       });
     }
 
-    const q = query(collection(db, "Users"), where("displayName", "==", newName.trim()));
+    const q = query(
+      collection(db, "Users"),
+      where("displayName", "==", newName.trim()),
+    );
     const snap = await getDocs(q);
 
     if (!snap.empty) {
@@ -730,10 +754,10 @@ export default function Home() {
 
     try {
       const userRef = doc(db, "Users", user!.uid);
-      
+
       // Verifica se o documento do usuário existe
       const userDocSnap = await getDoc(userRef);
-      
+
       if (userDocSnap.exists()) {
         await updateDoc(userRef, { displayName: newName.trim() });
       } else {
@@ -741,8 +765,8 @@ export default function Home() {
         await setDoc(userRef, {
           displayName: newName.trim(),
           photoURL: user!.photoURL || "",
-          tag: "",
-          createdAt: serverTimestamp()
+          organizationTag: "",
+          createdAt: serverTimestamp(),
         });
       }
 
@@ -770,11 +794,16 @@ export default function Home() {
   if (!user) return <Login handleGoogleLogin={handleGoogleLogin} />;
 
   // Filtrar navegação baseado no status do usuário
-  const filteredNavigation = navigation.filter(n => {
+  const filteredNavigation = navigation.filter((n) => {
     // Se o usuário já é membro de uma organização, não mostrar "Criar Organização"
-    if (n.label === "Criar Organização" && userOrganizations && userOrganizations.length > 0) {
+    if (
+      n.label === "Criar Organização" &&
+      userOrganizations &&
+      userOrganizations.length > 0
+    ) {
       return false;
     }
+
     return true;
   });
 
@@ -788,21 +817,34 @@ export default function Home() {
             {filteredNavigation.map((n) => (
               <NavbarItem key={n.label} isActive={activeTab === n.label}>
                 <Tooltip content={n.label} placement="bottom">
-                  <Button onPress={() => setActiveTab(n.label as "Feed" | "Conversas" | "Minhas Organizações" | "Explorar Organizações" | "Criar Organização" | "Painel da Organização")}>
+                  <Button
+                    onPress={() =>
+                      setActiveTab(
+                        n.label as
+                          | "Feed"
+                          | "Conversas"
+                          | "Minhas Organizações"
+                          | "Explorar Organizações"
+                          | "Criar Organização"
+                          | "Painel da Organização",
+                      )
+                    }
+                  >
                     {n.icon}
                     {/* Badge vermelho para Conversas */}
-                    {n.label === "Conversas" && conversas.some((c) => c.unread) && (
-                      <span
-                        style={{
-                          display: "inline-block",
-                          width: 8,
-                          height: 8,
-                          borderRadius: "50%",
-                          background: "red",
-                          marginLeft: 4,
-                        }}
-                      />
-                    )}
+                    {n.label === "Conversas" &&
+                      conversas.some((c) => c.unread) && (
+                        <span
+                          style={{
+                            display: "inline-block",
+                            width: 8,
+                            height: 8,
+                            borderRadius: "50%",
+                            background: "red",
+                            marginLeft: 4,
+                          }}
+                        />
+                      )}
                   </Button>
                 </Tooltip>
               </NavbarItem>
@@ -821,8 +863,18 @@ export default function Home() {
                 {filteredNavigation.map((n) => (
                   <DropdownItem
                     key={n.label}
-                    onPress={() => setActiveTab(n.label as "Feed" | "Conversas" | "Minhas Organizações" | "Explorar Organizações" | "Criar Organização" | "Painel da Organização")}
                     className="flex items-center justify-between w-full"
+                    onPress={() =>
+                      setActiveTab(
+                        n.label as
+                          | "Feed"
+                          | "Conversas"
+                          | "Minhas Organizações"
+                          | "Explorar Organizações"
+                          | "Criar Organização"
+                          | "Painel da Organização",
+                      )
+                    }
                   >
                     {/* Ícone + Texto lado a lado */}
                     <div className="flex items-center gap-2">
@@ -831,17 +883,18 @@ export default function Home() {
                     </div>
 
                     {/* Badge vermelho para Conversas */}
-                    {n.label === "Conversas" && conversas.some((c) => c.unread) && (
-                      <span
-                        style={{
-                          display: "inline-block",
-                          width: 8,
-                          height: 8,
-                          borderRadius: "50%",
-                          background: "red",
-                        }}
-                      />
-                    )}
+                    {n.label === "Conversas" &&
+                      conversas.some((c) => c.unread) && (
+                        <span
+                          style={{
+                            display: "inline-block",
+                            width: 8,
+                            height: 8,
+                            borderRadius: "50%",
+                            background: "red",
+                          }}
+                        />
+                      )}
                   </DropdownItem>
                 ))}
               </DropdownMenu>
@@ -860,9 +913,9 @@ export default function Home() {
             <DropdownTrigger>
               <div className="group h-12 w-12 rounded-full overflow-hidden border-2 border-white/30 bg-gray-700 flex items-center justify-center relative cursor-pointer">
                 <img
-                  src={profilePhoto || "/default-avatar.png"}
                   alt="Avatar"
                   className="h-full w-full object-cover"
+                  src={profilePhoto || "/default-avatar.png"}
                 />
                 <div className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-50 text-white opacity-0 group-hover:opacity-100 transition-opacity rounded-full">
                   <HiOutlinePencil className="w-5 h-5" />
@@ -870,32 +923,40 @@ export default function Home() {
               </div>
             </DropdownTrigger>
             <DropdownMenu>
-              <DropdownItem key="edit-photo" onClick={() => inputRef.current?.click()}>Editar Foto</DropdownItem>
-              <DropdownItem key="edit-name" onClick={handleEditName}>Editar Nome</DropdownItem>
-              <DropdownItem key="edit-tag" onClick={handleEditTag}>Editar Tag</DropdownItem>
+              <DropdownItem
+                key="edit-photo"
+                onClick={() => inputRef.current?.click()}
+              >
+                Editar Foto
+              </DropdownItem>
+              <DropdownItem key="edit-name" onClick={handleEditName}>
+                Editar Nome
+              </DropdownItem>
             </DropdownMenu>
           </Dropdown>
 
           <input
             ref={inputRef}
-            type="file"
             accept="image/*"
             style={{ display: "none" }}
+            type="file"
             onChange={async (e) => {
               if (!e.target.files || e.target.files.length === 0) return;
               const file = e.target.files[0];
               const formData = new FormData();
+
               formData.append("image", file);
 
               try {
                 const res = await fetch(
                   `https://api.imgbb.com/1/upload?key=b1356253eee00f53fbcbe77dad8acae8`,
-                  { method: "POST", body: formData }
+                  { method: "POST", body: formData },
                 );
                 const data = await res.json();
 
                 if (data.success) {
                   const newPhotoURL = data.data.url;
+
                   setProfilePhoto(newPhotoURL);
 
                   if (user) {
@@ -904,6 +965,7 @@ export default function Home() {
 
                     // Atualiza Firestore
                     const userDocRef = doc(db, "Users", user.uid);
+
                     await updateDoc(userDocRef, { photoURL: newPhotoURL });
                   }
 
@@ -935,14 +997,15 @@ export default function Home() {
               <ModalHeader>Editar Nome</ModalHeader>
               <ModalBody className="flex flex-col gap-2">
                 <div>
-                  <Code color="primary" className="mb-2">Seu nome atual</Code>
+                  <Code className="mb-2" color="primary">
+                    Seu nome atual
+                  </Code>
                   <div className="flex items-center gap-2">
-
                     {/* Tag em Code, alinhada à altura do input */}
                     {profileNameTag && (
                       <Code
-                        color="danger"
                         className="flex items-center px-2 h-[38px] text-sm rounded" // h igual à altura do input
+                        color="danger"
                       >
                         {profileNameTag}
                       </Code>
@@ -950,85 +1013,58 @@ export default function Home() {
 
                     {/* Input com apenas o nome */}
                     <Input
-                      type="text"
-                      value={profileName}
                       disabled
                       className="h-[38px]" // mesma altura que o Code
+                      type="text"
+                      value={profileName}
                     />
                   </div>
                 </div>
                 <div>
-                  <Code color="primary" className="mb-2">Seu novo nome</Code>
+                  <Code className="mb-2" color="primary">
+                    Seu novo nome
+                  </Code>
                   <Input
                     type="text"
-
                     onChange={(e) => setNewName(e.target.value)}
-
                   />
                 </div>
               </ModalBody>
               <ModalFooter className="flex justify-end gap-2">
-                <Button onPress={() => setShowNameModal(false)}><HiOutlineX className="w-4 h-4" /></Button>
-                <Button color="primary" onPress={handleSubmitName}><HiOutlineSave className="w-4 h-4" /></Button>
+                <Button onPress={() => setShowNameModal(false)}>
+                  <HiOutlineX className="w-4 h-4" />
+                </Button>
+                <Button color="primary" onPress={handleSubmitName}>
+                  <HiOutlineSave className="w-4 h-4" />
+                </Button>
               </ModalFooter>
             </ModalContent>
           </Modal>
 
-          {/* Modal para editar tag */}
-          <Modal isOpen={showTagModal} onOpenChange={setShowTagModal}>
-            <ModalContent>
-              <ModalHeader>Editar Tag</ModalHeader>
-              <ModalBody className="flex flex-col gap-2">
-                <div>
-                  <Code color="primary" className="mb-2">Sua tag atual</Code>
-                  <div className="flex items-center gap-2">
-                    {profileNameTag ? (
-                      <Code
-                        color="danger"
-                        className="flex items-center px-2 h-[38px] text-sm rounded"
-                      >
-                        {profileNameTag}
-                      </Code>
-                    ) : (
-                      <Code
-                        color="default"
-                        className="flex items-center px-2 h-[38px] text-sm rounded"
-                      >
-                        Sem tag
-                      </Code>
-                    )}
-                  </div>
-                </div>
-                <div>
-                  <Code color="primary" className="mb-2">Nova tag</Code>
-                  <Input
-                    type="text"
-                    value={newTag}
-                    onChange={(e) => setNewTag(e.target.value)}
-                    placeholder="Digite sua nova tag (opcional)"
-                     description="Apenas letras e números (máximo 5 caracteres)"
-                  />
-                </div>
-              </ModalBody>
-              <ModalFooter className="flex justify-end gap-2">
-                <Button onPress={() => setShowTagModal(false)}><HiOutlineX className="w-4 h-4" /></Button>
-                <Button color="primary" onPress={handleSubmitTag}><HiOutlineSave className="w-4 h-4" /></Button>
-              </ModalFooter>
-            </ModalContent>
-          </Modal>
+         
         </NavbarContent>
       </Navbar>
-      <div style={{ maxWidth: 800, margin: "0 auto", marginTop: 10, marginBottom: -10, paddingLeft: 40, }}>
+      <div
+        style={{
+          maxWidth: 800,
+          margin: "0 auto",
+          marginTop: 10,
+          marginBottom: -10,
+          paddingLeft: 40,
+        }}
+      >
         <Breadcrumbs>
           {/* Sempre Home */}
-          <BreadcrumbItem startContent={<HiOutlineNewspaper />} onPress={() => setActiveTab("Feed")}>
+          <BreadcrumbItem
+            startContent={<HiOutlineNewspaper />}
+            onPress={() => setActiveTab("Feed")}
+          >
             Feed
           </BreadcrumbItem>
 
           {/* Aba ativa */}
           {activeTab && activeTab !== "Feed" && (
             <BreadcrumbItem isCurrent>{activeTab}</BreadcrumbItem>
-
           )}
         </Breadcrumbs>
       </div>
@@ -1036,21 +1072,21 @@ export default function Home() {
       <div style={{ maxWidth: 800, margin: "0 auto", padding: 24 }}>
         {activeTab === "Feed" && (
           <FeedWithChat
-            posts={posts}
-            user={user}
-            text={text}
-            setText={setText}
-            handlePost={handlePost}
-            toggleReaction={toggleReaction}
+            chatMessages={chatMessages.map(m => ({
+              ...m,
+              senderAvatar: m.senderAvatar ?? "",
+            }))}
+            chatText={chatText}
             conversas={conversas.map(c => ({
               ...c,
               lastMessage: c.lastMessage ?? "",
               unread: c.unread ?? false,
             }))}
-            chatMessages={chatMessages.map(m => ({
-              ...m,
-              senderAvatar: m.senderAvatar ?? "",
-            }))}
+            currentUserId={user.uid}
+            handleComment={handleComment}
+            handleDeleteComment={handleDeleteComment}
+            handlePost={handlePost}
+            openChatFromConversa={openChatFromConversa}
             showChatWith={showChatWith ? {
               ...showChatWith,
               otherUserAvatar: showChatWith.otherUserAvatar ?? "",
@@ -1058,20 +1094,23 @@ export default function Home() {
               unread: showChatWith.unread ?? false,
             } : null}
             // @ts-expect-error: Type mismatch due to different ChatOverview imports, but runtime shape is compatible
-            setShowChatWith={setShowChatWith}
+            posts={posts}
             sendMessage={sendMessage}
-            chatText={chatText}
             setChatText={setChatText}
-            currentUserId={user.uid}
-            openChatFromConversa={openChatFromConversa}
-            handleComment={handleComment}
-            handleDeleteComment={handleDeleteComment}
+            setShowChatWith={setShowChatWith}
+            setText={setText}
+            text={text}
+            toggleReaction={toggleReaction}
+            user={user}
           />
         )}
 
         {activeTab === "Conversas" && (
           <Chat
-            userId={user?.uid || ""}
+            chatMessages={chatMessages.map(m => ({
+              ...m,
+              senderAvatar: m.senderAvatar ?? "",
+            }))}
             showChatWith={showChatWith ? {
               ...showChatWith,
               otherUserAvatar: showChatWith.otherUserAvatar ?? "",
@@ -1079,44 +1118,41 @@ export default function Home() {
               unread: showChatWith.unread ?? false,
             } : null}
             // @ts-expect-error: Type mismatch due to different ChatOverview imports, but runtime shape is compatible
-            setShowChatWith={setShowChatWith}
+            chatText={chatText}
             conversas={conversas.map(c => ({
               ...c,
               lastMessage: c.lastMessage ?? "",
               unread: c.unread ?? false,
             }))}
-            chatMessages={chatMessages.map(m => ({
-              ...m,
-              senderAvatar: m.senderAvatar ?? "",
-            }))}
-            chatText={chatText}
-            setChatText={setChatText}
-            sendMessage={sendMessage}
-            openChatFromConversa={openChatFromConversa}
             deleteConversa={(id: string) => {
               // Implementar lógica de deletar conversa se necessário
               console.log('Deletar conversa:', id);
             }}
             isTyping={showChatWith ? isTyping[`${user?.uid}_${showChatWith.otherUserId}`.split('_').sort().join('_')] || undefined : undefined}
+            openChatFromConversa={openChatFromConversa}
+            sendMessage={sendMessage}
+            setChatText={setChatText}
+            setShowChatWith={setShowChatWith}
+            userId={user?.uid || ""}
             onChatTextChange={handleChatTextChange}
           />
         )}
 
         {activeTab === "Minhas Organizações" && (
           <MinhasOrganizacoes
-            user={user}
-            userOrganizations={userOrganizations}
             loading={userOrgsLoading}
             selectedOrgId={selectedOrgId}
+            user={user}
+            userOrganizations={userOrganizations}
             onSelectOrganization={setSelectedOrgId}
           />
         )}
 
         {activeTab === "Explorar Organizações" && (
           <ExplorarOrganizacoes
-            user={user}
-            organizations={publicOrganizations}
             loading={publicOrgsLoading}
+            organizations={publicOrganizations}
+            user={user}
           />
         )}
 
@@ -1128,17 +1164,15 @@ export default function Home() {
 
         {activeTab === "Painel da Organização" && (
           <PainelOrganizacao
-            user={user}
-            userOrg={userOrg}
-            userMembership={userMembership}
             loading={userOrgsLoading || membershipLoading}
-            userOrganizations={userOrganizations}
             selectedOrgId={selectedOrgId}
+            user={user}
+            userMembership={userMembership}
+            userOrg={userOrg}
+            userOrganizations={userOrganizations}
             onSelectOrganization={setSelectedOrgId}
           />
         )}
-
-
       </div>
     </div>
   );

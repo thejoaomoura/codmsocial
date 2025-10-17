@@ -1,18 +1,19 @@
-import { useState } from 'react';
-import { 
-  collection, 
-  addDoc, 
-  serverTimestamp, 
-  query, 
-  where, 
-  onSnapshot, 
-  updateDoc, 
-  doc, 
-  getDocs 
-} from 'firebase/firestore';
-import { db } from '../firebase';
-import { EventRegistration, RegistrationState } from '../types';
-import { addToast } from '@heroui/toast';
+import { useState } from "react";
+import {
+  collection,
+  addDoc,
+  serverTimestamp,
+  query,
+  where,
+  onSnapshot,
+  updateDoc,
+  doc,
+  getDocs,
+} from "firebase/firestore";
+import { addToast } from "@heroui/toast";
+
+import { db } from "../firebase";
+import { EventRegistration, RegistrationState } from "../types";
 
 export const useEventRegistrations = () => {
   const [loading, setLoading] = useState(false);
@@ -25,31 +26,32 @@ export const useEventRegistrations = () => {
     orgId: string,
     managerId: string,
     roster: string[],
-    substitutes: string[] = []
+    substitutes: string[] = [],
   ): Promise<boolean> => {
     setLoading(true);
-    
+
     try {
       // Verificar se já existe uma inscrição para esta organização neste evento
       const existingRegistrationQuery = query(
-        collection(db, 'eventRegistrations'),
-        where('eventId', '==', eventId),
-        where('orgId', '==', orgId)
+        collection(db, "eventRegistrations"),
+        where("eventId", "==", eventId),
+        where("orgId", "==", orgId),
       );
-      
+
       const existingRegistrations = await getDocs(existingRegistrationQuery);
-      
+
       if (!existingRegistrations.empty) {
         addToast({
-          title: 'Inscrição Já Existe',
-          description: 'Sua organização já está inscrita neste evento',
-          color: 'warning'
+          title: "Inscrição Já Existe",
+          description: "Sua organização já está inscrita neste evento",
+          color: "warning",
         });
+
         return false;
       }
 
       // Criar nova inscrição
-      const registrationData: Omit<EventRegistration, 'id'> = {
+      const registrationData: Omit<EventRegistration, "id"> = {
         eventId,
         orgId,
         managerId,
@@ -57,25 +59,26 @@ export const useEventRegistrations = () => {
         substitutes,
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
-        state: 'pending' as RegistrationState
+        state: "pending" as RegistrationState,
       };
 
-      await addDoc(collection(db, 'eventRegistrations'), registrationData);
-      
+      await addDoc(collection(db, "eventRegistrations"), registrationData);
+
       addToast({
-        title: 'Inscrição Enviada',
-        description: 'Sua organização foi inscrita no evento com sucesso!',
-        color: 'success'
+        title: "Inscrição Enviada",
+        description: "Sua organização foi inscrita no evento com sucesso!",
+        color: "success",
       });
-      
+
       return true;
     } catch (error) {
-      console.error('Erro ao inscrever no evento:', error);
+      console.error("Erro ao inscrever no evento:", error);
       addToast({
-        title: 'Erro na Inscrição',
-        description: 'Erro ao inscrever no evento. Tente novamente.',
-        color: 'danger'
+        title: "Erro na Inscrição",
+        description: "Erro ao inscrever no evento. Tente novamente.",
+        color: "danger",
       });
+
       return false;
     } finally {
       setLoading(false);
@@ -88,33 +91,34 @@ export const useEventRegistrations = () => {
   const updateRegistrationRoster = async (
     registrationId: string,
     newRoster: string[],
-    newSubstitutes: string[] = []
+    newSubstitutes: string[] = [],
   ): Promise<boolean> => {
     setLoading(true);
-    
+
     try {
-      const registrationRef = doc(db, 'eventRegistrations', registrationId);
-      
+      const registrationRef = doc(db, "eventRegistrations", registrationId);
+
       await updateDoc(registrationRef, {
         roster: newRoster,
         substitutes: newSubstitutes,
-        updatedAt: serverTimestamp()
+        updatedAt: serverTimestamp(),
       });
-      
+
       addToast({
-        title: 'Roster Atualizado',
-        description: 'Roster da equipe foi atualizado com sucesso!',
-        color: 'success'
+        title: "Roster Atualizado",
+        description: "Roster da equipe foi atualizado com sucesso!",
+        color: "success",
       });
-      
+
       return true;
     } catch (error) {
-      console.error('Erro ao atualizar roster:', error);
+      console.error("Erro ao atualizar roster:", error);
       addToast({
-        title: 'Erro na Atualização',
-        description: 'Erro ao atualizar roster. Tente novamente.',
-        color: 'danger'
+        title: "Erro na Atualização",
+        description: "Erro ao atualizar roster. Tente novamente.",
+        color: "danger",
       });
+
       return false;
     } finally {
       setLoading(false);
@@ -126,15 +130,16 @@ export const useEventRegistrations = () => {
    */
   const subscribeToOrgRegistrations = (
     orgId: string,
-    callback: (registrations: EventRegistration[]) => void
+    callback: (registrations: EventRegistration[]) => void,
   ) => {
     const registrationsQuery = query(
-      collection(db, 'eventRegistrations'),
-      where('orgId', '==', orgId)
+      collection(db, "eventRegistrations"),
+      where("orgId", "==", orgId),
     );
 
     return onSnapshot(registrationsQuery, (snapshot) => {
       const registrations: EventRegistration[] = [];
+
       snapshot.forEach((doc) => {
         registrations.push({ id: doc.id, ...doc.data() } as EventRegistration);
       });
@@ -147,15 +152,16 @@ export const useEventRegistrations = () => {
    */
   const subscribeToEventRegistrations = (
     eventId: string,
-    callback: (registrations: EventRegistration[]) => void
+    callback: (registrations: EventRegistration[]) => void,
   ) => {
     const registrationsQuery = query(
-      collection(db, 'eventRegistrations'),
-      where('eventId', '==', eventId)
+      collection(db, "eventRegistrations"),
+      where("eventId", "==", eventId),
     );
 
     return onSnapshot(registrationsQuery, (snapshot) => {
       const registrations: EventRegistration[] = [];
+
       snapshot.forEach((doc) => {
         registrations.push({ id: doc.id, ...doc.data() } as EventRegistration);
       });
@@ -168,6 +174,6 @@ export const useEventRegistrations = () => {
     registerForEvent,
     updateRegistrationRoster,
     subscribeToOrgRegistrations,
-    subscribeToEventRegistrations
+    subscribeToEventRegistrations,
   };
 };

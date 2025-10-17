@@ -32,12 +32,12 @@ const TypingIndicator: React.FC<TypingIndicatorProps> = ({ isVisible }) => {
         }}
       >
         <div className="typing-dots">
-          <div className="dot"></div>
-          <div className="dot"></div>
-          <div className="dot"></div>
+          <div className="dot" />
+          <div className="dot" />
+          <div className="dot" />
         </div>
       </div>
-      
+
       <style jsx>{`
         @keyframes fadeIn {
           from {
@@ -78,7 +78,9 @@ const TypingIndicator: React.FC<TypingIndicatorProps> = ({ isVisible }) => {
         }
 
         @keyframes typing {
-          0%, 60%, 100% {
+          0%,
+          60%,
+          100% {
             transform: translateY(0);
             opacity: 0.4;
           }
