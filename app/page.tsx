@@ -83,6 +83,8 @@ import { Post, ChatOverview, ChatMessage } from "./types";
 import Login from "./Login";
 import Chat from "./Chat";
 import FeedWithChat from "./FeedWithChat";
+import { HiOutlineBuildingStorefront } from "react-icons/hi2";
+import MercadoOrganizacao from "./components/MercadoOrganizacao";
 
 const navigation = [
   { label: "Feed", icon: <HiOutlineNewspaper className="w-5 h-5" /> },
@@ -100,6 +102,10 @@ const navigation = [
     label: "Painel da Organização",
     icon: <HiOutlineShieldCheck className="w-5 h-5" />,
   },
+    {
+    label: "Mercado das Organização",
+    icon: <HiOutlineBuildingStorefront className="w-5 h-5" />,
+  },
 ];
 
 export default function Home() {
@@ -111,6 +117,7 @@ export default function Home() {
     | "Explorar Organizações"
     | "Criar Organização"
     | "Painel da Organização"
+    | "Mercado das Organização"
   >("Feed");
   const [posts, setPosts] = useState<Post[]>([]);
   const [text, setText] = useState("");
@@ -826,7 +833,8 @@ export default function Home() {
                           | "Minhas Organizações"
                           | "Explorar Organizações"
                           | "Criar Organização"
-                          | "Painel da Organização",
+                          | "Painel da Organização"
+                          | "Mercado das Organização",
                       )
                     }
                   >
@@ -872,7 +880,8 @@ export default function Home() {
                           | "Minhas Organizações"
                           | "Explorar Organizações"
                           | "Criar Organização"
-                          | "Painel da Organização",
+                          | "Painel da Organização"
+                          | "Mercado das Organização",
                       )
                     }
                   >
@@ -1171,6 +1180,11 @@ export default function Home() {
             userOrg={userOrg}
             userOrganizations={userOrganizations}
             onSelectOrganization={setSelectedOrgId}
+          />
+        )}
+
+         {activeTab === "Mercado das Organização" && (
+          <MercadoOrganizacao
           />
         )}
       </div>

@@ -536,7 +536,7 @@ const handleAcceptRequest = async (
       batch.set(logRef, {
         displayName: request.userData.displayName || request.userData.name,
         photoURL: request.userData.photoURL || request.userData.avatar || null,
-        status: "Aceito",
+        status: "Aceitou",
         organizationName: orgData.name || null,
         organizationLogo: orgData.logoURL || null,
         createdAt: serverTimestamp(),
@@ -611,7 +611,7 @@ const handleRejectRequest = async (
       batch.set(logRef, {
         displayName: request.userData.displayName || request.userData.name,
         photoURL: request.userData.photoURL || request.userData.avatar || null,
-        status: "Recusado",
+        status: "Recusou",
         organizationName: orgData.name || null,
         organizationLogo: orgData.logoURL || null,
         createdAt: serverTimestamp(),
