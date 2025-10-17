@@ -5,20 +5,20 @@ const resend = new Resend(process.env.RESEND_API_KEY);
 
 export async function POST(req: NextRequest) {
   try {
-    const { 
-      invitedEmail, 
-      organizationName, 
+    const {
+      invitedEmail,
+      organizationName,
       organizationLogo,
-      inviterName, 
+      inviterName,
       message,
-      inviteUrl 
+      inviteUrl,
     } = await req.json();
 
     // Validação básica
     if (!invitedEmail || !organizationName) {
       return NextResponse.json(
         { error: "Email e nome da organização são obrigatórios" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -41,14 +41,18 @@ export async function POST(req: NextRequest) {
                   <!-- Header -->
                   <tr>
                     <td style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 40px 30px; text-align: center;">
-                      ${organizationLogo ? `
+                      ${
+                        organizationLogo
+                          ? `
                         <img src="${organizationLogo}" alt="${organizationName}" style="width: 80px; height: 80px; border-radius: 50%; border: 4px solid #ffffff; margin-bottom: 20px; object-fit: cover;">
-                      ` : ''}
+                      `
+                          : ""
+                      }
                       <h1 style="color: #ffffff; margin: 0; font-size: 28px; font-weight: 700;">
                         Você foi convidado!
                       </h1>
                       <p style="color: rgba(255, 255, 255, 0.9); margin: 10px 0 0 0; font-size: 16px;">
-                        ${inviterName || 'Um membro'} está te convidando para se juntar
+                        ${inviterName || "Um membro"} está te convidando para se juntar
                       </p>
                     </td>
                   </tr>
@@ -65,7 +69,9 @@ export async function POST(req: NextRequest) {
                         </p>
                       </div>
 
-                      ${message ? `
+                      ${
+                        message
+                          ? `
                         <div style="background-color: #f7fafc; padding: 20px; border-radius: 8px; margin-bottom: 30px;">
                           <p style="color: #2d3748; margin: 0 0 5px 0; font-weight: 600; font-size: 14px;">
                             💬 Mensagem pessoal:
@@ -74,10 +80,12 @@ export async function POST(req: NextRequest) {
                             "${message}"
                           </p>
                         </div>
-                      ` : ''}
+                      `
+                          : ""
+                      }
 
                       <div style="text-align: center; margin: 30px 0;">
-                        <a href="${inviteUrl || process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}" 
+                        <a href="${inviteUrl || process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}" 
                            style="display: inline-block; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: #ffffff; text-decoration: none; padding: 16px 40px; border-radius: 8px; font-weight: 600; font-size: 16px; box-shadow: 0 4px 6px rgba(102, 126, 234, 0.3);">
                           Aceitar Convite
                         </a>
@@ -101,11 +109,11 @@ export async function POST(req: NextRequest) {
                         Este é um e-mail automático, por favor não responda.
                       </p>
                       <div style="margin-top: 20px;">
-                        <a href="${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}" style="color: #667eea; text-decoration: none; font-size: 13px; margin: 0 10px;">
+                        <a href="${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}" style="color: #667eea; text-decoration: none; font-size: 13px; margin: 0 10px;">
                           Acessar Plataforma
                         </a>
                         <span style="color: #cbd5e0;">•</span>
-                        <a href="${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/ajuda" style="color: #667eea; text-decoration: none; font-size: 13px; margin: 0 10px;">
+                        <a href="${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}/ajuda" style="color: #667eea; text-decoration: none; font-size: 13px; margin: 0 10px;">
                           Central de Ajuda
                         </a>
                       </div>
@@ -122,7 +130,8 @@ export async function POST(req: NextRequest) {
 
     // Enviar e-mail usando Resend
     const { data, error } = await resend.emails.send({
-      from: process.env.RESEND_FROM_EMAIL || "CODM Social <onboarding@resend.dev>",
+      from:
+        process.env.RESEND_FROM_EMAIL || "CODM Social <onboarding@resend.dev>",
       to: [invitedEmail],
       subject: `🎉 Você foi convidado para ${organizationName}!`,
       html: emailHtml,
@@ -131,25 +140,25 @@ export async function POST(req: NextRequest) {
     // Verificar se houve erro no envio
     if (error) {
       console.error("Erro do Resend:", error);
+
       return NextResponse.json(
         { error: "Erro ao enviar e-mail de convite", details: error },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
     console.log("✅ E-mail enviado com sucesso:", data);
 
-    return NextResponse.json({ 
-      success: true, 
-      messageId: data?.id 
+    return NextResponse.json({
+      success: true,
+      messageId: data?.id,
     });
-
   } catch (error) {
     console.error("Erro ao enviar e-mail:", error);
+
     return NextResponse.json(
       { error: "Erro ao enviar e-mail de convite", details: error },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
-

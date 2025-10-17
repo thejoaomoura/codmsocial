@@ -612,8 +612,14 @@ const FeedWithChat: React.FC<FeedProps> = ({
                     <div className="flex flex-col">
                       <span className="font-medium flex items-center gap-1">
                         {p.authorTag && (
-                           
-          <Chip color="primary" size="sm" variant="flat" radius="sm">{p.authorTag}</Chip>
+                          <Chip
+                            color="primary"
+                            radius="sm"
+                            size="sm"
+                            variant="flat"
+                          >
+                            {p.authorTag}
+                          </Chip>
                         )}
                         {p.authorName}
                       </span>
@@ -782,7 +788,12 @@ const FeedWithChat: React.FC<FeedProps> = ({
                                 />
                                 <div className="flex flex-col">
                                   <span className="text-[13px] text-gray-200 -mt-0">
-                       <Chip color="primary" size="sm" variant="flat" radius="sm">
+                                    <Chip
+                                      color="primary"
+                                      radius="sm"
+                                      size="sm"
+                                      variant="flat"
+                                    >
                                       {c.authorTag}
                                     </Chip>{" "}
                                     {c.authorName}
@@ -916,10 +927,14 @@ const FeedWithChat: React.FC<FeedProps> = ({
                 {likesUsers.map((u) => (
                   <ListboxItem key={u.uid} textValue={u.name}>
                     <div className="flex items-center gap-2">
-                      
                       <span className="font-medium flex items-center gap-1">
                         {u.organizationTag && (
-                                  <Chip color="primary" size="sm" variant="flat" radius="sm">
+                          <Chip
+                            color="primary"
+                            radius="sm"
+                            size="sm"
+                            variant="flat"
+                          >
                             {u.organizationTag}
                           </Chip>
                         )}

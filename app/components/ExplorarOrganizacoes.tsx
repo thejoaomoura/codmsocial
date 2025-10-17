@@ -39,7 +39,7 @@ import {
 } from "firebase/firestore";
 
 import { db } from "../firebase";
-import { Organization, Membership, MembershipStatus } from "../types";
+import { Organization, Membership } from "../types";
 
 interface ExplorarOrganizacoesProps {
   user: User | null;
@@ -132,139 +132,151 @@ const ExplorarOrganizacoes: React.FC<ExplorarOrganizacoesProps> = ({
   }, [organizations, searchTerm, visibilityFilter]);
 
   const handleRequestToJoin = async (orgId: string) => {
-  if (!user) {
-    addToast({
-      title: "Erro",
-      description: "Você precisa estar logado",
-      color: "danger",
-    });
-    return;
-  }
-
-  const isMemberOfAnyOrg = Object.values(userMemberships).some(
-    (m) => m.status === "accepted"
-  );
-
-  if (isMemberOfAnyOrg) {
-    addToast({
-      title: "Aviso",
-      description:
-        "Você já é membro de uma organização e não pode solicitar entrada em outra",
-      color: "warning",
-    });
-    return;
-  }
-
-  if (userMemberships[orgId]) {
-    if (userMemberships[orgId].status === "accepted") {
+    if (!user) {
       addToast({
-        title: "Aviso",
-        description: "Você já é membro desta organização",
-        color: "warning",
+        title: "Erro",
+        description: "Você precisa estar logado",
+        color: "danger",
       });
+
       return;
     }
-    if (userMemberships[orgId].status === "pending") {
+
+    const isMemberOfAnyOrg = Object.values(userMemberships).some(
+      (m) => m.status === "accepted",
+    );
+
+    if (isMemberOfAnyOrg) {
       addToast({
         title: "Aviso",
-        description: "Você já tem uma solicitação pendente para esta organização",
+        description:
+          "Você já é membro de uma organização e não pode solicitar entrada em outra",
         color: "warning",
       });
+
       return;
     }
-  }
 
-  setRequesting(orgId);
+    if (userMemberships[orgId]) {
+      if (userMemberships[orgId].status === "accepted") {
+        addToast({
+          title: "Aviso",
+          description: "Você já é membro desta organização",
+          color: "warning",
+        });
 
-  const optimisticMembership: Membership = {
-    id: user.uid,
-    organizationId: orgId,
-    userId: user.uid,
-    role: "ranked",
-    status: "pending",
-    joinedAt: null,
-    updatedAt: new Date() as any,
-    invitedBy: user.uid,
-    invitedAt: new Date() as any,
-    roleHistory: [],
-    displayName: user.displayName || user.email || "Usuário",
-    photoURL: user.photoURL || "",
-  };
+        return;
+      }
+      if (userMemberships[orgId].status === "pending") {
+        addToast({
+          title: "Aviso",
+          description:
+            "Você já tem uma solicitação pendente para esta organização",
+          color: "warning",
+        });
 
-  setUserMemberships((prev) => ({
-    ...prev,
-    [orgId]: optimisticMembership,
-  }));
-  setPendingRequests((prev) => ({
-    ...prev,
-    [orgId]: true,
-  }));
+        return;
+      }
+    }
 
-  try {
-    const membershipData: Omit<Membership, "id"> = {
+    setRequesting(orgId);
+
+    const optimisticMembership: Membership = {
+      id: user.uid,
       organizationId: orgId,
       userId: user.uid,
       role: "ranked",
       status: "pending",
       joinedAt: null,
-      updatedAt: serverTimestamp() as any,
+      updatedAt: new Date() as any,
       invitedBy: user.uid,
-      invitedAt: serverTimestamp() as any,
+      invitedAt: new Date() as any,
       roleHistory: [],
       displayName: user.displayName || user.email || "Usuário",
       photoURL: user.photoURL || "",
     };
 
-    // Salva membership
-    await setDoc(doc(db, `organizations/${orgId}/memberships`, user.uid), membershipData);
-    await addDoc(collection(db, "memberships"), membershipData);
+    setUserMemberships((prev) => ({
+      ...prev,
+      [orgId]: optimisticMembership,
+    }));
+    setPendingRequests((prev) => ({
+      ...prev,
+      [orgId]: true,
+    }));
 
-    // Buscar dados da organização para log
-    const orgRef = doc(db, "organizations", orgId);
-    const orgSnap = await getDoc(orgRef);
-    const orgData = orgSnap.exists() ? orgSnap.data() : null;
-
-    // Criar log nas Atividades Recentes
-    if (orgData) {
-      await addDoc(collection(db, "logMercado"), {
+    try {
+      const membershipData: Omit<Membership, "id"> = {
+        organizationId: orgId,
+        userId: user.uid,
+        role: "ranked",
+        status: "pending",
+        joinedAt: null,
+        updatedAt: serverTimestamp() as any,
+        invitedBy: user.uid,
+        invitedAt: serverTimestamp() as any,
+        roleHistory: [],
         displayName: user.displayName || user.email || "Usuário",
         photoURL: user.photoURL || "",
-        status: "Solicitou",
-        organizationName: orgData.name || null,
-        organizationLogo: orgData.logoURL || null,
-        createdAt: serverTimestamp(),
+      };
+
+      // Salva membership
+      await setDoc(
+        doc(db, `organizations/${orgId}/memberships`, user.uid),
+        membershipData,
+      );
+      await addDoc(collection(db, "memberships"), membershipData);
+
+      // Buscar dados da organização para log
+      const orgRef = doc(db, "organizations", orgId);
+      const orgSnap = await getDoc(orgRef);
+      const orgData = orgSnap.exists() ? orgSnap.data() : null;
+
+      // Criar log nas Atividades Recentes
+      if (orgData) {
+        await addDoc(collection(db, "logMercado"), {
+          displayName: user.displayName || user.email || "Usuário",
+          photoURL: user.photoURL || "",
+          status: "Solicitou",
+          organizationName: orgData.name || null,
+          organizationLogo: orgData.logoURL || null,
+          createdAt: serverTimestamp(),
+        });
+      }
+
+      addToast({
+        title: "Solicitação enviada",
+        description:
+          "Sua solicitação foi enviada para a organização e aguarda aprovação",
+        color: "success",
       });
+    } catch (error) {
+      console.error("❌ Erro ao solicitar entrada:", error);
+
+      setUserMemberships((prev) => {
+        const newState = { ...prev };
+
+        delete newState[orgId];
+
+        return newState;
+      });
+      setPendingRequests((prev) => {
+        const newState = { ...prev };
+
+        delete newState[orgId];
+
+        return newState;
+      });
+
+      addToast({
+        title: "Erro",
+        description: "Falha ao enviar solicitação. Tente novamente.",
+        color: "danger",
+      });
+    } finally {
+      setRequesting(null);
     }
-
-    addToast({
-      title: "Solicitação enviada",
-      description:
-        "Sua solicitação foi enviada para a organização e aguarda aprovação",
-      color: "success",
-    });
-  } catch (error) {
-    console.error("❌ Erro ao solicitar entrada:", error);
-
-    setUserMemberships((prev) => {
-      const newState = { ...prev };
-      delete newState[orgId];
-      return newState;
-    });
-    setPendingRequests((prev) => {
-      const newState = { ...prev };
-      delete newState[orgId];
-      return newState;
-    });
-
-    addToast({
-      title: "Erro",
-      description: "Falha ao enviar solicitação. Tente novamente.",
-      color: "danger",
-    });
-  } finally {
-    setRequesting(null);
-  }
-};
+  };
 
   const openMembersModal = async (orgId: string, orgName: string) => {
     try {
@@ -337,11 +349,10 @@ const ExplorarOrganizacoes: React.FC<ExplorarOrganizacoesProps> = ({
     }
   };
 
-// Verifica se o usuário tem solicitação pendente em QUALQUER organização
-const userHasAnyPendingRequest = Object.values(userMemberships).some(
-  (m) => m.status === "pending"
-);
-
+  // Verifica se o usuário tem solicitação pendente em QUALQUER organização
+  const userHasAnyPendingRequest = Object.values(userMemberships).some(
+    (m) => m.status === "pending",
+  );
 
   if (!user) {
     return (
@@ -350,7 +361,6 @@ const userHasAnyPendingRequest = Object.values(userMemberships).some(
       </div>
     );
   }
-
 
   if (loading) {
     return (
@@ -470,7 +480,10 @@ const userHasAnyPendingRequest = Object.values(userMemberships).some(
                           <div className="flex items-center gap-1 text-gray-500">
                             <HiOutlineUsers className="w-4 h-4" />
                             <span>
-                              {org.memberCount || 1} {(org.memberCount || 1) === 1 ? 'membro' : 'membros'}
+                              {org.memberCount || 1}{" "}
+                              {(org.memberCount || 1) === 1
+                                ? "membro"
+                                : "membros"}
                             </span>
                           </div>
                         </div>
@@ -483,102 +496,113 @@ const userHasAnyPendingRequest = Object.values(userMemberships).some(
                         </div>
 
                         <div className="pt-2">
-                         {isOwner ? (
-  // Dono da organização
-  <div className="w-full flex flex-col gap-2">
-    <Chip
-      className="w-full shiny-badge"
-      color="warning"
-      size="sm"
-      variant="flat"
-    >
-      👑 Sua Organização
-    </Chip>
+                          {isOwner ? (
+                            // Dono da organização
+                            <div className="w-full flex flex-col gap-2">
+                              <Chip
+                                className="w-full shiny-badge"
+                                color="warning"
+                                size="sm"
+                                variant="flat"
+                              >
+                                👑 Sua Organização
+                              </Chip>
 
-    <Button
-      className="w-full"
-      color="secondary"
-      size="sm"
-      variant="flat"
-      onClick={() => openMembersModal(org.id, org.name)}
-    >
-      Ver Membros
-    </Button>
-  </div>
-) : isMember ? (
-  // Membro aceito
-  <div className="w-full flex flex-col gap-2">
-    <Chip
-      className="w-full shiny-badge"
-      color="success"
-      size="sm"
-      variant="flat"
-      startContent={<HiOutlineCheck />}
-    >
-      Você é membro
-    </Chip>
+                              <Button
+                                className="w-full"
+                                color="secondary"
+                                size="sm"
+                                variant="flat"
+                                onClick={() =>
+                                  openMembersModal(org.id, org.name)
+                                }
+                              >
+                                Ver Membros
+                              </Button>
+                            </div>
+                          ) : isMember ? (
+                            // Membro aceito
+                            <div className="w-full flex flex-col gap-2">
+                              <Chip
+                                className="w-full shiny-badge"
+                                color="success"
+                                size="sm"
+                                startContent={<HiOutlineCheck />}
+                                variant="flat"
+                              >
+                                Você é membro
+                              </Chip>
 
-    <Button
-      className="w-full"
-      color="secondary"
-      size="sm"
-      variant="flat"
-      onClick={() => openMembersModal(org.id, org.name)}
-    >
-      Ver Membros
-    </Button>
-  </div>
-) : hasPendingRequest ? (
-  // Tem solicitação pendente nesta organização
-  <Chip
-    className="w-full"
-    color="default"
-    size="sm"
-    variant="flat"
-    startContent={<HiOutlineClock />}
-  >
-    Solicitação pendente
-  </Chip>
-) : !isMemberOfAnyOrg && !userHasAnyPendingRequest ? (
-  // Não é membro de nenhuma organização e não tem solicitação em nenhuma
-  <div className="w-full flex flex-col gap-2">
-    <Button
-      className="w-full"
-      color="primary"
-      isLoading={requesting === org.id}
-      size="sm"
-      startContent={<HiOutlineUserAdd className="w-3 h-3" />}
-      variant="flat"
-      onClick={() => handleRequestToJoin(org.id)}
-    >
-      {requesting === org.id ? "Enviando..." : "Solicitar Entrada"}
-    </Button>
+                              <Button
+                                className="w-full"
+                                color="secondary"
+                                size="sm"
+                                variant="flat"
+                                onClick={() =>
+                                  openMembersModal(org.id, org.name)
+                                }
+                              >
+                                Ver Membros
+                              </Button>
+                            </div>
+                          ) : hasPendingRequest ? (
+                            // Tem solicitação pendente nesta organização
+                            <Chip
+                              className="w-full"
+                              color="default"
+                              size="sm"
+                              startContent={<HiOutlineClock />}
+                              variant="flat"
+                            >
+                              Solicitação pendente
+                            </Chip>
+                          ) : !isMemberOfAnyOrg && !userHasAnyPendingRequest ? (
+                            // Não é membro de nenhuma organização e não tem solicitação em nenhuma
+                            <div className="w-full flex flex-col gap-2">
+                              <Button
+                                className="w-full"
+                                color="primary"
+                                isLoading={requesting === org.id}
+                                size="sm"
+                                startContent={
+                                  <HiOutlineUserAdd className="w-3 h-3" />
+                                }
+                                variant="flat"
+                                onClick={() => handleRequestToJoin(org.id)}
+                              >
+                                {requesting === org.id
+                                  ? "Enviando..."
+                                  : "Solicitar Entrada"}
+                              </Button>
 
-    <Button
-      className="w-full"
-      color="secondary"
-      size="sm"
-      variant="flat"
-      onClick={() => openMembersModal(org.id, org.name)}
-    >
-      Ver Membros
-    </Button>
-  </div>
-) : (
-  // Já tem solicitação pendente em outra organização
-  <div className="w-full flex flex-col gap-2">
-
-    <Button
-      className="w-full"
-      color="secondary"
-      size="sm"
-      variant="flat"
-      onClick={() => openMembersModal(org.id, org.name)}
-    >
-      Ver Membros
-    </Button>
-  </div>
-)}
+                              <Button
+                                className="w-full"
+                                color="secondary"
+                                size="sm"
+                                variant="flat"
+                                onClick={() =>
+                                  openMembersModal(org.id, org.name)
+                                }
+                              >
+                                Ver Membros
+                              </Button>
+                            </div>
+                          ) : (
+                            // Já tem solicitação pendente em outra organização
+                            <div className="w-full flex flex-col gap-2">
+                              <Button
+                                className="w-full"
+                                color="secondary"
+                                size="sm"
+                                variant="flat"
+                                onClick={() =>
+                                  openMembersModal(org.id, org.name)
+                                }
+                              >
+                                Ver Membros
+                              </Button>
+                            </div>
+                          )}
                         </div>
                       </div>
                     </CardBody>
@@ -695,7 +719,8 @@ const userHasAnyPendingRequest = Object.values(userMemberships).some(
               ).length === 0 &&
                 modalMemberFilter && (
                   <p className="text-default-500 text-center py-4">
-                    Nenhum membro encontrado com o nome "{modalMemberFilter}"
+                    Nenhum membro encontrado com o nome &quot;
+                    {modalMemberFilter}&quot;
                   </p>
                 )}
             </ModalBody>

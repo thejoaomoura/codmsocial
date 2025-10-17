@@ -314,7 +314,8 @@ export default function CriarOrganizacao() {
                 <div>
                   <div className="font-medium">Privada</div>
                   <div className="text-xs text-gray-500">
-                    Apenas membros com status "aceito" podem ver a organização.
+                    Apenas membros com status &quot;aceito&quot; podem ver a
+                    organização.
                   </div>
                 </div>
               </div>
@@ -339,8 +340,8 @@ export default function CriarOrganizacao() {
           <div className="text-xs text-gray-500 mt-4">
             <p>
               <strong>Nota:</strong> Após criar a organização, você poderá
-              gerenciá-la através do painel "Minhas Organizações" ou "Painel da
-              Organização".
+              gerenciá-la através do painel &quot;Minhas Organizações&quot; ou
+              &quot;Painel da Organização&quot;.
             </p>
           </div>
         </CardBody>

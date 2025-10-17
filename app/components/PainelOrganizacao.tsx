@@ -401,7 +401,8 @@ const PainelOrganizacao: React.FC<PainelOrganizacaoProps> = ({
                 <div className="flex items-center gap-1">
                   <HiOutlineUsers className="w-4 h-4" />
                   <span>
-                    {userOrg.memberCount || 1} {(userOrg.memberCount || 1) === 1 ? 'membro' : 'membros'}
+                    {userOrg.memberCount || 1}{" "}
+                    {(userOrg.memberCount || 1) === 1 ? "membro" : "membros"}
                   </span>
                 </div>
                 <div className="flex items-center gap-1">
@@ -513,7 +514,9 @@ const PainelOrganizacao: React.FC<PainelOrganizacaoProps> = ({
                         variant="flat"
                         onClick={() => setActiveTab("members")}
                       >
-                        Ver {members.length === 1 ? 'o' : 'todos os'} {members.length} {members.length === 1 ? 'membro' : 'membros'}
+                        Ver {members.length === 1 ? "o" : "todos os"}{" "}
+                        {members.length}{" "}
+                        {members.length === 1 ? "membro" : "membros"}
                       </Button>
                     )}
                   </div>
@@ -544,96 +547,114 @@ const PainelOrganizacao: React.FC<PainelOrganizacaoProps> = ({
                   currentUserId={user.uid}
                   currentUserRole={userMembership.role}
                   members={members}
-                 onRemoveMember={async (userId: string, reason?: string) => {
-  if (!user || !userOrg || !userMembership) return;
+                  onRemoveMember={async (userId: string, reason?: string) => {
+                    if (!user || !userOrg || !userMembership) return;
 
-  console.log("🔧 Iniciando remoção de membro:", { userId, reason });
+                    console.log("🔧 Iniciando remoção de membro:", {
+                      userId,
+                      reason,
+                    });
 
-  const targetMember = members?.find((m) => m.userId === userId);
+                    const targetMember = members?.find(
+                      (m) => m.userId === userId,
+                    );
 
-  if (!targetMember) {
-    console.error("❌ Membro não encontrado");
-    addToast({
-      title: "Erro",
-      description: "Membro não encontrado",
-      color: "danger",
-    });
-    return;
-  }
+                    if (!targetMember) {
+                      console.error("❌ Membro não encontrado");
+                      addToast({
+                        title: "Erro",
+                        description: "Membro não encontrado",
+                        color: "danger",
+                      });
 
-  const validation = validateMemberRemoval(
-    userMembership.role,
-    targetMember.role,
-  );
+                      return;
+                    }
 
-  if (!validation.valid) {
-    console.error("❌ Validação falhou:", validation.reason);
-    addToast({
-      title: "Erro de Permissão",
-      description: validation.reason || "Erro de validação",
-      color: "danger",
-    });
-    return;
-  }
+                    const validation = validateMemberRemoval(
+                      userMembership.role,
+                      targetMember.role,
+                    );
 
-  try {
-    const batch = writeBatch(db);
+                    if (!validation.valid) {
+                      console.error("❌ Validação falhou:", validation.reason);
+                      addToast({
+                        title: "Erro de Permissão",
+                        description: validation.reason || "Erro de validação",
+                        color: "danger",
+                      });
 
-    // 🔹 Remove da subcoleção da organização
-    const orgMembershipRef = doc(
-      db,
-      `organizations/${userOrg.id}/memberships`,
-      userId,
-    );
-    batch.delete(orgMembershipRef);
+                      return;
+                    }
 
-    // 🔹 Remove da coleção global "memberships"
-    const globalMembershipsQuery = query(
-      collection(db, "memberships"),
-      where("userId", "==", userId),
-      where("organizationId", "==", userOrg.id),
-    );
-    const globalMembershipsSnapshot = await getDocs(globalMembershipsQuery);
-    globalMembershipsSnapshot.forEach((docSnap) => batch.delete(docSnap.ref));
+                    try {
+                      const batch = writeBatch(db);
 
-    // 🔹 Atualiza contador da organização
-    const orgRef = doc(db, "organizations", userOrg.id);
-    batch.update(orgRef, {
-      memberCount: (userOrg.memberCount || 0) - 1,
-      updatedAt: serverTimestamp(),
-    });
+                      // 🔹 Remove da subcoleção da organização
+                      const orgMembershipRef = doc(
+                        db,
+                        `organizations/${userOrg.id}/memberships`,
+                        userId,
+                      );
 
-    // 🔹 Remove o campo organizationTag do documento do usuário
-    const userRef = doc(db, "Users", userId);
-    batch.set(
-      userRef,
-      {
-        organizationTag: deleteField(),
-        updatedAt: serverTimestamp(),
-      },
-      { merge: true } // garante que não apague outros campos
-    );
+                      batch.delete(orgMembershipRef);
 
-    // 🔹 Executa o batch
-    await batch.commit();
+                      // 🔹 Remove da coleção global "memberships"
+                      const globalMembershipsQuery = query(
+                        collection(db, "memberships"),
+                        where("userId", "==", userId),
+                        where("organizationId", "==", userOrg.id),
+                      );
+                      const globalMembershipsSnapshot = await getDocs(
+                        globalMembershipsQuery,
+                      );
 
-    console.log("✅ Membro removido e organizationTag apagado");
+                      globalMembershipsSnapshot.forEach((docSnap) =>
+                        batch.delete(docSnap.ref),
+                      );
 
-    addToast({
-      title: "Membro Removido",
-      description: "Membro foi removido da organização com sucesso",
-      color: "success",
-    });
-  } catch (error) {
-    console.error("❌ Erro ao remover membro:", error);
-    addToast({
-      title: "Erro",
-      description:
-        "Erro ao remover membro da organização. Tente novamente.",
-      color: "danger",
-    });
-  }
-}}
+                      // 🔹 Atualiza contador da organização
+                      const orgRef = doc(db, "organizations", userOrg.id);
+
+                      batch.update(orgRef, {
+                        memberCount: (userOrg.memberCount || 0) - 1,
+                        updatedAt: serverTimestamp(),
+                      });
+
+                      // 🔹 Remove o campo organizationTag do documento do usuário
+                      const userRef = doc(db, "Users", userId);
+
+                      batch.set(
+                        userRef,
+                        {
+                          organizationTag: deleteField(),
+                          updatedAt: serverTimestamp(),
+                        },
+                        { merge: true }, // garante que não apague outros campos
+                      );
+
+                      // 🔹 Executa o batch
+                      await batch.commit();
+
+                      console.log(
+                        "✅ Membro removido e organizationTag apagado",
+                      );
+
+                      addToast({
+                        title: "Membro Removido",
+                        description:
+                          "Membro foi removido da organização com sucesso",
+                        color: "success",
+                      });
+                    } catch (error) {
+                      console.error("❌ Erro ao remover membro:", error);
+                      addToast({
+                        title: "Erro",
+                        description:
+                          "Erro ao remover membro da organização. Tente novamente.",
+                        color: "danger",
+                      });
+                    }
+                  }}
                   onRoleChange={async (
                     userId: string,
                     newRole: any,
@@ -852,9 +873,9 @@ const PainelOrganizacao: React.FC<PainelOrganizacaoProps> = ({
 
                     {/* Logo da Organização */}
                     <div className="space-y-2">
-                      <label className="text-sm font-medium">
+                      <span className="text-sm font-medium">
                         Logo da Organização
-                      </label>
+                      </span>
                       <div className="flex gap-3 mt-3">
                         <Button
                           isDisabled={settingsLoading}

@@ -214,7 +214,8 @@ const InviteModal: React.FC<InviteModalProps> = ({
             organizationLogo: organizationLogo || "",
             inviterName: currentUserName || "Um membro",
             message: message.trim(),
-            inviteUrl: typeof window !== "undefined" ? window.location.origin : "",
+            inviteUrl:
+              typeof window !== "undefined" ? window.location.origin : "",
           }),
         });
 
@@ -427,7 +428,7 @@ const PendingInvites: React.FC<PendingInvitesProps> = ({
 
                 {invite.message && (
                   <p className="text-sm text-gray-600 mb-2">
-                    "{invite.message}"
+                    &quot;{invite.message}&quot;
                   </p>
                 )}
 
@@ -518,184 +519,194 @@ const PendingRequests: React.FC<PendingRequestsProps> = ({
     }
   };
 
-const handleAcceptRequest = async (
-  request: Membership & { userData: User },
-) => {
-  if (!canInviteMembers(currentUserRole)) {
-    addToast({
-      title: "Sem Permissão",
-      description: "Você não tem permissão para aceitar solicitações",
-      color: "danger",
-    });
-    return;
-  }
+  const handleAcceptRequest = async (
+    request: Membership & { userData: User },
+  ) => {
+    if (!canInviteMembers(currentUserRole)) {
+      addToast({
+        title: "Sem Permissão",
+        description: "Você não tem permissão para aceitar solicitações",
+        color: "danger",
+      });
 
-  setProcessing(request.userId);
+      return;
+    }
 
-  try {
-    const batch = writeBatch(db);
+    setProcessing(request.userId);
 
-    // Atualizar membership na subcoleção da organização
-    const orgMembershipRef = doc(
-      db,
-      `organizations/${organizationId}/memberships`,
-      request.userId,
-    );
+    try {
+      const batch = writeBatch(db);
 
-    batch.update(orgMembershipRef, {
-      status: "accepted" as MembershipStatus,
-      joinedAt: serverTimestamp(),
-      updatedAt: serverTimestamp(),
-    });
+      // Atualizar membership na subcoleção da organização
+      const orgMembershipRef = doc(
+        db,
+        `organizations/${organizationId}/memberships`,
+        request.userId,
+      );
 
-    // Atualizar na coleção global de memberships
-    const globalMembershipsQuery = query(
-      collection(db, "memberships"),
-      where("organizationId", "==", organizationId),
-      where("userId", "==", request.userId),
-      where("status", "==", "pending"),
-    );
-
-    const globalSnapshot = await getDocs(globalMembershipsQuery);
-    globalSnapshot.docs.forEach((docSnap) => {
-      batch.update(docSnap.ref, {
+      batch.update(orgMembershipRef, {
         status: "accepted" as MembershipStatus,
         joinedAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
       });
-    });
 
-    // Incrementar memberCount da organização
-    const orgRef = doc(db, "organizations", organizationId);
-    batch.update(orgRef, {
-      memberCount: increment(1),
-      updatedAt: serverTimestamp(),
-    });
+      // Atualizar na coleção global de memberships
+      const globalMembershipsQuery = query(
+        collection(db, "memberships"),
+        where("organizationId", "==", organizationId),
+        where("userId", "==", request.userId),
+        where("status", "==", "pending"),
+      );
 
-    // Buscar dados da organização
-    const orgSnap = await getDoc(orgRef);
-    const orgData = orgSnap.exists() ? orgSnap.data() : null;
-    const organizationTag = orgData?.tag || orgData?.slug || null;
+      const globalSnapshot = await getDocs(globalMembershipsQuery);
 
-    // Atualizar documento do usuário
-    if (organizationTag) {
-      const userRef = doc(db, "Users", request.userId);
-      batch.update(userRef, {
-        organizationTag: organizationTag,
+      globalSnapshot.docs.forEach((docSnap) => {
+        batch.update(docSnap.ref, {
+          status: "accepted" as MembershipStatus,
+          joinedAt: serverTimestamp(),
+          updatedAt: serverTimestamp(),
+        });
+      });
+
+      // Incrementar memberCount da organização
+      const orgRef = doc(db, "organizations", organizationId);
+
+      batch.update(orgRef, {
+        memberCount: increment(1),
         updatedAt: serverTimestamp(),
       });
-    }
 
-    // Criar log nas Atividades Recentes
-    if (orgData) {
-      const logRef = doc(collection(db, "logMercado"));
-      batch.set(logRef, {
-        displayName: request.userData.displayName || request.userData.name,
-        photoURL: request.userData.photoURL || request.userData.avatar || null,
-        status: "Aceitou",
-        organizationName: orgData.name || null,
-        organizationLogo: orgData.logoURL || null,
-        createdAt: serverTimestamp(),
+      // Buscar dados da organização
+      const orgSnap = await getDoc(orgRef);
+      const orgData = orgSnap.exists() ? orgSnap.data() : null;
+      const organizationTag = orgData?.tag || orgData?.slug || null;
+
+      // Atualizar documento do usuário
+      if (organizationTag) {
+        const userRef = doc(db, "Users", request.userId);
+
+        batch.update(userRef, {
+          organizationTag: organizationTag,
+          updatedAt: serverTimestamp(),
+        });
+      }
+
+      // Criar log nas Atividades Recentes
+      if (orgData) {
+        const logRef = doc(collection(db, "logMercado"));
+
+        batch.set(logRef, {
+          displayName: request.userData.displayName || request.userData.name,
+          photoURL:
+            request.userData.photoURL || request.userData.avatar || null,
+          status: "Aceitou",
+          organizationName: orgData.name || null,
+          organizationLogo: orgData.logoURL || null,
+          createdAt: serverTimestamp(),
+        });
+      }
+
+      await batch.commit();
+
+      addToast({
+        title: "Solicitação aceita",
+        description: `${request.userData.displayName || request.userData.name} foi aceito na organização`,
+        color: "success",
       });
-    }
 
-    await batch.commit();
-
-    addToast({
-      title: "Solicitação aceita",
-      description: `${request.userData.displayName || request.userData.name} foi aceito na organização`,
-      color: "success",
-    });
-
-    loadRequests();
-    onRequestProcessed();
-  } catch (error) {
-    console.error("Erro ao aceitar solicitação:", error);
-    addToast({
-      title: "Erro",
-      description: "Erro ao aceitar solicitação",
-      color: "danger",
-    });
-  } finally {
-    setProcessing(null);
-  }
-};
-
-const handleRejectRequest = async (
-  request: Membership & { userData: User },
-) => {
-  if (!canInviteMembers(currentUserRole)) {
-    addToast({
-      title: "Sem Permissão",
-      description: "Você não tem permissão para recusar solicitações",
-      color: "danger",
-    });
-    return;
-  }
-
-  setProcessing(request.userId);
-
-  try {
-    const batch = writeBatch(db);
-
-    // Remover membership da subcoleção da organização
-    const orgMembershipRef = doc(
-      db,
-      `organizations/${organizationId}/memberships`,
-      request.userId,
-    );
-    batch.delete(orgMembershipRef);
-
-    // Remover da coleção global de memberships
-    const globalMembershipsQuery = query(
-      collection(db, "memberships"),
-      where("organizationId", "==", organizationId),
-      where("userId", "==", request.userId),
-      where("status", "==", "pending"),
-    );
-    const globalSnapshot = await getDocs(globalMembershipsQuery);
-    globalSnapshot.docs.forEach((docSnap) => batch.delete(docSnap.ref));
-
-    // Buscar dados da organização para log
-    const orgRef = doc(db, "organizations", organizationId);
-    const orgSnap = await getDoc(orgRef);
-    const orgData = orgSnap.exists() ? orgSnap.data() : null;
-
-    // Criar log nas Atividades Recentes
-    if (orgData) {
-      const logRef = doc(collection(db, "logMercado"));
-      batch.set(logRef, {
-        displayName: request.userData.displayName || request.userData.name,
-        photoURL: request.userData.photoURL || request.userData.avatar || null,
-        status: "Recusou",
-        organizationName: orgData.name || null,
-        organizationLogo: orgData.logoURL || null,
-        createdAt: serverTimestamp(),
+      loadRequests();
+      onRequestProcessed();
+    } catch (error) {
+      console.error("Erro ao aceitar solicitação:", error);
+      addToast({
+        title: "Erro",
+        description: "Erro ao aceitar solicitação",
+        color: "danger",
       });
+    } finally {
+      setProcessing(null);
+    }
+  };
+
+  const handleRejectRequest = async (
+    request: Membership & { userData: User },
+  ) => {
+    if (!canInviteMembers(currentUserRole)) {
+      addToast({
+        title: "Sem Permissão",
+        description: "Você não tem permissão para recusar solicitações",
+        color: "danger",
+      });
+
+      return;
     }
 
-    await batch.commit();
+    setProcessing(request.userId);
 
-    addToast({
-      title: "Solicitação recusada",
-      description: `A solicitação de ${request.userData.displayName || request.userData.name} foi recusada`,
-      color: "success",
-    });
+    try {
+      const batch = writeBatch(db);
 
-    loadRequests();
-    onRequestProcessed();
-  } catch (error) {
-    console.error("Erro ao recusar solicitação:", error);
-    addToast({
-      title: "Erro",
-      description: "Erro ao recusar solicitação",
-      color: "danger",
-    });
-  } finally {
-    setProcessing(null);
-  }
-};
+      // Remover membership da subcoleção da organização
+      const orgMembershipRef = doc(
+        db,
+        `organizations/${organizationId}/memberships`,
+        request.userId,
+      );
 
+      batch.delete(orgMembershipRef);
+
+      // Remover da coleção global de memberships
+      const globalMembershipsQuery = query(
+        collection(db, "memberships"),
+        where("organizationId", "==", organizationId),
+        where("userId", "==", request.userId),
+        where("status", "==", "pending"),
+      );
+      const globalSnapshot = await getDocs(globalMembershipsQuery);
+
+      globalSnapshot.docs.forEach((docSnap) => batch.delete(docSnap.ref));
+
+      // Buscar dados da organização para log
+      const orgRef = doc(db, "organizations", organizationId);
+      const orgSnap = await getDoc(orgRef);
+      const orgData = orgSnap.exists() ? orgSnap.data() : null;
+
+      // Criar log nas Atividades Recentes
+      if (orgData) {
+        const logRef = doc(collection(db, "logMercado"));
+
+        batch.set(logRef, {
+          displayName: request.userData.displayName || request.userData.name,
+          photoURL:
+            request.userData.photoURL || request.userData.avatar || null,
+          status: "Recusou",
+          organizationName: orgData.name || null,
+          organizationLogo: orgData.logoURL || null,
+          createdAt: serverTimestamp(),
+        });
+      }
+
+      await batch.commit();
+
+      addToast({
+        title: "Solicitação recusada",
+        description: `A solicitação de ${request.userData.displayName || request.userData.name} foi recusada`,
+        color: "success",
+      });
+
+      loadRequests();
+      onRequestProcessed();
+    } catch (error) {
+      console.error("Erro ao recusar solicitação:", error);
+      addToast({
+        title: "Erro",
+        description: "Erro ao recusar solicitação",
+        color: "danger",
+      });
+    } finally {
+      setProcessing(null);
+    }
+  };
 
   useEffect(() => {
     loadRequests();
@@ -857,9 +868,9 @@ const InviteSystem: React.FC<InviteSystemProps> = ({
 
       {/* Modal de convite */}
       <InviteModal
-        currentUserRole={currentUserRole}
         currentUserId={currentUserId}
         currentUserName={currentUserName}
+        currentUserRole={currentUserRole}
         isOpen={isInviteModalOpen}
         organizationId={organizationId}
         organizationLogo={organizationLogo}

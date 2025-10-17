@@ -200,3 +200,185 @@ export interface OrganizationInvite {
   status: "pending" | "accepted" | "rejected" | "expired";
   expiresAt: any; // Timestamp
 }
+
+// ===== SISTEMA DE RANKING E TEMPORADAS =====
+
+export type SeasonStatus = "active" | "completed" | "archived";
+
+export type EventTier = "major" | "regional" | "local" | "community";
+
+export type InteractionType =
+  | "post_created"
+  | "comment_made"
+  | "reaction_received"
+  | "reaction_given"
+  | "event_participation";
+
+export interface Season {
+  id: string;
+  seasonNumber: number; // Temporada 1, 2, 3, etc.
+  name: string; // ex: "Temporada 1 - Ascensão"
+  startDate: any; // Timestamp
+  endDate: any; // Timestamp
+  status: SeasonStatus;
+  durationDays: number; // 60-90 dias
+  createdAt: any; // Timestamp
+  updatedAt: any; // Timestamp
+  config: SeasonConfig;
+}
+
+export interface SeasonConfig {
+  // Configurações de interação diária
+  dailyInteractionCap: number; // Cap de pontos por dia (ex: 20)
+  interactionWeight: number; // Peso da interação (ex: 0.6 = 60%)
+
+  // Pesos por tipo de interação
+  weights: {
+    postCreated: number; // ex: 2
+    commentMade: number; // ex: 1
+    reactionReceived: number; // ex: 0.5
+    reactionGiven: number; // ex: 0.2
+  };
+
+  // Configurações de eventos
+  eventTierMultipliers: {
+    major: number; // ex: 1.5
+    regional: number; // ex: 1.2
+    local: number; // ex: 1.0
+    community: number; // ex: 0.8
+  };
+
+  // Pontos por colocação em eventos
+  eventPlacementPoints: {
+    first: number; // ex: 100
+    second: number; // ex: 80
+    third: number; // ex: 65
+    fourth: number; // ex: 55
+    fifth: number; // ex: 45
+    sixth: number; // ex: 35
+    seventh: number; // ex: 25
+    eighth: number; // ex: 20
+    participation: number; // ex: 15 (para quem participou mas não ficou no top 8)
+  };
+
+  // Anti-gaming
+  antiSpam: {
+    maxPostsPerDay: number; // ex: 10
+    maxCommentsPerDay: number; // ex: 20
+    maxReactionsPerDay: number; // ex: 50
+    duplicateTextThreshold: number; // similaridade % para considerar spam (ex: 80)
+  };
+}
+
+export interface DailyInteraction {
+  id?: string;
+  userId: string;
+  seasonId: string;
+  date: string; // formato: YYYY-MM-DD
+  interactions: {
+    postsCreated: number;
+    commentsMade: number;
+    reactionsReceived: number;
+    reactionsGiven: number;
+  };
+  rawPoints: number; // pontos antes do cap
+  cappedPoints: number; // pontos depois do cap
+  weightedPoints: number; // pontos finais com peso aplicado
+  createdAt: any; // Timestamp
+  updatedAt: any; // Timestamp
+}
+
+export interface ExternalEventParticipation {
+  id?: string;
+  userId: string;
+  seasonId: string;
+  eventId: string; // ID do evento externo
+  eventName: string;
+  eventTier: EventTier;
+  placement: number; // colocação final (1, 2, 3, etc.)
+  participated: boolean; // true se participou
+  basePoints: number; // pontos base pela colocação
+  tierMultiplier: number; // multiplicador do tier
+  finalPoints: number; // pontos finais (base * multiplier)
+  eventDate: any; // Timestamp
+  createdAt: any; // Timestamp
+}
+
+export interface UserSeasonScore {
+  id?: string;
+  userId: string;
+  seasonId: string;
+  userName: string;
+  userAvatar?: string;
+  organizationTag?: string;
+
+  // Componentes do score
+  interactionScore: number; // soma de todos os weightedPoints das DailyInteractions
+  eventScore: number; // soma de todos os finalPoints das ExternalEventParticipations
+  totalScore: number; // interactionScore + eventScore
+
+  // Estatísticas para desempate e exibição
+  stats: {
+    totalPosts: number;
+    totalComments: number;
+    totalReactionsReceived: number;
+    totalReactionsGiven: number;
+    eventsParticipated: number;
+    bestEventPlacement: number | null; // melhor colocação em eventos (1 = primeiro)
+    totalWins: number; // quantas vezes ficou em 1º lugar
+    activeDays: number; // quantos dias teve interação
+  };
+
+  // Ranking
+  rank: number; // posição no ranking (1, 2, 3, etc.)
+  previousRank?: number; // posição na última atualização
+
+  // Controle
+  lastUpdated: any; // Timestamp
+  createdAt: any; // Timestamp
+}
+
+export interface ScoreHistory {
+  id?: string;
+  userId: string;
+  seasonId: string;
+  date: string; // formato: YYYY-MM-DD
+  totalScore: number;
+  rank: number;
+  createdAt: any; // Timestamp
+}
+
+// Configuração padrão v1 da fórmula
+export const DEFAULT_SEASON_CONFIG: SeasonConfig = {
+  dailyInteractionCap: 20,
+  interactionWeight: 0.6,
+  weights: {
+    postCreated: 2,
+    commentMade: 1,
+    reactionReceived: 0.5,
+    reactionGiven: 0.2,
+  },
+  eventTierMultipliers: {
+    major: 1.5,
+    regional: 1.2,
+    local: 1.0,
+    community: 0.8,
+  },
+  eventPlacementPoints: {
+    first: 100,
+    second: 80,
+    third: 65,
+    fourth: 55,
+    fifth: 45,
+    sixth: 35,
+    seventh: 25,
+    eighth: 20,
+    participation: 15,
+  },
+  antiSpam: {
+    maxPostsPerDay: 10,
+    maxCommentsPerDay: 20,
+    maxReactionsPerDay: 50,
+    duplicateTextThreshold: 80,
+  },
+};

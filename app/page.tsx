@@ -52,17 +52,16 @@ import { addToast } from "@heroui/toast";
 import { Code } from "@heroui/code";
 import { Input } from "@heroui/input";
 import { Tooltip } from "@heroui/tooltip";
-
 import {
   HiOutlineBriefcase,
   HiOutlineGlobe,
   HiOutlineCog,
   HiOutlineShieldCheck,
 } from "react-icons/hi";
+import { Breadcrumbs, BreadcrumbItem } from "@heroui/breadcrumbs";
+import { HiOutlineBuildingStorefront, HiOutlineTrophy } from "react-icons/hi2";
+
 import { db, auth, provider } from "./firebase";
-
-
-
 import CriarOrganizacao from "./CriarOrganizacao";
 import {
   useUserOrganizations,
@@ -71,24 +70,24 @@ import {
 import { useUserMembership } from "./hooks/useMemberships";
 import { useRoleManagement } from "./hooks/useRoleManagement";
 
-
 // Componentes para as novas funcionalidades
 import MinhasOrganizacoes from "./components/MinhasOrganizacoes";
 import ExplorarOrganizacoes from "./components/ExplorarOrganizacoes";
 import PainelOrganizacao from "./components/PainelOrganizacao";
-
-import { Breadcrumbs, BreadcrumbItem } from "@heroui/breadcrumbs";
-
 import { Post, ChatOverview, ChatMessage } from "./types";
 import Login from "./Login";
 import Chat from "./Chat";
 import FeedWithChat from "./FeedWithChat";
-import { HiOutlineBuildingStorefront } from "react-icons/hi2";
 import MercadoOrganizacao from "./components/MercadoOrganizacao";
+import RankingSystem from "./components/RankingSystem";
 
 const navigation = [
   { label: "Feed", icon: <HiOutlineNewspaper className="w-5 h-5" /> },
   { label: "Conversas", icon: <HiOutlineInbox className="w-5 h-5" /> },
+  {
+    label: "Ranking",
+    icon: <HiOutlineTrophy className="w-5 h-5" />,
+  },
   {
     label: "Minhas Organizações",
     icon: <HiOutlineBriefcase className="w-5 h-5" />,
@@ -102,7 +101,7 @@ const navigation = [
     label: "Painel da Organização",
     icon: <HiOutlineShieldCheck className="w-5 h-5" />,
   },
-    {
+  {
     label: "Atividades Recentes",
     icon: <HiOutlineBuildingStorefront className="w-5 h-5" />,
   },
@@ -113,6 +112,7 @@ export default function Home() {
   const [activeTab, setActiveTab] = useState<
     | "Feed"
     | "Conversas"
+    | "Ranking"
     | "Minhas Organizações"
     | "Explorar Organizações"
     | "Criar Organização"
@@ -350,8 +350,6 @@ export default function Home() {
       });
     }
   };
-
- 
 
   const handleLogout = async () => await signOut(auth);
 
@@ -735,7 +733,6 @@ export default function Home() {
     setShowNameModal(true);
   };
 
-
   const handleSubmitName = async () => {
     if (!newName.trim()) {
       return addToast({
@@ -830,6 +827,7 @@ export default function Home() {
                         n.label as
                           | "Feed"
                           | "Conversas"
+                          | "Ranking"
                           | "Minhas Organizações"
                           | "Explorar Organizações"
                           | "Criar Organização"
@@ -877,6 +875,7 @@ export default function Home() {
                         n.label as
                           | "Feed"
                           | "Conversas"
+                          | "Ranking"
                           | "Minhas Organizações"
                           | "Explorar Organizações"
                           | "Criar Organização"
@@ -1049,8 +1048,6 @@ export default function Home() {
               </ModalFooter>
             </ModalContent>
           </Modal>
-
-         
         </NavbarContent>
       </Navbar>
       <div
@@ -1081,12 +1078,12 @@ export default function Home() {
       <div style={{ maxWidth: 800, margin: "0 auto", padding: 24 }}>
         {activeTab === "Feed" && (
           <FeedWithChat
-            chatMessages={chatMessages.map(m => ({
+            chatMessages={chatMessages.map((m) => ({
               ...m,
               senderAvatar: m.senderAvatar ?? "",
             }))}
             chatText={chatText}
-            conversas={conversas.map(c => ({
+            conversas={conversas.map((c) => ({
               ...c,
               lastMessage: c.lastMessage ?? "",
               unread: c.unread ?? false,
@@ -1094,23 +1091,27 @@ export default function Home() {
             currentUserId={user.uid}
             deleteConversa={(id: string) => {
               // Implementar lógica de deletar conversa se necessário
-              console.log('Deletar conversa:', id);
+              console.log("Deletar conversa:", id);
             }}
             handleComment={handleComment}
             handleDeleteComment={handleDeleteComment}
             handlePost={handlePost}
             openChatFromConversa={openChatFromConversa}
-            showChatWith={showChatWith ? {
-              ...showChatWith,
-              otherUserAvatar: showChatWith.otherUserAvatar ?? "",
-              lastMessage: showChatWith.lastMessage ?? "",
-              unread: showChatWith.unread ?? false,
-            } : null}
             posts={posts}
             sendMessage={sendMessage}
             setChatText={setChatText}
             setShowChatWith={setShowChatWith}
             setText={setText}
+            showChatWith={
+              showChatWith
+                ? {
+                    ...showChatWith,
+                    otherUserAvatar: showChatWith.otherUserAvatar ?? "",
+                    lastMessage: showChatWith.lastMessage ?? "",
+                    unread: showChatWith.unread ?? false,
+                  }
+                : null
+            }
             text={text}
             toggleReaction={toggleReaction}
             user={user}
@@ -1119,35 +1120,50 @@ export default function Home() {
 
         {activeTab === "Conversas" && (
           <Chat
-            chatMessages={chatMessages.map(m => ({
+            chatMessages={chatMessages.map((m) => ({
               ...m,
               senderAvatar: m.senderAvatar ?? "",
             }))}
-            showChatWith={showChatWith ? {
-              ...showChatWith,
-              otherUserAvatar: showChatWith.otherUserAvatar ?? "",
-              lastMessage: showChatWith.lastMessage ?? "",
-              unread: showChatWith.unread ?? false,
-            } : null}
             chatText={chatText}
-            conversas={conversas.map(c => ({
+            conversas={conversas.map((c) => ({
               ...c,
               lastMessage: c.lastMessage ?? "",
               unread: c.unread ?? false,
             }))}
             deleteConversa={(id: string) => {
               // Implementar lógica de deletar conversa se necessário
-              console.log('Deletar conversa:', id);
+              console.log("Deletar conversa:", id);
             }}
-            isTyping={showChatWith ? isTyping[`${user?.uid}_${showChatWith.otherUserId}`.split('_').sort().join('_')] || undefined : undefined}
+            isTyping={
+              showChatWith
+                ? isTyping[
+                    `${user?.uid}_${showChatWith.otherUserId}`
+                      .split("_")
+                      .sort()
+                      .join("_")
+                  ] || undefined
+                : undefined
+            }
             openChatFromConversa={openChatFromConversa}
             sendMessage={sendMessage}
             setChatText={setChatText}
             setShowChatWith={setShowChatWith}
+            showChatWith={
+              showChatWith
+                ? {
+                    ...showChatWith,
+                    otherUserAvatar: showChatWith.otherUserAvatar ?? "",
+                    lastMessage: showChatWith.lastMessage ?? "",
+                    unread: showChatWith.unread ?? false,
+                  }
+                : null
+            }
             userId={user?.uid || ""}
             onChatTextChange={handleChatTextChange}
           />
         )}
+
+        {activeTab === "Ranking" && <RankingSystem user={user} />}
 
         {activeTab === "Minhas Organizações" && (
           <MinhasOrganizacoes
@@ -1185,10 +1201,7 @@ export default function Home() {
           />
         )}
 
-         {activeTab === "Atividades Recentes" && (
-          <MercadoOrganizacao
-          />
-        )}
+        {activeTab === "Atividades Recentes" && <MercadoOrganizacao />}
       </div>
     </div>
   );

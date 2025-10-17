@@ -10,35 +10,18 @@ const TypingIndicator: React.FC<TypingIndicatorProps> = ({ isVisible }) => {
   if (!isVisible) return null;
 
   return (
-    <div
-      style={{
-        display: "flex",
-        justifyContent: "flex-start",
-        marginBottom: 8,
-        animation: "fadeIn 0.3s ease-in-out",
-      }}
-    >
-      <div
-        style={{
-          padding: "8px 12px",
-          borderRadius: 12,
-          background: "hsl(var(--heroui-default-100))",
-          border: "1px solid hsl(var(--heroui-default-200))",
-          maxWidth: "70%",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          minWidth: "60px",
-        }}
-      >
+    <div className="typing-indicator-container">
+      <div className="typing-indicator-bubble">
         <div className="typing-dots">
-          <div className="dot" />
-          <div className="dot" />
-          <div className="dot" />
+          <div className="dot dot-1" />
+          <div className="dot dot-2" />
+          <div className="dot dot-3" />
         </div>
       </div>
 
-      <style jsx>{`
+      <style
+        dangerouslySetInnerHTML={{
+          __html: `
         @keyframes fadeIn {
           from {
             opacity: 0;
@@ -48,6 +31,25 @@ const TypingIndicator: React.FC<TypingIndicatorProps> = ({ isVisible }) => {
             opacity: 1;
             transform: translateY(0);
           }
+        }
+
+        .typing-indicator-container {
+          display: flex;
+          justify-content: flex-start;
+          margin-bottom: 8px;
+          animation: fadeIn 0.3s ease-in-out;
+        }
+
+        .typing-indicator-bubble {
+          padding: 8px 12px;
+          border-radius: 12px;
+          background: hsl(var(--heroui-default-100));
+          border: 1px solid hsl(var(--heroui-default-200));
+          max-width: 70%;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          min-width: 60px;
         }
 
         .typing-dots {
@@ -65,15 +67,15 @@ const TypingIndicator: React.FC<TypingIndicatorProps> = ({ isVisible }) => {
           animation: typing 1.4s infinite ease-in-out;
         }
 
-        .dot:nth-child(1) {
+        .dot-1 {
           animation-delay: 0s;
         }
 
-        .dot:nth-child(2) {
+        .dot-2 {
           animation-delay: 0.2s;
         }
 
-        .dot:nth-child(3) {
+        .dot-3 {
           animation-delay: 0.4s;
         }
 
@@ -89,7 +91,9 @@ const TypingIndicator: React.FC<TypingIndicatorProps> = ({ isVisible }) => {
             opacity: 1;
           }
         }
-      `}</style>
+      `,
+        }}
+      />
     </div>
   );
 };

@@ -57,9 +57,11 @@ const MinhasOrganizacoes: React.FC<MinhasOrganizacoesProps> = ({
     if (org.ownerId === user.uid) {
       addToast({
         title: "Ação Não Permitida",
-        description: "Você é o dono da organização e não pode sair. Transfira a propriedade primeiro.",
+        description:
+          "Você é o dono da organização e não pode sair. Transfira a propriedade primeiro.",
         color: "danger",
       });
+
       return;
     }
 
@@ -77,6 +79,7 @@ const MinhasOrganizacoes: React.FC<MinhasOrganizacoesProps> = ({
         `organizations/${org.id}/memberships`,
         user.uid,
       );
+
       batch.delete(orgMembershipRef);
 
       // Remove da coleção global "memberships"
@@ -86,10 +89,12 @@ const MinhasOrganizacoes: React.FC<MinhasOrganizacoesProps> = ({
         where("organizationId", "==", org.id),
       );
       const globalMembershipsSnapshot = await getDocs(globalMembershipsQuery);
+
       globalMembershipsSnapshot.forEach((docSnap) => batch.delete(docSnap.ref));
 
       // Atualiza contador da organização
       const orgRef = doc(db, "organizations", org.id);
+
       batch.update(orgRef, {
         memberCount: (org.memberCount || 0) - 1,
         updatedAt: serverTimestamp(),
@@ -97,13 +102,14 @@ const MinhasOrganizacoes: React.FC<MinhasOrganizacoesProps> = ({
 
       //  Remove o campo organizationTag do documento do usuário
       const userRef = doc(db, "Users", user.uid);
+
       batch.set(
         userRef,
         {
           organizationTag: deleteField(),
           updatedAt: serverTimestamp(),
         },
-        { merge: true }
+        { merge: true },
       );
 
       // Executa o batch
@@ -275,7 +281,8 @@ const MinhasOrganizacoes: React.FC<MinhasOrganizacoesProps> = ({
                       <div className="flex items-center gap-1 text-gray-500">
                         <HiOutlineUsers className="w-4 h-4" />
                         <span>
-                          {org.memberCount || 1} {(org.memberCount || 1) === 1 ? 'membro' : 'membros'}
+                          {org.memberCount || 1}{" "}
+                          {(org.memberCount || 1) === 1 ? "membro" : "membros"}
                         </span>
                       </div>
                       <Chip
