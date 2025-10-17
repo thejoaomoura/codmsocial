@@ -1056,7 +1056,7 @@ const EventsManagement: React.FC<EventsManagementProps> = ({
                             {member.userData.displayName}
                           </p>
                           <p className="text-sm text-default-600">
-                            @{member.userData.tag}
+                            @{member.userData.organizationTag}
                           </p>
                         </div>
                       </div>

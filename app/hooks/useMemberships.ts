@@ -188,7 +188,7 @@ export const useMembersWithUserData = (orgId: string | null) => {
               userData: userData || {
                 uid: membership.userId,
                 name: "Usuário não encontrado",
-                tag: "",
+                organizationTag: "",
                 avatar: "",
                 displayName: "Usuário não encontrado",
                 email: "",
