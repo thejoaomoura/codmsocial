@@ -21,6 +21,7 @@ import {
 } from "@heroui/table";
 import { Input } from "@heroui/input";
 import { HiArrowRight, HiOutlineSearch } from "react-icons/hi";
+import { useRouter } from "next/navigation";
 
 import TypingIndicator from "./components/TypingIndicator";
 import { ChatMessage, ChatOverview } from "./types";
@@ -56,6 +57,7 @@ const Chat: React.FC<ChatProps> = ({
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [filterValue, setFilterValue] = useState("");
+  const router = useRouter();
 
   useEffect(() => {
     setIsOpen(!!showChatWith);
@@ -84,6 +86,8 @@ const Chat: React.FC<ChatProps> = ({
               alt={c.otherUserName}
               aria-label={`Avatar de ${c.otherUserName}`}
               src={c.otherUserAvatar}
+              className="cursor-pointer"
+              onClick={() => router.push(`/perfil/${c.otherUserId}`)}
             />
             <span>{c.otherUserName}</span>
           </div>
@@ -116,7 +120,7 @@ const Chat: React.FC<ChatProps> = ({
       default:
         return null;
     }
-  }, []);
+  }, [router]);
 
   return (
     <>
@@ -172,6 +176,8 @@ const Chat: React.FC<ChatProps> = ({
               alt={showChatWith?.otherUserName}
               aria-label={`Avatar de ${showChatWith?.otherUserName}`}
               src={showChatWith?.otherUserAvatar}
+              className="cursor-pointer"
+              onClick={() => showChatWith && router.push(`/perfil/${showChatWith.otherUserId}`)}
             />
             <span>{showChatWith?.otherUserName}</span>
           </DrawerHeader>

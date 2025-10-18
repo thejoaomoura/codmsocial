@@ -57,12 +57,15 @@ const RankingSystem: React.FC<RankingSystemProps> = ({ user }) => {
     return (
       <Card>
         <CardBody className="text-center py-12">
-          <HiOutlineTrophy className="w-16 h-16 text-gray-400 mx-auto mb-4" />
+          <div className="text-6xl mb-4">⚠️</div>
           <h3 className="text-xl font-semibold mb-2">
-            Nenhuma Temporada Ativa
+            Sistema em Implementação
           </h3>
-          <p className="text-gray-500">
-            Aguarde o início da próxima temporada para ver o ranking.
+          <p className="text-gray-500 mb-4">
+            O sistema de ranking ainda está sendo desenvolvido.
+          </p>
+          <p className="text-gray-400 text-sm">
+            Não há dados de temporada disponíveis no momento.
           </p>
         </CardBody>
       </Card>

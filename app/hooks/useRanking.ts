@@ -44,7 +44,6 @@ export function useSeasonRanking(seasonId: string | null, limit: number = 100) {
     const q = query(
       collection(db, "userSeasonScores"),
       where("seasonId", "==", seasonId),
-      orderBy("totalScore", "desc"),
     );
 
     const unsubscribe = onSnapshot(
@@ -54,6 +53,9 @@ export function useSeasonRanking(seasonId: string | null, limit: number = 100) {
           id: doc.id,
           ...doc.data(),
         })) as UserSeasonScore[];
+
+        // Ordenar no lado do cliente por totalScore (desc)
+        scores.sort((a, b) => (b.totalScore || 0) - (a.totalScore || 0));
 
         // Recalcular ranks para garantir consistência
         const rankedScores = calculateRanks(scores);
@@ -139,11 +141,11 @@ export function useUserDailyInteractions(
       return;
     }
 
+    // Removendo orderBy para evitar erro de índice composto
     const q = query(
       collection(db, "dailyInteractions"),
       where("userId", "==", userId),
       where("seasonId", "==", seasonId),
-      orderBy("date", "desc"),
     );
 
     const unsubscribe = onSnapshot(q, (snapshot) => {
@@ -151,6 +153,9 @@ export function useUserDailyInteractions(
         id: doc.id,
         ...doc.data(),
       })) as DailyInteraction[];
+
+      // Ordenar no lado do cliente por data (desc)
+      data.sort((a, b) => b.date.localeCompare(a.date));
 
       setInteractions(data);
       setLoading(false);
@@ -181,11 +186,11 @@ export function useUserEventParticipations(
       return;
     }
 
+    // Removendo orderBy para evitar erro de índice composto
     const q = query(
       collection(db, "externalEventParticipations"),
       where("userId", "==", userId),
       where("seasonId", "==", seasonId),
-      orderBy("eventDate", "desc"),
     );
 
     const unsubscribe = onSnapshot(q, (snapshot) => {
@@ -193,6 +198,13 @@ export function useUserEventParticipations(
         id: doc.id,
         ...doc.data(),
       })) as ExternalEventParticipation[];
+
+      // Ordenar no lado do cliente por eventDate (desc)
+      data.sort((a, b) => {
+        const dateA = a.eventDate?.toDate?.() || new Date(0);
+        const dateB = b.eventDate?.toDate?.() || new Date(0);
+        return dateB.getTime() - dateA.getTime();
+      });
 
       setParticipations(data);
       setLoading(false);

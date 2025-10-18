@@ -71,13 +71,14 @@ const MercadoOrganizacao = () => {
         </p>
       </div>
 
-      {/* Linha vertical */}
-      <div className="absolute top-0 left-10 w-[2px] h-full bg-gray-300" />
-
+  
       {logs.map((log, index) => (
+        
         <div key={index} className="flex items-start mb-8 relative">
           {/* Marcador da timeline */}
+                     <div className="absolute top-0 left-10 w-[2px] bg-gray-300 h-full" />
           <div className="flex flex-col items-center">
+    
             <div
               className={`w-4 h-4 rounded-full border-2 ml-3 mt-3 ${
                 log.status === "Aceitou"
@@ -93,6 +94,7 @@ const MercadoOrganizacao = () => {
 
           {/* Card do evento */}
           <Card className="w-full shadow-md mr-5 ml-5">
+           
             <CardBody className="-mt-1">
               {log.status === "Aceitou" ||
               log.status === "Recusou" ||

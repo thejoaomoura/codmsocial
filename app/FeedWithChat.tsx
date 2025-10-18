@@ -48,6 +48,7 @@ import { Chip } from "@heroui/chip";
 import { db } from "./firebase";
 import { Post, PostReaction, ChatOverview, ChatMessage } from "./types";
 import Chat from "./Chat";
+import { useRouter } from "next/navigation";
 
 interface FeedProps {
   posts: Post[];
@@ -107,6 +108,9 @@ const FeedWithChat: React.FC<FeedProps> = ({
   handleComment,
   handleDeleteComment,
 }) => {
+
+  const router = useRouter();
+
   // Lista de reações do Feed
   const feedReactions = [
     { name: "Curtir", emoji: "👍" },
@@ -115,6 +119,7 @@ const FeedWithChat: React.FC<FeedProps> = ({
     { name: "Uau", emoji: "😮" },
     { name: "Triste", emoji: "😢" },
     { name: "Grr", emoji: "😡" },
+    { name: "Fogo", emoji: "🔥" }
   ];
 
   const [showChatDrawer, setShowChatDrawer] = useState(false);
@@ -592,13 +597,13 @@ const FeedWithChat: React.FC<FeedProps> = ({
             <Card key={p.id} className="mb-3">
               <CardHeader className="flex items-center gap-3">
                 {p.authorId !== user.uid ? (
-                  <Tooltip content="Enviar mensagem" placement="top">
-                    <Avatar
-                      alt={p.authorName}
-                      className="h-10 w-10 cursor-pointer"
-                      src={p.authorAvatar || "/default-avatar.png"}
-                      onClick={() => openChatFromFeed(p)}
-                    />
+                  <Tooltip content="Visitar perfil" placement="top">
+                 <Avatar
+                    alt={p.authorName}
+                    className="h-10 w-10 cursor-pointer"
+                    src={p.authorAvatar || "/default-avatar.png"}
+                    onClick={() => router.push(`/perfil/${p.authorId}`)}
+                  />
                   </Tooltip>
                 ) : (
                   <Avatar

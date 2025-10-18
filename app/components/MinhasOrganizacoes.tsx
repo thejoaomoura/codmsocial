@@ -164,10 +164,10 @@ const MinhasOrganizacoes: React.FC<MinhasOrganizacoesProps> = ({
         <div className="text-center py-12">
           <div className="mb-6">
             <HiOutlineUsers className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-            <h3 className="text-xl font-semibold mb-2">
+            <h3 className="text-xl font-semibold mb-2 mr-5 ml-5">
               Nenhuma Organização Encontrada
             </h3>
-            <p className="text-gray-500 mb-6">
+            <p className="text-gray-500 mb-6 mr-5 ml-5">
               Você ainda não faz parte de nenhuma organização. Crie uma nova ou
               explore organizações da comunidade para se juntar.
             </p>
@@ -175,7 +175,7 @@ const MinhasOrganizacoes: React.FC<MinhasOrganizacoesProps> = ({
           <div className="flex gap-4 justify-center">
             <Button
               color="primary"
-              startContent={<HiOutlinePlus className="w-4 h-4" />}
+              startContent={<HiOutlinePlus className="w-4 h-4 mr-5 ml-5" />}
               onClick={() => {
                 // Navegar para criar organização
                 const event = new CustomEvent("changeTab", {
@@ -188,7 +188,7 @@ const MinhasOrganizacoes: React.FC<MinhasOrganizacoesProps> = ({
               Criar Organização
             </Button>
             <Button
-              startContent={<HiOutlineEye className="w-4 h-4" />}
+              startContent={<HiOutlineEye className="w-4 h-4 mr-5 ml-5" />}
               variant="bordered"
               onClick={() => {
                 // Navegar para explorar organizações

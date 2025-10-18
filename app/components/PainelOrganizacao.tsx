@@ -128,12 +128,12 @@ const PainelOrganizacao: React.FC<PainelOrganizacaoProps> = ({
           <div className="mb-6">
             <HiOutlineShieldCheck className="w-16 h-16 text-gray-400 mx-auto mb-4" />
             <h3 className="text-xl font-semibold mb-2">Nenhuma Organização</h3>
-            <p className="text-gray-500 mb-6">
+            <p className="text-gray-500 mb-6 mr-5 ml-5">
               Você não faz parte de nenhuma organização ainda. Crie uma nova ou
               junte-se a uma existente.
             </p>
           </div>
-          <div className="flex gap-4 justify-center">
+          <div className="flex gap-4 justify-center mr-5 ml-5">
             <Button
               color="primary"
               startContent={<HiOutlineUsers className="w-4 h-4" />}
@@ -148,7 +148,7 @@ const PainelOrganizacao: React.FC<PainelOrganizacaoProps> = ({
               Criar Organização
             </Button>
             <Button
-              startContent={<HiOutlineUsers className="w-4 h-4" />}
+              startContent={<HiOutlineUsers className="w-4 h-4 mr-5 ml-5" />}
               variant="bordered"
               onClick={() => {
                 const event = new CustomEvent("changeTab", {

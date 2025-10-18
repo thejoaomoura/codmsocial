@@ -80,6 +80,7 @@ import Chat from "./Chat";
 import FeedWithChat from "./FeedWithChat";
 import MercadoOrganizacao from "./components/MercadoOrganizacao";
 import RankingSystem from "./components/RankingSystem";
+import Perfil from "./components/Perfil"; // importa o componente
 
 const navigation = [
   { label: "Feed", icon: <HiOutlineNewspaper className="w-5 h-5" /> },
@@ -118,12 +119,13 @@ export default function Home() {
     | "Criar Organização"
     | "Painel da Organização"
     | "Atividades Recentes"
+    | "Perfil"
   >("Feed");
   const [posts, setPosts] = useState<Post[]>([]);
   const [text, setText] = useState("");
   const [conversas, setConversas] = useState<ChatOverview[]>([]);
   const [activeChatOverview, setActiveChatOverview] =
-    useState<ChatOverview | null>(null);
+  useState<ChatOverview | null>(null);
   const [showChatWith, setShowChatWith] = useState<ChatOverview | null>(null);
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
   const [chatText, setChatText] = useState("");
@@ -940,6 +942,12 @@ export default function Home() {
               <DropdownItem key="edit-name" onClick={handleEditName}>
                 Editar Nome
               </DropdownItem>
+              <DropdownItem
+                key="my-profile"
+                onClick={() => setActiveTab("Perfil")}
+              >
+                Meu Perfil
+              </DropdownItem>
             </DropdownMenu>
           </Dropdown>
 
@@ -1202,6 +1210,7 @@ export default function Home() {
         )}
 
         {activeTab === "Atividades Recentes" && <MercadoOrganizacao />}
+                {activeTab === "Perfil" && <Perfil  />}
       </div>
     </div>
   );
