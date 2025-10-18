@@ -224,6 +224,36 @@ const FeedWithChat: React.FC<FeedProps> = ({
 
     return () => document.removeEventListener("touchstart", handleTouchOutside);
   }, [showReactionPicker]);
+
+  // Adicionar listener para fechar picker em clique fora dele (desktop)
+  useEffect(() => {
+    if (!showReactionPicker || isTouchDevice()) return;
+
+    const handleClickOutside = (e: MouseEvent) => {
+      const target = e.target as Element;
+      const picker = document.querySelector("[data-reaction-picker]");
+      const button = reactionButtonRefs.current[showReactionPicker];
+
+      if (
+        picker &&
+        !picker.contains(target) &&
+        button &&
+        !button.contains(target)
+      ) {
+        // Limpar timeout se existir
+        if (reactionTimeout) {
+          clearTimeout(reactionTimeout);
+          setReactionTimeout(null);
+        }
+        setShowReactionPicker(null);
+        setPickerPosition(null);
+      }
+    };
+
+    document.addEventListener("mousedown", handleClickOutside);
+
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [showReactionPicker, reactionTimeout]);
   useEffect(() => {
     if (!showReactionPicker) return;
 
@@ -983,17 +1013,16 @@ const FeedWithChat: React.FC<FeedProps> = ({
         createPortal(
           <div
             data-reaction-picker
-            className="fixed rounded-full px-3 py-2 shadow-2xl border border-gray-600/50 flex z-[9999] backdrop-blur-sm animate-in fade-in-0 zoom-in-0 slide-in-from-bottom-2 duration-300 max-w-[90vw]"
+            className="fixed rounded-full px-4 py-3 shadow-2xl border border-gray-600/50 flex gap-1 sm:gap-2 z-[9999] backdrop-blur-sm animate-in fade-in-0 zoom-in-0 slide-in-from-bottom-2 duration-300 min-w-[280px] sm:min-w-[320px] md:min-w-[380px] max-w-[95vw]"
             style={{
               top: pickerPosition.top,
               left: pickerPosition.left,
-              width: pickerPosition.width,
               transform: "translateX(-50%)",
               // opcional: respeitar safe area no iOS
-              paddingLeft: "max(12px, env(safe-area-inset-left))",
-              paddingRight: "max(12px, env(safe-area-inset-right))",
+              paddingLeft: "max(16px, env(safe-area-inset-left))",
+              paddingRight: "max(16px, env(safe-area-inset-right))",
             }}
-            // no touch não use hover timeouts
+            // Eventos de mouse para desktop
             onMouseEnter={() => {
               if (!isTouchDevice() && reactionTimeout) {
                 clearTimeout(reactionTimeout);
@@ -1010,29 +1039,32 @@ const FeedWithChat: React.FC<FeedProps> = ({
                 setReactionTimeout(timeout);
               }
             }}
+            // Eventos de touch para dispositivos móveis
+            onTouchStart={(e) => {
+              e.preventDefault();
+              if (isTouchDevice() && reactionTimeout) {
+                clearTimeout(reactionTimeout);
+                setReactionTimeout(null);
+              }
+            }}
+            onTouchEnd={(e) => {
+              // Não fechar imediatamente no touchEnd para permitir seleção
+              e.preventDefault();
+            }}
           >
             {feedReactions.map((reaction, index) => (
               <button
                 key={index}
-                className="text-2xl md:text-3xl hover:scale-150 transition-all duration-200 p-1 md:p-2 rounded-full hover:bg-gray-700/50 transform hover:-translate-y-1 cursor-pointer"
-                style={{
-                  filter: "drop-shadow(0 4px 8px rgba(0,0,0,0.3))",
-                }}
-                title={reaction.name}
-                onClick={(e) => {
-                  e.preventDefault();
-                  e.stopPropagation();
+                className="text-xl sm:text-2xl hover:scale-110 transition-transform duration-200 p-1 sm:p-2 rounded-full hover:bg-gray-100/20 min-w-[32px] sm:min-w-[40px] flex items-center justify-center"
+                onClick={() => {
                   const currentPost = localPosts.find(
                     (post) => post.id === showReactionPicker,
                   );
-
+                  
                   if (currentPost) {
                     handleReactionSelect(currentPost, reaction);
                   }
-                }}
-                onMouseDown={(e) => {
-                  e.preventDefault();
-                  e.stopPropagation();
+                  setShowReactionPicker(null);
                 }}
               >
                 {reaction.emoji}
