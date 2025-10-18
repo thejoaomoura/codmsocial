@@ -21,6 +21,11 @@ import {
   HiOutlinePhotograph,
   HiOutlineEye,
   HiOutlineLockClosed,
+  HiOutlineGlobeAlt,
+  HiOutlineDesktopComputer,
+  HiOutlineUserGroup,
+  HiOutlineLink,
+  HiOutlineSwitchHorizontal,
 } from "react-icons/hi";
 import { User } from "firebase/auth";
 import {
@@ -36,7 +41,7 @@ import {
 } from "firebase/firestore";
 import { addToast } from "@heroui/toast";
 
-import { Organization, Membership } from "../types";
+import { Organization, Membership, GameType } from "../types";
 import { useRoleManagement } from "../hooks/useRoleManagement";
 import {
   useMembersWithUserData,
@@ -79,6 +84,11 @@ const PainelOrganizacao: React.FC<PainelOrganizacaoProps> = ({
     description: userOrg?.description || "",
     logoURL: userOrg?.logoURL || "",
     visibility: userOrg?.visibility || "public",
+    game: userOrg?.game || "CODM",
+    maxMembers: userOrg?.maxMembers || 50,
+    region: userOrg?.region || "BR",
+    slug: userOrg?.slug || "",
+    ownerId: userOrg?.ownerId || "",
   });
   const [settingsLoading, setSettingsLoading] = useState(false);
   const [tagValidation, setTagValidation] = useState({
@@ -244,16 +254,21 @@ const PainelOrganizacao: React.FC<PainelOrganizacaoProps> = ({
       }
 
       // Atualizar organização no Firestore
-      const orgRef = doc(db, "organizations", userOrg.id);
+       const orgRef = doc(db, "organizations", userOrg.id);
 
-      await updateDoc(orgRef, {
-        name: orgSettings.name.trim(),
-        tag: orgSettings.tag.trim(),
-        description: orgSettings.description.trim(),
-        logoURL: orgSettings.logoURL.trim() || null,
-        visibility: orgSettings.visibility,
-        updatedAt: serverTimestamp(),
-      });
+       await updateDoc(orgRef, {
+         name: orgSettings.name.trim(),
+         tag: orgSettings.tag.trim(),
+         description: orgSettings.description.trim(),
+         logoURL: orgSettings.logoURL.trim() || null,
+         visibility: orgSettings.visibility,
+         game: orgSettings.game,
+         maxMembers: orgSettings.maxMembers,
+         region: orgSettings.region,
+         slug: orgSettings.slug.trim(),
+         ownerId: orgSettings.ownerId.trim() || userOrg.ownerId,
+         updatedAt: serverTimestamp(),
+       });
 
       addToast({
         title: "Configurações Salvas",
@@ -320,16 +335,21 @@ const PainelOrganizacao: React.FC<PainelOrganizacaoProps> = ({
   };
 
   // Função para resetar configurações
-  const handleResetSettings = () => {
-    setOrgSettings({
-      name: userOrg?.name || "",
-      tag: userOrg?.tag || "",
-      description: userOrg?.description || "",
-      logoURL: userOrg?.logoURL || "",
-      visibility: userOrg?.visibility || "public",
-    });
-    setTagValidation({ isValid: true, message: "" });
-  };
+   const handleResetSettings = () => {
+     setOrgSettings({
+       name: userOrg?.name || "",
+       tag: userOrg?.tag || "",
+       description: userOrg?.description || "",
+       logoURL: userOrg?.logoURL || "",
+       visibility: userOrg?.visibility || "public",
+       game: userOrg?.game || "CODM",
+       maxMembers: userOrg?.maxMembers || 50,
+       region: userOrg?.region || "BR",
+       slug: userOrg?.slug || "",
+       ownerId: userOrg?.ownerId || "",
+     });
+     setTagValidation({ isValid: true, message: "" });
+   };
 
   return (
     <div className="space-y-6">
@@ -907,7 +927,6 @@ const PainelOrganizacao: React.FC<PainelOrganizacaoProps> = ({
                           const file = e.target.files[0];
 
                           await handleLogoUpload(file);
-                          // Limpar o input para permitir selecionar o mesmo arquivo novamente
                           e.target.value = "";
                         }}
                       />
@@ -968,6 +987,164 @@ const PainelOrganizacao: React.FC<PainelOrganizacaoProps> = ({
                       </SelectItem>
                     </Select>
 
+                    {/* Jogo da Organização */}
+                    <Select
+                      description="Selecione o jogo principal da organização"
+                      label="Jogo Principal"
+                      placeholder="Selecione o jogo"
+                      selectedKeys={[orgSettings.game]}
+                      startContent={
+                        <HiOutlineDesktopComputer className="w-4 h-4 text-blue-500" />
+                      }
+                      onSelectionChange={(keys) => {
+                        const gameValue = Array.from(keys)[0] as GameType;
+                        setOrgSettings((prev) => ({
+                          ...prev,
+                          game: gameValue,
+                        }));
+                      }}
+                    >
+                      <SelectItem
+                        key="CODM"
+                        startContent={
+                          <HiOutlineDesktopComputer className="w-4 h-4 text-blue-500" />
+                        }
+                      >
+                        Call of Duty Mobile
+                      </SelectItem>
+                      <SelectItem
+                        key="PUBGM"
+                        startContent={
+                          <HiOutlineDesktopComputer className="w-4 h-4 text-green-500" />
+                        }
+                      >
+                        PUBG Mobile
+                      </SelectItem>
+                      <SelectItem
+                        key="FF"
+                        startContent={
+                          <HiOutlineDesktopComputer className="w-4 h-4 text-orange-500" />
+                        }
+                      >
+                        Free Fire
+                      </SelectItem>
+                      <SelectItem
+                        key="VALORANT"
+                        startContent={
+                          <HiOutlineDesktopComputer className="w-4 h-4 text-red-500" />
+                        }
+                      >
+                        Valorant
+                      </SelectItem>
+                    </Select>
+
+                    {/* Região da Organização */}
+                    <Select
+                      description="Selecione a região principal da organização"
+                      label="Região"
+                      placeholder="Selecione a região"
+                      selectedKeys={[orgSettings.region]}
+                      startContent={
+                        <span className="text-lg">🌍</span>
+                      }
+                      onSelectionChange={(keys) => {
+                        const selectedKey = Array.from(keys)[0] as string;
+
+                        setOrgSettings((prev) => ({
+                          ...prev,
+                          region: selectedKey,
+                        }));
+                      }}
+                    >
+                      <SelectItem
+                        key="BR"
+                        startContent={<span className="text-lg">🇧🇷</span>}
+                      >
+                        Brasil
+                      </SelectItem>
+                      <SelectItem
+                        key="NA"
+                        startContent={<span className="text-lg">🇺🇸</span>}
+                      >
+                        América do Norte
+                      </SelectItem>
+                      <SelectItem
+                        key="EU"
+                        startContent={<span className="text-lg">🇪🇺</span>}
+                      >
+                        Europa
+                      </SelectItem>
+                      <SelectItem
+                        key="AS"
+                        startContent={<span className="text-lg">🇯🇵</span>}
+                      >
+                        Ásia
+                      </SelectItem>
+                      <SelectItem
+                        key="SA"
+                        startContent={<span className="text-lg">🇦🇷</span>}
+                      >
+                        América do Sul
+                      </SelectItem>
+                    </Select>
+
+                    {/* Máximo de Membros */}
+                    <Input
+                      description="Número máximo de membros permitidos na organização"
+                      label="Máximo de Membros"
+                      placeholder="Digite o número máximo de membros"
+                      startContent={
+                        <HiOutlineUserGroup className="w-4 h-4 text-indigo-500" />
+                      }
+                      type="number"
+                      min="1"
+                      max="1000"
+                      value={orgSettings.maxMembers.toString()}
+                      onChange={(e) => {
+                        const value = parseInt(e.target.value) || 50;
+                        setOrgSettings((prev) => ({
+                          ...prev,
+                          maxMembers: Math.max(1, Math.min(1000, value)),
+                        }));
+                      }}
+                    />
+
+                    {/* Proprietário da Organização */}
+                    <Select
+                      description="Selecione um membro para transferir a liderança da organização"
+                      label="Transferir Liderança"
+                      placeholder={members && members.length > 1 ? "Selecione um membro" : "Nenhum membro disponível (não é possível transferir)"}
+                      selectedKeys={orgSettings.ownerId ? [orgSettings.ownerId] : []}
+                      startContent={
+                        <HiOutlineSwitchHorizontal className="w-4 h-4 text-pink-500" />
+                      }
+                      isDisabled={!members || members.length <= 1 || settingsLoading}
+                      onSelectionChange={(keys) => {
+                        const selectedKey = Array.from(keys)[0] as string;
+                        setOrgSettings((prev) => ({
+                          ...prev,
+                          ownerId: selectedKey || "",
+                        }));
+                      }}
+                    >
+                      {members && members
+                         .filter(member => member.userId !== userOrg?.ownerId && member.status === 'accepted')
+                         .map((member) => (
+                           <SelectItem
+                             key={member.userId}
+                             startContent={
+                               <Avatar
+                                 className="w-6 h-6"
+                                 name={member.userData?.displayName || "Usuário"}
+                                 src={member.userData?.photoURL}
+                               />
+                             }
+                           >
+                             {member.userData?.displayName || "Usuário"} ({getRoleName(member.role)})
+                           </SelectItem>
+                         ))}
+                    </Select>
+
                     {/* Preview do Logo */}
                     {orgSettings.logoURL && (
                       <div className="flex items-start gap-3 p-3 rounded-lg">
@@ -1007,7 +1184,7 @@ const PainelOrganizacao: React.FC<PainelOrganizacaoProps> = ({
                     {/* Botões de Ação */}
                     <div className="flex gap-3 pt-4">
                       <Button
-                        color="primary"
+                        color="success"
                         isLoading={settingsLoading}
                         startContent={
                           !settingsLoading && (
