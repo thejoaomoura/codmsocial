@@ -23,6 +23,7 @@ import {
   HiOutlineFilter,
   HiOutlineClock,
   HiOutlineCheck,
+  HiOutlineUser,
 } from "react-icons/hi";
 import { User } from "firebase/auth";
 import { addToast } from "@heroui/toast";
@@ -37,6 +38,7 @@ import {
   getDocs,
   getDoc,
 } from "firebase/firestore";
+import { useRouter } from "next/navigation";
 
 import { db } from "../firebase";
 import { Organization, Membership } from "../types";
@@ -52,6 +54,7 @@ const ExplorarOrganizacoes: React.FC<ExplorarOrganizacoesProps> = ({
   organizations,
   loading,
 }) => {
+  const router = useRouter();
   const [searchTerm, setSearchTerm] = useState("");
   const [visibilityFilter, setVisibilityFilter] = useState<string>("all");
   const [requesting, setRequesting] = useState<string | null>(null);
@@ -556,8 +559,7 @@ const ExplorarOrganizacoes: React.FC<ExplorarOrganizacoesProps> = ({
                             >
                               Solicitação pendente
                             </Chip>
-                          ) : !isMemberOfAnyOrg && !userHasAnyPendingRequest ? (
-                            // Não é membro de nenhuma organização e não tem solicitação em nenhuma
+                          ) : !isMemberOfAnyOrg && !userHasAnyPendingRequest && org.visibility === "public" ? (
                             <div className="w-full flex flex-col gap-2">
                               <Button
                                 className="w-full"
@@ -588,7 +590,6 @@ const ExplorarOrganizacoes: React.FC<ExplorarOrganizacoesProps> = ({
                               </Button>
                             </div>
                           ) : (
-                            // Já tem solicitação pendente em outra organização
                             <div className="w-full flex flex-col gap-2">
                               <Button
                                 className="w-full"
@@ -707,6 +708,19 @@ const ExplorarOrganizacoes: React.FC<ExplorarOrganizacoesProps> = ({
                           </div>
                         </div>
                       </div>
+                      
+                      {/* Botão Ver Perfil */}
+                      {member.userId !== user?.uid && (
+                        <Button
+                          size="sm"
+                          variant="flat"
+                          color="primary"
+                          startContent={<HiOutlineUser className="w-4 h-4" />}
+                          onClick={() => router.push(`/perfil/${member.userId}`)}
+                        >
+                          Ver Perfil
+                        </Button>
+                      )}
                     </div>
                   ))
               )}

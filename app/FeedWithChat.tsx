@@ -224,36 +224,6 @@ const FeedWithChat: React.FC<FeedProps> = ({
 
     return () => document.removeEventListener("touchstart", handleTouchOutside);
   }, [showReactionPicker]);
-
-  // Adicionar listener para fechar picker em clique fora dele (desktop)
-  useEffect(() => {
-    if (!showReactionPicker || isTouchDevice()) return;
-
-    const handleClickOutside = (e: MouseEvent) => {
-      const target = e.target as Element;
-      const picker = document.querySelector("[data-reaction-picker]");
-      const button = reactionButtonRefs.current[showReactionPicker];
-
-      if (
-        picker &&
-        !picker.contains(target) &&
-        button &&
-        !button.contains(target)
-      ) {
-        // Limpar timeout se existir
-        if (reactionTimeout) {
-          clearTimeout(reactionTimeout);
-          setReactionTimeout(null);
-        }
-        setShowReactionPicker(null);
-        setPickerPosition(null);
-      }
-    };
-
-    document.addEventListener("mousedown", handleClickOutside);
-
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, [showReactionPicker, reactionTimeout]);
   useEffect(() => {
     if (!showReactionPicker) return;
 
@@ -582,6 +552,18 @@ const FeedWithChat: React.FC<FeedProps> = ({
                           <span>Conversar</span>
                         </div>
                       </DropdownItem>
+                      {u.uid !== user.uid ? (
+                        <DropdownItem
+                          key={`${u.uid}-profile`}
+                          className="flex items-center px-3 py-2"
+                          onClick={() => router.push(`/perfil/${u.uid}`)}
+                        >
+                          <div className="flex items-center gap-2">
+                            <HiOutlineUser className="w-4 h-4" />
+                            <span>Visitar Perfil</span>
+                          </div>
+                        </DropdownItem>
+                      ) : null}
                     </DropdownMenu>
                   </Dropdown>
                 ),
@@ -647,14 +629,9 @@ const FeedWithChat: React.FC<FeedProps> = ({
                     <div className="flex flex-col">
                       <span className="font-medium flex items-center gap-1">
                         {p.authorTag && (
-                          <Chip
-                            color="primary"
-                            radius="sm"
-                            size="sm"
-                            variant="flat"
-                          >
-                            {p.authorTag}
-                          </Chip>
+<span className="text-[14px] mr-0 ml-0 text-white drop-shadow-[0_0_3px_rgba(255,255,255,0.8)] animate-pulse">
+  {p.authorTag}
+</span>
                         )}
                         {p.authorName}
                       </span>
@@ -817,20 +794,28 @@ const FeedWithChat: React.FC<FeedProps> = ({
                               className="flex flex-col  pb-2 last:border-none"
                             >
                               <div className="flex items-center gap-2">
-                                <Avatar
-                                  size="sm"
-                                  src={c.authorAvatar || "/default-avatar.png"}
-                                />
+            {c.authorId !== user.uid ? (
+    <Tooltip content="Visitar perfil" placement="top">
+      <Avatar
+        size="sm"
+        src={c.authorAvatar || "/default-avatar.png"}
+        className="cursor-pointer"
+        onClick={() => router.push(`/perfil/${c.authorId}`)}
+      />
+    </Tooltip>
+  ) : (
+    <Avatar
+      size="sm"
+      src={c.authorAvatar || "/default-avatar.png"}
+    />
+  )}
                                 <div className="flex flex-col">
                                   <span className="text-[13px] text-gray-200 -mt-0">
-                                    <Chip
-                                      color="primary"
-                                      radius="sm"
-                                      size="sm"
-                                      variant="flat"
-                                    >
-                                      {c.authorTag}
-                                    </Chip>{" "}
+                                    {c.authorTag && c.authorTag.trim() !== "" && (
+<span className="text-[14px] mr-2 ml-0 text-white drop-shadow-[0_0_3px_rgba(255,255,255,0.8)] animate-pulse">
+   {c.authorTag}
+</span>
+                                    )}
                                     {c.authorName}
                                     <span className="text-[8px] text-gray-500 italic ml-1">
                                       {c.createdAt?.toDate
@@ -952,34 +937,44 @@ const FeedWithChat: React.FC<FeedProps> = ({
             {likesUsers.length === 0 ? (
               <p>Sem reacao ainda.</p>
             ) : (
-              <Listbox
-                aria-label="Lista de usuários que curtiram"
-                classNames={{
-                  base: "w-full max-w-[280px]",
-                  list: "max-h-[300px] overflow-y-auto",
-                }}
-              >
-                {likesUsers.map((u) => (
-                  <ListboxItem key={u.uid} textValue={u.name}>
-                    <div className="flex items-center gap-2">
-                      <span className="font-medium flex items-center gap-1">
-                        {u.organizationTag && (
-                          <Chip
-                            color="primary"
-                            radius="sm"
-                            size="sm"
-                            variant="flat"
-                          >
-                            {u.organizationTag}
-                          </Chip>
-                        )}
-                        {u.name}
-                        <span className="ml-2 text-lg">{u.reactionEmoji}</span>
-                      </span>
-                    </div>
-                  </ListboxItem>
-                ))}
-              </Listbox>
+             <Listbox
+  aria-label="Lista de usuários que curtiram"
+  classNames={{
+    base: "w-full max-w-[280px] -mt-3",
+    list: "max-h-[300px] overflow-y-auto",
+  }}
+>
+  {likesUsers.map((u) => (
+   <ListboxItem key={u.uid} textValue={u.name}>
+  {u.uid !== user.uid ? (
+    <Tooltip content="Visitar perfil" placement="top">
+      <div
+        className="flex items-center gap-2 cursor-pointer hover:bg-gray-700/20 rounded-md p-1 transition-colors"
+        onClick={() => router.push(`/perfil/${u.uid}`)}
+      >
+        <Avatar
+          alt={u.name}
+          className="h-8 w-8 rounded-full"
+          src={u.avatar || "/default-avatar.png"}
+        />
+        <span className="font-medium">{u.name}</span>
+        <span className="ml-2 text-lg">{u.reactionEmoji}</span>
+      </div>
+    </Tooltip>
+  ) : (
+    <div className="flex items-center gap-2">
+      <Avatar
+        alt={u.name}
+        className="h-8 w-8 rounded-full"
+        src={u.avatar || "/default-avatar.png"}
+      />
+      <span className="font-medium">{u.name}</span>
+      <span className="ml-2 text-lg">{u.reactionEmoji}</span>
+    </div>
+  )}
+</ListboxItem>
+  ))}
+</Listbox>
             )}
           </ModalBody>
           <ModalFooter>
@@ -1013,16 +1008,17 @@ const FeedWithChat: React.FC<FeedProps> = ({
         createPortal(
           <div
             data-reaction-picker
-            className="fixed rounded-full px-4 py-3 shadow-2xl border border-gray-600/50 flex gap-1 sm:gap-2 z-[9999] backdrop-blur-sm animate-in fade-in-0 zoom-in-0 slide-in-from-bottom-2 duration-300 min-w-[280px] sm:min-w-[320px] md:min-w-[380px] max-w-[95vw]"
+            className="fixed rounded-full px-3 py-2 shadow-2xl border border-gray-600/50 flex z-[9999] backdrop-blur-sm animate-in fade-in-0 zoom-in-0 slide-in-from-bottom-2 duration-300 max-w-[90vw]"
             style={{
               top: pickerPosition.top,
               left: pickerPosition.left,
+              width: pickerPosition.width,
               transform: "translateX(-50%)",
               // opcional: respeitar safe area no iOS
-              paddingLeft: "max(16px, env(safe-area-inset-left))",
-              paddingRight: "max(16px, env(safe-area-inset-right))",
+              paddingLeft: "max(12px, env(safe-area-inset-left))",
+              paddingRight: "max(12px, env(safe-area-inset-right))",
             }}
-            // Eventos de mouse para desktop
+            // no touch não use hover timeouts
             onMouseEnter={() => {
               if (!isTouchDevice() && reactionTimeout) {
                 clearTimeout(reactionTimeout);
@@ -1039,32 +1035,29 @@ const FeedWithChat: React.FC<FeedProps> = ({
                 setReactionTimeout(timeout);
               }
             }}
-            // Eventos de touch para dispositivos móveis
-            onTouchStart={(e) => {
-              e.preventDefault();
-              if (isTouchDevice() && reactionTimeout) {
-                clearTimeout(reactionTimeout);
-                setReactionTimeout(null);
-              }
-            }}
-            onTouchEnd={(e) => {
-              // Não fechar imediatamente no touchEnd para permitir seleção
-              e.preventDefault();
-            }}
           >
             {feedReactions.map((reaction, index) => (
               <button
                 key={index}
-                className="text-xl sm:text-2xl hover:scale-110 transition-transform duration-200 p-1 sm:p-2 rounded-full hover:bg-gray-100/20 min-w-[32px] sm:min-w-[40px] flex items-center justify-center"
-                onClick={() => {
+                className="text-2xl md:text-3xl hover:scale-150 transition-all duration-200 p-1 md:p-2 rounded-full hover:bg-gray-700/50 transform hover:-translate-y-1 cursor-pointer"
+                style={{
+                  filter: "drop-shadow(0 4px 8px rgba(0,0,0,0.3))",
+                }}
+                title={reaction.name}
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
                   const currentPost = localPosts.find(
                     (post) => post.id === showReactionPicker,
                   );
-                  
+
                   if (currentPost) {
                     handleReactionSelect(currentPost, reaction);
                   }
-                  setShowReactionPicker(null);
+                }}
+                onMouseDown={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
                 }}
               >
                 {reaction.emoji}
