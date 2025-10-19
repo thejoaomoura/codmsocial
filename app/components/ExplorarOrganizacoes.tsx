@@ -739,7 +739,7 @@ const ExplorarOrganizacoes: React.FC<ExplorarOrganizacoesProps> = ({
                 )}
             </ModalBody>
             <ModalFooter>
-              <Button color="primary" onClick={() => setModalOpen(false)}>
+              <Button color="danger" onClick={() => setModalOpen(false)}>
                 Fechar
               </Button>
             </ModalFooter>

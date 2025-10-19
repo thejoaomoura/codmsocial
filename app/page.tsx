@@ -548,8 +548,7 @@ export default function Home() {
         const msgs = snap.docs.map((d) => {
           const data = d.data() as ChatMessage;
 
-          console.log("Mensagem:", data);
-
+          //console.log("Mensagem:", data);
           return { ...data, id: d.id }; // Adicionar ID do documento
         });
 
@@ -923,9 +922,14 @@ export default function Home() {
 
         {/* Navbar direita */}
         <NavbarContent justify="end">
-          <Button color="danger" onPress={handleLogout}>
-            <HiOutlineLogout className="w-5 h-5" />
-          </Button>
+          <button 
+            onClick={handleLogout}
+            className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full transition-colors cursor-pointer"
+            title="Sair"
+            aria-label="Sair"
+          >
+            <HiOutlineLogout className="w-5 h-5 text-red-500" />
+          </button>
 
           {/* Avatar com dropdown */}
           <Dropdown>
@@ -1177,6 +1181,8 @@ export default function Home() {
             }
             userId={user?.uid || ""}
             onChatTextChange={handleChatTextChange}
+            userName={user?.displayName || ""}
+            userAvatar={user?.photoURL || ""}
           />
         )}
 

@@ -64,6 +64,10 @@ export interface ChatMessage {
   senderAvatar?: string;
   text: string;
   createdAt: any; // serverTimestamp
+  audioUrl?: string; // URL do áudio 
+  audioData?: string; // Data string do áudio (base64)
+  audioDuration?: number; // duração em segundos
+  messageType?: 'text' | 'audio'; // tipo da mensagem
 }
 
 // ===== SISTEMA DE CARGOS E ORGANIZAÇÕES =====
