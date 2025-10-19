@@ -81,6 +81,7 @@ import FeedWithChat from "./FeedWithChat";
 import MercadoOrganizacao from "./components/MercadoOrganizacao";
 import RankingSystem from "./components/RankingSystem";
 import Perfil from "./components/Perfil"; // importa o componente
+import SplashScreen from "./components/SplashScreen";
 
 const navigation = [
   { label: "Feed", icon: <HiOutlineNewspaper className="w-5 h-5" /> },
@@ -110,6 +111,7 @@ const navigation = [
 
 export default function Home() {
   const [user, setUser] = useState<User | null>(null);
+  const [isAuthLoading, setIsAuthLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<
     | "Feed"
     | "Conversas"
@@ -232,6 +234,8 @@ export default function Home() {
           setProfilePhoto(u.photoURL || "");
         }
       }
+      // Definir loading como false após verificar o estado de autenticação
+      setIsAuthLoading(false);
     });
 
     return () => unsub();
@@ -796,6 +800,11 @@ export default function Home() {
       });
     }
   };
+
+  // Mostrar splash screen enquanto verifica autenticação
+  if (isAuthLoading) {
+    return <SplashScreen />;
+  }
 
   if (!user) return <Login handleGoogleLogin={handleGoogleLogin} />;
 
