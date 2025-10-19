@@ -265,10 +265,10 @@ const Chat: React.FC<ChatProps> = ({
                 >
                   <div
                     style={{
-                      padding: 8,
+                      padding: m.messageType === 'audio' ? 0 : 8,
                       borderRadius: 8,
                       maxWidth: "70%",
-                      background: isSender ? "#006affff" : "#ffffffff",
+                      background: m.messageType === 'audio' ? "transparent" : (isSender ? "#006affff" : "#ffffffff"),
                       color: isSender ? "white" : "black",
                     }}
                   >
@@ -282,13 +282,16 @@ const Chat: React.FC<ChatProps> = ({
                       <div>{m.text}</div>
                     )}
                     
-                    <div
-                      style={{ fontSize: 10, textAlign: "right", marginTop: 4 }}
-                    >
-                      {m.createdAt?.toDate
-                        ? new Date(m.createdAt.toDate()).toLocaleTimeString()
-                        : ""}
-                    </div>
+                    {/* Timestamp apenas para mensagens de texto */}
+                    {m.messageType !== 'audio' && (
+                      <div
+                        style={{ fontSize: 10, textAlign: "right", marginTop: 4 }}
+                      >
+                        {m.createdAt?.toDate
+                          ? new Date(m.createdAt.toDate()).toLocaleTimeString()
+                          : ""}
+                      </div>
+                    )}
                   </div>
                 </div>
               );
