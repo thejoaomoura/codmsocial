@@ -53,6 +53,7 @@ import { validateRoleChange, validateMemberRemoval } from "../utils/validation";
 import RoleManagement from "./RoleManagement";
 import InviteSystem from "./InviteSystem";
 import EventsManagement from "./EventsManagement";
+import XTreinosPublicos from "./XTreinosPublicos";
 import InfoCardExpandable from "./InfoCardExpandable";
 
 interface PainelOrganizacaoProps {
@@ -829,6 +830,24 @@ const PainelOrganizacao: React.FC<PainelOrganizacaoProps> = ({
             />
           </Tab>
         )}
+
+        {/* Tab de X-Treinos Públicos - Visível para todos os membros */}
+        <Tab
+          key="x-treinos"
+          title={
+            <div className="flex items-center gap-2">
+              <HiOutlineGlobeAlt className="w-4 h-4" />
+              X-Treinos
+            </div>
+          }
+        >
+          <XTreinosPublicos
+            currentUserId={user?.uid}
+            currentUserRole={userMembership.role}
+            members={members || []}
+            organization={userOrg}
+          />
+        </Tab>
 
         {/* Tab de Configurações - Apenas para Owner */}
         {userMembership.role === "owner" && (

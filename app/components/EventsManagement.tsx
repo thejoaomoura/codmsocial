@@ -37,6 +37,7 @@ import {
   onSnapshot,
   query,
   orderBy,
+  where,
   Timestamp,
   doc,
   updateDoc,
@@ -51,6 +52,7 @@ import {
   User,
   OrganizationRole,
   EventType,
+  EventVisibility,
   GameMode,
   EventStatus,
 } from "../types";
@@ -158,6 +160,7 @@ const EventsManagement: React.FC<EventsManagementProps> = ({
     prizePool: "",
     prizeCurrency: "BRL" as "BRL" | "USD",
     rulesURL: "",
+    visibility: "public" as EventVisibility,
   });
 
   // Função para formatar valor da premiação
@@ -195,9 +198,9 @@ const EventsManagement: React.FC<EventsManagementProps> = ({
   const permissions = getRolePermissions(currentUserRole);
 
   React.useEffect(() => {
+    // Query simples para evitar erro de índice
     const eventsQuery = query(
-      collection(db, "events"),
-      orderBy("createdAt", "desc"),
+      collection(db, "events")
     );
 
     const unsubscribe = onSnapshot(
@@ -208,6 +211,14 @@ const EventsManagement: React.FC<EventsManagementProps> = ({
         snapshot.forEach((doc) => {
           eventsData.push({ id: doc.id, ...doc.data() } as Event);
         });
+        
+        // Ordenar no cliente por createdAt (mais recente primeiro)
+        eventsData.sort((a, b) => {
+          const dateA = a.createdAt instanceof Timestamp ? a.createdAt.toDate() : new Date(a.createdAt);
+          const dateB = b.createdAt instanceof Timestamp ? b.createdAt.toDate() : new Date(b.createdAt);
+          return dateB.getTime() - dateA.getTime();
+        });
+        
         setEvents(eventsData);
         setLoading(false);
       },
@@ -236,6 +247,7 @@ const EventsManagement: React.FC<EventsManagementProps> = ({
       prizePool: "",
       prizeCurrency: "BRL" as "BRL" | "USD",
       rulesURL: "",
+      visibility: "public" as EventVisibility,
     });
   };
 
@@ -266,6 +278,7 @@ const EventsManagement: React.FC<EventsManagementProps> = ({
       prizePool: prizeValue,
       prizeCurrency: currency,
       rulesURL: event.rulesURL || "",
+      visibility: event.visibility || "public",
     });
   };
 
@@ -344,6 +357,7 @@ const EventsManagement: React.FC<EventsManagementProps> = ({
         startsAt: jsDate.toISOString(),
         checkinWindow: eventForm.checkinWindow,
         status: "open" as EventStatus,
+        visibility: eventForm.visibility,
         createdBy: currentUserId || "",
         createdAt: serverTimestamp(),
         region: organization.region,
@@ -455,6 +469,7 @@ const EventsManagement: React.FC<EventsManagementProps> = ({
         rosterMax: eventForm.rosterMax,
         startsAt: jsDate.toISOString(),
         checkinWindow: eventForm.checkinWindow,
+        visibility: eventForm.visibility,
         ...(eventForm.maxTeams && { maxTeams: eventForm.maxTeams }),
         ...(eventForm.prizePool.trim() && {
           prizePool: formatPrizeValue(
@@ -491,79 +506,35 @@ const EventsManagement: React.FC<EventsManagementProps> = ({
     }
   };
 
-  // Mock data para demonstração / Remover em produção
-  const mockEvents: Event[] = [
-    {
-      id: "1",
-      type: "scrim",
-      hostOrgId: organization.id,
-      name: "Scrim Semanal - BR",
-      description:
-        "Treino competitivo semanal para melhorar coordenação da equipe",
-      gameMode: "BR",
-      teamSize: 4,
-      rosterMin: 4,
-      rosterMax: 6,
-      startsAt: new Date(Date.now() + 86400000), // Amanhã
-      checkinWindow: 30,
-      status: "open",
-      createdBy: organization.ownerId,
-      createdAt: new Date(),
-      region: "BR",
-      rulesURL: "https://example.com/rules",
-    },
-    {
-      id: "2",
-      type: "tournament",
-      hostOrgId: "other-org",
-      name: "Copa Nacional CODM",
-      description:
-        "Torneio nacional com premiação em dinheiro. Evento aberto para todas as organizações qualificadas.",
-      gameMode: "MP",
-      teamSize: 5,
-      rosterMin: 5,
-      rosterMax: 7,
-      startsAt: new Date(Date.now() + 604800000), // Próxima semana
-      checkinWindow: 60,
-      status: "open",
-      createdBy: "other-user",
-      createdAt: new Date(),
-      maxTeams: 32,
-      prizePool: "R$ 5.000",
-      region: "BR",
-      rulesURL: "https://example.com/tournament-rules",
-    },
-    {
-      id: "3",
-      type: "scrim",
-      hostOrgId: "private-org",
-      name: "Scrim Privado - Elite",
-      description: "Treino exclusivo para organizações convidadas",
-      gameMode: "BR",
-      teamSize: 4,
-      rosterMin: 4,
-      rosterMax: 6,
-      startsAt: new Date(Date.now() + 172800000),
-      status: "closed",
-      createdBy: "private-user",
-      createdAt: new Date(),
-      region: "BR",
-    },
-  ];
+  // Estado para registrations
+  const [registrations, setRegistrations] = useState<EventRegistration[]>([]);
 
-  // Mock data para registrations
-  const mockRegistrations: EventRegistration[] = [
-    {
-      eventId: "2",
-      orgId: organization.id,
-      managerId: organization.ownerId,
-      roster: [currentUserId || "", "user2", "user3", "user4", "user5"],
-      substitutes: ["user6"],
-      createdAt: new Date(),
-      updatedAt: new Date(),
-      state: "approved",
-    },
-  ];
+  // Carregar registrations em tempo real
+  React.useEffect(() => {
+    if (events.length === 0) return;
+
+    const eventIds = events.map(event => event.id);
+    const registrationsQuery = query(
+      collection(db, "eventRegistrations"),
+      where("eventId", "in", eventIds)
+    );
+
+    const unsubscribe = onSnapshot(
+      registrationsQuery,
+      (snapshot) => {
+        const registrationsData: EventRegistration[] = [];
+        snapshot.forEach((doc) => {
+          registrationsData.push({ id: doc.id, ...doc.data() } as EventRegistration);
+        });
+        setRegistrations(registrationsData);
+      },
+      (error) => {
+        console.error("Erro ao carregar registrations:", error);
+      }
+    );
+
+    return () => unsubscribe();
+  }, [events]);
 
   // Função para verificar se o usuário pode ver um evento
   const canViewEvent = (event: Event): boolean => {
@@ -577,8 +548,13 @@ const EventsManagement: React.FC<EventsManagementProps> = ({
       return true;
     }
 
-    // Para eventos de outras organizações, verificar se é público ou se a org está inscrita
-    const isRegistered = mockRegistrations.some(
+    // Para eventos privados de outras organizações, não são visíveis
+    if (event.visibility === "private") {
+      return false;
+    }
+
+    // Para eventos públicos de outras organizações, verificar se está aberto ou se a org está inscrita
+    const isRegistered = registrations.some(
       (reg) => reg.eventId === event.id && reg.orgId === organization.id,
     );
 
@@ -587,7 +563,7 @@ const EventsManagement: React.FC<EventsManagementProps> = ({
 
   // Função para obter o status da inscrição da organização
   const getRegistrationStatus = (eventId: string) => {
-    return mockRegistrations.find(
+    return registrations.find(
       (reg) => reg.eventId === eventId && reg.orgId === organization.id,
     );
   };
@@ -1666,6 +1642,26 @@ const EventsManagement: React.FC<EventsManagementProps> = ({
                   setEventForm({ ...eventForm, rulesURL: e.target.value })
                 }
               />
+
+              <Select
+                classNames={{
+                  trigger: "bg-default-100",
+                  label: "text-default-700",
+                }}
+                label="Visibilidade do Evento"
+                description="Eventos públicos aparecem na aba X-Treinos para todas as organizações. Eventos privados são visíveis apenas no painel da sua organização."
+                selectedKeys={[eventForm.visibility]}
+                variant="bordered"
+                onSelectionChange={(keys) => {
+                  const selected = Array.from(keys)[0] as EventVisibility;
+                  if (selected && (selected === "public" || selected === "private")) {
+                    setEventForm({ ...eventForm, visibility: selected });
+                  }
+                }}
+              >
+                <SelectItem key="public">Público</SelectItem>
+                <SelectItem key="private">Privado</SelectItem>
+              </Select>
             </div>
           </ModalBody>
           <ModalFooter>
