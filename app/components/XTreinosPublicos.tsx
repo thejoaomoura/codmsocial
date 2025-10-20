@@ -63,8 +63,43 @@ export default function XTreinosPublicos(props?: XTreinosPublicosProps) {
   // Mock data para permissões
   const permissions = { canRegisterForEvents: true };
 
+  // Função para formatar valor da premiação
+  const formatPrizeValue = (prizePool: string): string => {
+    if (!prizePool) return "";
+    
+    if (prizePool.includes("R$") || prizePool.includes("$")) {
+      return prizePool;
+    }
+    
+    const cleanValue = prizePool.replace(/[^\d.,]/g, "");
+    
+    if (!cleanValue) return prizePool;
+    
+    // Converte vírgula para ponto para processamento
+    const normalizedValue = cleanValue.replace(",", ".");
+    const numericValue = parseFloat(normalizedValue);
+    
+    if (isNaN(numericValue)) return prizePool;
+    
+    // Detecta a moeda baseada no valor original
+    const currency = prizePool.includes("$") ? "USD" : "BRL";
+    
+    // Formata conforme a moeda
+    if (currency === "BRL") {
+      return new Intl.NumberFormat("pt-BR", {
+        style: "currency",
+        currency: "BRL",
+      }).format(numericValue);
+    } else {
+      return new Intl.NumberFormat("en-US", {
+        style: "currency",
+        currency: "USD",
+      }).format(numericValue);
+    }
+  };
+
   useEffect(() => {
-    // Query simples para buscar apenas eventos públicos 
+    // Query para buscar apenas eventos públicos 
     const eventsQuery = query(
       collection(db, "events"),
       where("visibility", "==", "public")
@@ -367,7 +402,7 @@ export default function XTreinosPublicos(props?: XTreinosPublicosProps) {
                       </Chip>
                       {event.prizePool && (
                         <Chip color="warning" size="sm" variant="flat">
-                          {event.prizePool}
+                          {formatPrizeValue(event.prizePool)}
                         </Chip>
                       )}
                     </div>
@@ -421,7 +456,7 @@ export default function XTreinosPublicos(props?: XTreinosPublicosProps) {
 
                       {canRegister && (
                         <Button
-                          color="primary"
+                          color="default"
                           size="sm"
                           onClick={() => handleRegisterForEvent(event)}
                         >
@@ -516,7 +551,7 @@ export default function XTreinosPublicos(props?: XTreinosPublicosProps) {
                   <div>
                     <h4 className="font-semibold mb-2">Premiação</h4>
                     <Chip color="warning" variant="flat">
-                      {selectedEvent.prizePool}
+                      {formatPrizeValue(selectedEvent.prizePool)}
                     </Chip>
                   </div>
                 )}
@@ -575,7 +610,7 @@ export default function XTreinosPublicos(props?: XTreinosPublicosProps) {
               selectedEvent.status === "open" &&
               !getRegistrationStatus(selectedEvent.id) && (
                 <Button
-                  color="primary"
+                  color="default"
                   onClick={() => {
                     setShowEventDetailsModal(false);
                     handleRegisterForEvent(selectedEvent);
