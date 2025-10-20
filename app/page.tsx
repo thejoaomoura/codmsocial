@@ -60,6 +60,7 @@ import {
 } from "react-icons/hi";
 import { Breadcrumbs, BreadcrumbItem } from "@heroui/breadcrumbs";
 import { HiOutlineBuildingStorefront, HiOutlineTrophy } from "react-icons/hi2";
+import { HiOutlineCalendar } from "react-icons/hi";
 
 import { db, auth, provider } from "./firebase";
 import CriarOrganizacao from "./CriarOrganizacao";
@@ -74,6 +75,7 @@ import { useRoleManagement } from "./hooks/useRoleManagement";
 import MinhasOrganizacoes from "./components/MinhasOrganizacoes";
 import ExplorarOrganizacoes from "./components/ExplorarOrganizacoes";
 import PainelOrganizacao from "./components/PainelOrganizacao";
+import XTreinosPublicos from "./components/XTreinosPublicos";
 import { Post, ChatOverview, ChatMessage } from "./types";
 import Login from "./Login";
 import Chat from "./Chat";
@@ -86,6 +88,10 @@ import SplashScreen from "./components/SplashScreen";
 const navigation = [
   { label: "Feed", icon: <HiOutlineNewspaper className="w-5 h-5" /> },
   { label: "Conversas", icon: <HiOutlineInbox className="w-5 h-5" /> },
+  {
+    label: "Treinos/Campeonatos",
+    icon: <HiOutlineCalendar className="w-5 h-5" />,
+  },
   {
     label: "Ranking",
     icon: <HiOutlineTrophy className="w-5 h-5" />,
@@ -115,6 +121,7 @@ export default function Home() {
   const [activeTab, setActiveTab] = useState<
     | "Feed"
     | "Conversas"
+    | "Treinos/Campeonatos"
     | "Ranking"
     | "Minhas Organizações"
     | "Explorar Organizações"
@@ -837,6 +844,7 @@ export default function Home() {
                         n.label as
                           | "Feed"
                           | "Conversas"
+                          | "Treinos/Campeonatos"
                           | "Ranking"
                           | "Minhas Organizações"
                           | "Explorar Organizações"
@@ -885,6 +893,7 @@ export default function Home() {
                         n.label as
                           | "Feed"
                           | "Conversas"
+                          | "Treinos/Campeonatos"
                           | "Ranking"
                           | "Minhas Organizações"
                           | "Explorar Organizações"
@@ -1185,6 +1194,8 @@ export default function Home() {
             userAvatar={user?.photoURL || ""}
           />
         )}
+
+        {activeTab === "Treinos/Campeonatos" && <XTreinosPublicos />}
 
         {activeTab === "Ranking" && <RankingSystem user={user} />}
 

@@ -283,11 +283,11 @@ export default function XTreinosPublicos(props?: XTreinosPublicosProps) {
 
       {/* Informação sobre permissões para Ranked/Pro */}
       {(currentUserRole === "ranked" || currentUserRole === "pro") && (
-        <Card className="bg-blue-50 border-blue-200">
+        <Card className="bg-gray-900 border-gray-700">
           <CardBody className="py-3">
             <div className="flex items-center gap-2">
-              <HiOutlineEye className="w-5 h-5 text-blue-600" />
-              <p className="text-sm text-blue-800">
+              <HiOutlineEye className="w-5 h-5 text-gray-400" />
+              <p className="text-sm text-gray-300">
                 <strong>Modo Visualização:</strong> Você pode ver informações
                 dos eventos, mas não pode inscrever a organização.
               </p>
@@ -542,10 +542,10 @@ export default function XTreinosPublicos(props?: XTreinosPublicosProps) {
 
                 {/* Informação sobre limitações para Ranked/Pro */}
                 {(currentUserRole === "ranked" || currentUserRole === "pro") && (
-                  <div className="p-4 bg-primary-50 border border-primary-200 rounded-lg">
+                  <div className="p-4 bg-gray-900 border border-gray-700 rounded-lg">
                     <div className="flex items-start gap-2">
-                      <HiOutlineEye className="w-5 h-5 text-primary-600 mt-0.5" />
-                      <div className="text-sm text-primary-800">
+                      <HiOutlineEye className="w-5 h-5 text-gray-400 mt-0.5" />
+                      <div className="text-sm text-gray-300">
                         <p className="font-medium mb-1">Modo Visualização</p>
                         <p>
                           Como{" "}
