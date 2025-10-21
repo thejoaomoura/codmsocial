@@ -632,30 +632,32 @@ const Chat: React.FC<ChatProps> = ({
         onOpenChange={setShowDeleteModal}
         placement="center"
       >
-        <ModalContent>
+        <ModalContent className="max-w-sm">
           {(onClose) => (
             <>
-              <ModalHeader className="flex flex-col gap-1">
-                Confirmar Exclusão
+              <ModalHeader className="flex flex-col gap-1 pb-2">
+                <h3 className="text-lg font-semibold">Confirmar Exclusão</h3>
               </ModalHeader>
-              <ModalBody>
-                <p>
+              <ModalBody className="py-3">
+                <p className="text-sm text-gray-600 dark:text-gray-400">
                   Tem certeza que deseja excluir esta conversa? Esta ação não pode ser desfeita.
                 </p>
               </ModalBody>
-              <ModalFooter>
+              <ModalFooter className="pt-2">
                 <Button
                   color="default"
                   variant="light"
+                  size="sm"
                   onPress={handleCancelDelete}
-                  startContent={<HiX className="w-4 h-4" />}
+                  startContent={<HiX className="w-3 h-3" />}
                 >
                   Cancelar
                 </Button>
                 <Button
                   color="danger"
+                  size="sm"
                   onPress={handleConfirmDelete}
-                  startContent={<HiCheck className="w-4 h-4" />}
+                  startContent={<HiCheck className="w-3 h-3" />}
                 >
                   Confirmar
                 </Button>

@@ -893,7 +893,7 @@ const PainelOrganizacao: React.FC<PainelOrganizacaoProps> = ({
                     {/* Tag da Organização */}
                     <Input
                       isRequired
-                      description="Tag única da organização (apenas letras, números e _)"
+                      description="Tag única da organização (letras, números). Ex: 123M, AB0, G4L"
                       endContent={<span className="text-gray-500">]</span>}
                       errorMessage={tagValidation.message}
                       isInvalid={!tagValidation.isValid}

@@ -258,14 +258,6 @@ export function validateTagFormat(tag: string): ValidationResult {
     };
   }
 
-  // Não pode começar com número
-  if (/^\d/.test(tag)) {
-    return {
-      valid: false,
-      reason: "Tag não pode começar com número",
-    };
-  }
-
   return { valid: true };
 }
 

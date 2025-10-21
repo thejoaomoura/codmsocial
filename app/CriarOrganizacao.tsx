@@ -268,12 +268,12 @@ export default function CriarOrganizacao() {
 
           <Input
             isRequired
-            description="Apenas letras minúsculas, números e hífens. Esta será a identificação única da sua organização."
+            description="Letras, números e underscore. Esta será a identificação única da sua organização. Ex: 4M, R7, G4L, K9E"
             isDisabled={isCreating}
             label="Tag da Organização"
-            placeholder="tag-unica"
+            placeholder="123ABC"
             value={tag}
-            onChange={(e) => setTag(e.target.value)}
+            onChange={(e) => setTag(e.target.value.toUpperCase())}
           />
 
           <Textarea
