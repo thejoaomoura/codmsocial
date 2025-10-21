@@ -40,3 +40,6 @@ yarn.lock
 package-lock.json
 bun.lockb
 /.trae
+database.rules.json
+docs/worker_helper.md
+scripts/setupCron.sh

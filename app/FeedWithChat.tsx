@@ -49,6 +49,7 @@ import { db } from "./firebase";
 import { Post, PostReaction, ChatOverview, ChatMessage } from "./types";
 import Chat from "./Chat";
 import { useRouter } from "next/navigation";
+import { usePresence } from "./hooks/usePresence";
 
 interface FeedProps {
   posts: Post[];
@@ -77,6 +78,12 @@ interface User {
   organizationTag: string;
   avatar: string;
   createdAt?: Date;
+  isOnline?: boolean;
+  presence?: "online" | "away" | "offline";
+  lastSeen?: any;
+  privacy?: {
+    lastSeen: "everyone" | "contacts" | "nobody" | "mutual";
+  };
 }
 
 interface LikesUser {
@@ -108,6 +115,8 @@ const FeedWithChat: React.FC<FeedProps> = ({
   handleComment,
   handleDeleteComment,
 }) => {
+  // Inicializa o sistema de presença
+  usePresence();
 
   const router = useRouter();
 
@@ -610,19 +619,23 @@ const FeedWithChat: React.FC<FeedProps> = ({
               <CardHeader className="flex items-center gap-3">
                 {p.authorId !== user.uid ? (
                   <Tooltip content="Visitar perfil" placement="top">
-                 <Avatar
-                    alt={p.authorName}
-                    className="h-10 w-10 cursor-pointer"
-                    src={p.authorAvatar || "/default-avatar.png"}
-                    onClick={() => router.push(`/perfil/${p.authorId}`)}
-                  />
-                  </Tooltip>
+                  <div className="relative">
+                    <Avatar
+                      alt={p.authorName}
+                      className="h-10 w-10 cursor-pointer"
+                      src={p.authorAvatar || "/default-avatar.png"}
+                      onClick={() => router.push(`/perfil/${p.authorId}`)}
+                    />
+                  </div>
+                </Tooltip>
                 ) : (
-                  <Avatar
-                    alt={p.authorName}
-                    className="h-10 w-10"
-                    src={p.authorAvatar || "/default-avatar.png"}
-                  />
+                  <div className="relative">
+                    <Avatar
+                      alt={p.authorName}
+                      className="h-10 w-10"
+                      src={p.authorAvatar || "/default-avatar.png"}
+                    />
+                  </div>
                 )}
                 <div className="flex-1">
                   <div className="flex items-center justify-between">
@@ -796,18 +809,22 @@ const FeedWithChat: React.FC<FeedProps> = ({
                               <div className="flex items-center gap-2">
             {c.authorId !== user.uid ? (
     <Tooltip content="Visitar perfil" placement="top">
+      <div className="relative">
+        <Avatar
+          size="sm"
+          src={c.authorAvatar || "/default-avatar.png"}
+          className="cursor-pointer"
+          onClick={() => router.push(`/perfil/${c.authorId}`)}
+        />
+      </div>
+    </Tooltip>
+  ) : (
+    <div className="relative">
       <Avatar
         size="sm"
         src={c.authorAvatar || "/default-avatar.png"}
-        className="cursor-pointer"
-        onClick={() => router.push(`/perfil/${c.authorId}`)}
       />
-    </Tooltip>
-  ) : (
-    <Avatar
-      size="sm"
-      src={c.authorAvatar || "/default-avatar.png"}
-    />
+    </div>
   )}
                                 <div className="flex flex-col">
                                   <span className="text-[13px] text-gray-200 -mt-0">

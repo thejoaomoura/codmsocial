@@ -5,6 +5,10 @@ export interface PostComment {
   authorAvatar: string;
   text: string;
   createdAt: any;
+  // Campos de presença
+  presence?: "online" | "away" | "offline";
+  isOnline?: boolean;
+  lastSeen?: any;
 }
 
 export interface PostReaction {
@@ -31,6 +35,10 @@ export interface Post {
   reactions: Record<string, PostReaction>;
   detailedReactions?: PostReaction[];
   comments: PostComment[];
+  // Campos de presença
+  presence?: "online" | "away" | "offline";
+  isOnline?: boolean;
+  lastSeen?: any;
 }
 
 export interface User {
@@ -46,6 +54,13 @@ export interface User {
     organizationsCount: number;
     eventsParticipated: number;
   };
+  // Campos de presença
+  isOnline?: boolean;
+  presence?: "online" | "away" | "offline";
+  lastSeen?: any; // Timestamp
+  privacy?: {
+    lastSeen: "everyone" | "contacts" | "nobody" | "mutual";
+  };
 }
 
 export interface ChatOverview {
@@ -55,6 +70,10 @@ export interface ChatOverview {
   otherUserAvatar?: string; // pode ser undefined
   lastMessage?: string; // pode ser undefined
   unread?: boolean; // opcional
+  // Campos de presença
+  presence?: "online" | "away" | "offline";
+  isOnline?: boolean;
+  lastSeen?: any;
 }
 
 export interface ChatMessage {

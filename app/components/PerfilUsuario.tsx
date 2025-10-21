@@ -12,6 +12,8 @@ import { doc, getDoc, updateDoc } from "firebase/firestore";
 import { auth, db } from "../firebase";
 import { HiOutlineCalendar, HiOutlineExternalLink, HiOutlineCheck, HiOutlinePencil, HiOutlineX, HiOutlineLogout, HiOutlineArrowLeft, HiOutlineShare } from "react-icons/hi";
 import { useRouter } from "next/navigation";
+import StatusIndicator from "./StatusIndicator";
+import { usePresence } from "../hooks/usePresence";
 
 interface PerfilUser {
   uid: string;
@@ -20,6 +22,12 @@ interface PerfilUser {
   photoUrl?: string;
   organizationTag?: string;
   createdAt?: Date;
+  isOnline?: boolean;
+  presence?: "online" | "away" | "offline";
+  lastSeen?: any;
+  privacy?: {
+    lastSeen: "everyone" | "contacts" | "nobody" | "mutual";
+  };
 }
 
 interface PerfilUsuarioProps {
@@ -33,7 +41,11 @@ const PerfilUsuario: React.FC<PerfilUsuarioProps> = ({ userId }) => {
   const [name, setName] = useState("");
   const [avatar, setAvatar] = useState("");
   const [organizationTag, setOrganizationTag] = useState("");
+  const [privacyLastSeen, setPrivacyLastSeen] = useState<"everyone" | "contacts" | "nobody" | "mutual">("everyone");
   const router = useRouter();
+
+  // Inicializa o sistema de presença para o usuário atual
+  usePresence();
 
   // Determina se o perfil é próprio
   const isOwnProfile = userId === auth.currentUser?.uid;
@@ -55,12 +67,17 @@ const PerfilUsuario: React.FC<PerfilUsuarioProps> = ({ userId }) => {
           photoUrl: data.photoURL || "",
           organizationTag: data.organizationTag || "",
           createdAt: data.createdAt?.toDate ? data.createdAt.toDate() : data.createdAt,
+          isOnline: data.isOnline || false,
+          presence: data.presence || "offline",
+          lastSeen: data.lastSeen,
+          privacy: data.privacy || { lastSeen: "everyone" },
         };
 
         setUser(perfil);
         setName(perfil.displayName);
         setAvatar(perfil.photoUrl || "");
         setOrganizationTag(perfil.organizationTag || "");
+        setPrivacyLastSeen(perfil.privacy?.lastSeen || "everyone");
       } catch (error) {
         console.error(error);
       } finally {
@@ -80,6 +97,9 @@ const PerfilUsuario: React.FC<PerfilUsuarioProps> = ({ userId }) => {
         displayName: name,
         photoURL: avatar,
         organizationTag,
+        privacy: {
+          lastSeen: privacyLastSeen,
+        },
       });
 
       if (auth.currentUser) {
@@ -148,12 +168,21 @@ const PerfilUsuario: React.FC<PerfilUsuarioProps> = ({ userId }) => {
         <Card className="w-full">
           {/* Header */}
           <CardHeader className="flex flex-col items-center gap-4 pb-6">
-            <div className="h-24 w-24 rounded-full overflow-hidden border-4 border-white shadow-lg bg-gray-700 flex items-center justify-center">
-              <img 
-                alt="Avatar" 
-                className="h-full w-full object-cover" 
-                src={avatar || "/default-avatar.png"} 
-              />
+            <div className="relative">
+              <div className="h-24 w-24 rounded-full overflow-hidden border-4 border-white shadow-lg bg-gray-700 flex items-center justify-center">
+                <img 
+                  alt="Avatar" 
+                  className="h-full w-full object-cover" 
+                  src={avatar || "/default-avatar.png"} 
+                />
+              </div>
+              {/* Indicador de status */}
+              <div className="absolute -bottom-1 -right-1">
+                <StatusIndicator 
+                  status={user.presence || "offline"} 
+                  size="md"
+                />
+              </div>
             </div>
 
             {editMode ? (
@@ -176,6 +205,19 @@ const PerfilUsuario: React.FC<PerfilUsuarioProps> = ({ userId }) => {
                   placeholder="Tag da organização" 
                   label="Tag da organização"
                 />
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-gray-700">Privacidade do Status</label>
+                  <select 
+                    value={privacyLastSeen}
+                    onChange={(e) => setPrivacyLastSeen(e.target.value as any)}
+                    className="w-full p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  >
+                    <option value="everyone">Todos podem ver quando estou online</option>
+                    <option value="contacts">Apenas contatos</option>
+                    <option value="mutual">Apenas contatos mútuos</option>
+                    <option value="nobody">Ninguém pode ver meu status</option>
+                  </select>
+                </div>
               </div>
             ) : (
               <div className="text-center">
@@ -206,6 +248,28 @@ const PerfilUsuario: React.FC<PerfilUsuarioProps> = ({ userId }) => {
                   Membro desde: {user.createdAt?.toLocaleDateString("pt-BR") || "Data não informada"}
                 </span>
               </div>
+              
+              {/* Status e visto por último */}
+              <div className="flex items-center gap-3">
+                <div className="flex items-center gap-2">
+                  <StatusIndicator status={user.presence || "offline"} size="sm" />
+                  <span className="text-lg font-medium">
+                    {user.presence === "online" ? "Online" : 
+                     user.presence === "away" ? "Ausente" : "Offline"}
+                  </span>
+                </div>
+              </div>
+              
+              {user.lastSeen && user.privacy?.lastSeen !== "nobody" && (
+                <div className="flex items-center gap-3">
+                  <HiOutlineCalendar className="w-5 h-5 text-gray-500" />
+                  <span className="text-lg">
+                    Visto por último: {user.lastSeen?.toDate ? 
+                      user.lastSeen.toDate().toLocaleString("pt-BR") : 
+                      "Data não disponível"}
+                  </span>
+                </div>
+              )}
             </div>
 
             {/* Botão de compartilhar perfil */}

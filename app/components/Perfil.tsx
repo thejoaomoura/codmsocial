@@ -34,6 +34,9 @@ import { Modal, ModalBody, ModalContent, ModalFooter, ModalHeader } from "@herou
 import { Code } from "@heroui/code";
 import { BreadcrumbItem, Breadcrumbs } from "@heroui/breadcrumbs";
 import { Organization, Membership} from "../types"; // ajuste o caminho conforme seu projeto
+import StatusIndicator from "./StatusIndicator";
+import { usePresence } from "../hooks/usePresence";
+import { useSafeUserPresence } from "../hooks/useSafeUserPresence";
 
 interface PerfilUser {
   uid: string;
@@ -43,6 +46,13 @@ interface PerfilUser {
   organizationTag?: string;
   organizationRole?: string;
   createdAt?: Date;
+  // Campos de presença
+  isOnline?: boolean;
+  presence?: "online" | "away" | "offline";
+  lastSeen?: any;
+  privacy?: {
+    lastSeen: "everyone" | "contacts" | "nobody" | "mutual";
+  };
 }
 
 interface PerfilProps {
@@ -65,10 +75,17 @@ const Perfil: React.FC<PerfilProps> = ({ userId }) => {
   const [organizationRole, setOrganizationRole] = useState("");
   const [showNameModal, setShowNameModal] = useState(false);
   const [newName, setNewName] = useState("");
+  const [privacyLastSeen, setPrivacyLastSeen] = useState<"everyone" | "contacts" | "nobody" | "mutual">("everyone");
   const router = useRouter();
   const inputRef = useRef<HTMLInputElement>(null);
   const handleLogout = async () => await signOut(auth);
   const isOwnProfile = !userId || userId === auth.currentUser?.uid;
+
+  // Inicializa o sistema de presença para o usuário atual
+  usePresence();
+  
+  // Busca dados de presença do usuário do perfil (apenas se userId for válido)
+  const { presence: userPresence, loading: presenceLoading, error: presenceError } = useSafeUserPresence(userId || "");
 const [organization, setOrganization] = useState<Organization | null>(null);
 // --- Modal de membros ---
 const [modalOpen, setModalOpen] = useState(false);
@@ -163,13 +180,17 @@ useEffect(() => {
           photoURL: data.photoURL || "",
           organizationTag: data.organizationTag || "",
           createdAt: data.createdAt?.toDate ? data.createdAt.toDate() : data.createdAt,
+          isOnline: data.isOnline || false,
+          presence: data.presence || "offline",
+          lastSeen: data.lastSeen,
+          privacy: data.privacy || { lastSeen: "everyone" },
         };
 
         setProfileUser(perfil);
         setName(perfil.displayName);
-    
         setAvatar(perfil.photoURL || "");
         setOrganizationTag(perfil.organizationTag || "");
+        setPrivacyLastSeen(perfil.privacy?.lastSeen || "everyone");
       } catch (err) {
         console.error(err);
       } finally {
@@ -186,17 +207,32 @@ useEffect(() => {
 
     try {
       const ref = doc(db, "Users", profileUser.uid);
-      await updateDoc(ref, { displayName: name });
+      await updateDoc(ref, { 
+        displayName: name,
+        photoURL: avatar,
+        organizationTag,
+        privacy: {
+          lastSeen: privacyLastSeen,
+        },
+      });
 
       if (auth.currentUser?.uid === profileUser.uid) {
-        await updateProfile(auth.currentUser, { displayName: name });
+        await updateProfile(auth.currentUser, { displayName: name, photoURL: avatar });
       }
 
       // Atualiza estado usando non-null assertion
-      setProfileUser({ ...profileUser, displayName: name });
+      setProfileUser({ 
+        ...profileUser, 
+        displayName: name,
+        photoURL: avatar,
+        organizationTag,
+        privacy: {
+          lastSeen: privacyLastSeen,
+        },
+      });
 
       setEditMode(false);
-      addToast({ title: "Sucesso", description: "Nome atualizado!", color: "success" });
+      addToast({ title: "Sucesso", description: "Perfil atualizado!", color: "success" });
     } catch (err) {
       console.error(err);
       addToast({ title: "Erro", description: "Falha ao atualizar nome.", color: "danger" });
@@ -316,8 +352,7 @@ useEffect(() => {
    <div>
   {isOwnProfile ? null : (
     <>
-    <Navbar>
-      
+    <Navbar>     
       <NavbarContent justify="start">
         {navigation.map((n) => (
           <NavbarItem key={n.label}>
@@ -473,11 +508,20 @@ useEffect(() => {
 <CardHeader className="flex flex-col items-center gap-3">
   {/* Avatares */}
   <div className="flex items-center gap-2">
-    <img
-      src={profileUser.photoURL || "/default-avatar.png"}
-      alt="Avatar"
-      className="h-20 w-20 rounded-full object-cover border-2 border-white/30 bg-gray-700 z-10"
-    />
+    <div className="relative">
+      <img
+        src={profileUser.photoURL || "/default-avatar.png"}
+        alt="Avatar"
+        className="h-20 w-20 rounded-full object-cover border-2 border-white/30 bg-gray-700 z-10"
+      />
+      {/* Indicador de status */}
+      <div className="absolute -bottom-1 -right-1">
+        <StatusIndicator 
+          status={userPresence?.presence || profileUser.presence || "offline"} 
+          size="md"
+        />
+      </div>
+    </div>
     {organization?.logoURL && (
       <img
         src={organization.logoURL}
@@ -490,11 +534,54 @@ useEffect(() => {
   {/* Nome, organização e cargo */}
   {isOwnProfile ? (
     editMode ? (
-      <Input
-        value={name}
-        onChange={(e) => setName(e.target.value)}
-        placeholder="Nome"
-      />
+      <div className="w-full space-y-3">
+        <Input
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          placeholder="Nome"
+          label="Nome"
+        />
+        <div className="space-y-2">
+          <label className="text-sm font-medium text-gray-300">Foto do perfil</label>
+          <div className="flex items-center gap-3">
+            <div className="h-16 w-16 rounded-full overflow-hidden border-2 border-gray-600 bg-gray-700 flex items-center justify-center">
+              <img 
+                alt="Avatar preview" 
+                className="h-full w-full object-cover" 
+                src={avatar || "/default-avatar.png"} 
+              />
+            </div>
+            <div className="flex-1">
+              <input
+                type="file"
+                accept="image/*"
+                onChange={handleAvatarChange}
+                className="block w-full text-sm text-gray-300 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-medium file:bg-blue-600 file:text-white hover:file:bg-blue-700 file:cursor-pointer cursor-pointer"
+              />
+              <p className="text-xs text-gray-400 mt-1">Formatos aceitos: JPG, PNG, GIF (máx. 5MB)</p>
+            </div>
+          </div>
+        </div>
+        <Input
+          value={organizationTag}
+          onChange={(e) => setOrganizationTag(e.target.value)}
+          placeholder="Tag da organização"
+          label="Tag da organização"
+        />
+        <div className="space-y-2">
+          <label className="text-sm font-medium text-gray-300">Quem pode ver meu status online</label>
+          <select 
+            value={privacyLastSeen}
+            onChange={(e) => setPrivacyLastSeen(e.target.value as any)}
+            className="w-full p-3 bg-gray-800 border border-gray-600 rounded-md text-gray-200 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+          >
+            <option value="everyone" className="bg-gray-800 text-gray-200">Todos podem ver quando estou online</option>
+            <option value="contacts" className="bg-gray-800 text-gray-200">Apenas meus contatos</option>
+            <option value="mutual" className="bg-gray-800 text-gray-200">Apenas contatos mútuos</option>
+            <option value="nobody" className="bg-gray-800 text-gray-200">Ninguém pode ver meu status</option>
+          </select>
+        </div>
+      </div>
     ) : (
       <>
         <h2 className="text-3xl font-bold">{profileUser.displayName}</h2>
@@ -624,8 +711,33 @@ useEffect(() => {
                 Criado em: {profileUser.createdAt ? profileUser.createdAt.toLocaleDateString() : "—"}
               </span>
             </div>
-
-
+            
+            {/* Status e visto por último */}
+            <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2">
+                <StatusIndicator 
+                  status={userPresence?.presence || profileUser.presence || "offline"} 
+                  size="sm"
+                />
+                <span className="font-medium">
+                  {userPresence?.presence === "online" ? "Online" : 
+                   userPresence?.presence === "away" ? "Ausente" : 
+                   profileUser.presence === "online" ? "Online" :
+                   profileUser.presence === "away" ? "Ausente" : "Offline"}
+                </span>
+              </div>
+            </div>
+            
+            {userPresence?.lastSeen && userPresence.privacy?.lastSeen !== "nobody" && (
+              <div className="flex items-center gap-2">
+                <HiOutlineCalendar className="w-5 h-5 text-gray-500" />
+                <span>
+                  Visto por último: {userPresence.lastSeen?.toDate ? 
+                    userPresence.lastSeen.toDate().toLocaleString("pt-BR") : 
+                    "Data não disponível"}
+                </span>
+              </div>
+            )}
           </CardBody>
 
           {isOwnProfile && (
@@ -637,7 +749,7 @@ useEffect(() => {
                 </>
               ) : (
                 <>
-                  <Button onPress={() => setEditMode(true)} startContent={<HiOutlinePencil />}>Editar Nome</Button>
+                  <Button onPress={() => setEditMode(true)} startContent={<HiOutlinePencil />}>Editar Perfil</Button>
                   <Button color="danger" onPress={() => signOut(auth)} startContent={<HiOutlineLogout />}>Sair</Button>
                 </>
               )}

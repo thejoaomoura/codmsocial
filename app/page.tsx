@@ -86,6 +86,7 @@ import MercadoOrganizacao from "./components/MercadoOrganizacao";
 import RankingSystem from "./components/RankingSystem";
 import Perfil from "./components/Perfil"; // importa o componente
 import SplashScreen from "./components/SplashScreen";
+import { usePresence } from "./hooks/usePresence";
 
 const navigation = [
   { label: "Feed", icon: <HiOutlineNewspaper className="w-5 h-5" /> },
@@ -120,6 +121,9 @@ const navigation = [
 export default function Home() {
   const [user, setUser] = useState<User | null>(null);
   const [isAuthLoading, setIsAuthLoading] = useState(true);
+
+  // Inicializa o sistema de presença
+  usePresence();
   const [activeTab, setActiveTab] = useState<
     | "Feed"
     | "Conversas"
