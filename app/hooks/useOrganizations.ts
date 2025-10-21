@@ -57,7 +57,9 @@ export const useUserOrganizations = (userId: string | null) => {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    if (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1") {
     console.log("useUserOrganizations - userId:", userId);
+    }
 
     if (!userId) {
       console.log("useUserOrganizations - No userId, setting empty array");
@@ -97,10 +99,12 @@ export const useUserOrganizations = (userId: string | null) => {
 
         const membershipsSnapshot = await getDocs(membershipsQuery);
 
-        console.log(
+        if (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1") 
+          { console.log(
           "useUserOrganizations - Found memberships:",
           membershipsSnapshot.size,
         );
+          }
 
         const memberOrgs: Organization[] = [];
 
@@ -108,10 +112,12 @@ export const useUserOrganizations = (userId: string | null) => {
         for (const membershipDoc of membershipsSnapshot.docs) {
           const membershipData = membershipDoc.data() as Membership;
 
-          console.log(
+          if (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1") 
+            { console.log(
             "useUserOrganizations - Processing membership for org:",
             membershipData.organizationId,
           );
+            }
 
           try {
             const orgDoc = await getDoc(
@@ -125,15 +131,19 @@ export const useUserOrganizations = (userId: string | null) => {
               } as Organization;
 
               memberOrgs.push(orgData);
-              console.log(
+              if (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1") 
+                { console.log(
                 "useUserOrganizations - Added member organization:",
                 orgData.name,
               );
+                }
             } else {
-              console.warn(
+              if (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1") 
+                { console.warn(
                 "useUserOrganizations - Organization not found:",
                 membershipData.organizationId,
               );
+                }
             }
           } catch (orgError) {
             console.error(

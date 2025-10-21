@@ -1,6 +1,12 @@
 "use client";
 
-import React, { useState, useEffect, useMemo, useCallback } from "react";
+import React, {
+  useState,
+  useEffect,
+  useMemo,
+  useCallback,
+  useRef,
+} from "react";
 import { Button } from "@heroui/button";
 import { Avatar } from "@heroui/avatar";
 import { Card, CardBody } from "@heroui/card";
@@ -19,10 +25,13 @@ import {
   TableRow,
   TableCell,
 } from "@heroui/table";
+import { Switch } from "@heroui/switch";
 import { Input } from "@heroui/input";
-import { HiArrowRight, HiOutlineSearch, HiMicrophone } from "react-icons/hi";
+import { Modal, ModalContent, ModalHeader, ModalBody, ModalFooter } from "@heroui/modal";
+import { HiArrowRight, HiOutlineSearch, HiTrash, HiCheck, HiX } from "react-icons/hi";
 import { useRouter } from "next/navigation";
 import { addDoc, collection, serverTimestamp } from "firebase/firestore";
+import { readConversationNotificationPreference, writeConversationNotificationPreference } from "./chatNotificationPreferences";
 
 import TypingIndicator from "./components/TypingIndicator";
 import AudioRecorder from "./components/AudioRecorder";
@@ -67,6 +76,43 @@ const Chat: React.FC<ChatProps> = ({
   const [searchTerm, setSearchTerm] = useState("");
   const [isRecording, setIsRecording] = useState(false);
   const [hasRecordedAudio, setHasRecordedAudio] = useState(false);
+  const [notificationPermission, setNotificationPermission] =
+    useState<NotificationPermission>(() =>
+      typeof window !== "undefined" && "Notification" in window
+        ? Notification.permission
+        : "default"
+    );
+  const currentConversationId = showChatWith?.id ?? null;
+  const hasNotificationSupport =
+    typeof window !== "undefined" && "Notification" in window;
+  const previousMessagesRef = useRef<ChatMessage[]>(chatMessages);
+  const previousConversationIdRef = useRef<string | null>(currentConversationId);
+  const [isConversationNotificationsEnabled, setIsConversationNotificationsEnabled] =
+    useState(true);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [conversaToDelete, setConversaToDelete] = useState<string | null>(null);
+
+  const router = useRouter();
+
+  // Funções para controlar o modal de confirmação
+  const handleDeleteClick = (conversaId: string) => {
+    setConversaToDelete(conversaId);
+    setShowDeleteModal(true);
+  };
+
+  const handleConfirmDelete = () => {
+    if (conversaToDelete) {
+      deleteConversa(conversaToDelete);
+      setShowDeleteModal(false);
+      setConversaToDelete(null);
+    }
+  };
+
+  const handleCancelDelete = () => {
+    setShowDeleteModal(false);
+    setConversaToDelete(null);
+  };
+
   // Função para enviar áudio
   const sendAudioMessage = async (audioBlob: Blob, duration: number) => {
     if (!showChatWith || !userName) return;
@@ -115,11 +161,168 @@ const Chat: React.FC<ChatProps> = ({
     setHasRecordedAudio(false);
   };
 
-   const router = useRouter();
+  const ensureServiceWorker = useCallback(async () => {
+    if (typeof window === "undefined") return;
+    if (!("serviceWorker" in navigator)) return;
+
+    try {
+      const existingRegistration = await navigator.serviceWorker.getRegistration(
+        "/notification-sw.js"
+      );
+
+      if (!existingRegistration) {
+        await navigator.serviceWorker.register("/notification-sw.js");
+      }
+    } catch (error) {
+      console.error("Erro ao registrar o service worker de notificações", error);
+    }
+  }, []);
+
+  const requestNotificationPermission = useCallback(async () => {
+    if (!hasNotificationSupport) return;
+
+    if (Notification.permission === "default") {
+      try {
+        const permission = await Notification.requestPermission();
+        setNotificationPermission(permission);
+      } catch (error) {
+        console.error("Erro ao solicitar permissão de notificações", error);
+      }
+    } else {
+      setNotificationPermission(Notification.permission);
+    }
+  }, [hasNotificationSupport]);
+
+  const showNotification = useCallback(
+    async (message: ChatMessage) => {
+      if (!hasNotificationSupport) return;
+      if (notificationPermission !== "granted") return;
+      if (!isConversationNotificationsEnabled) return;
+
+      // Verificar se a mensagem é do usuário atual
+      if (message.senderId === userId) return;
+
+      // Gerar ID único para a notificação baseado na mensagem
+      const notificationId = `chat-${message.id || message.createdAt?.seconds || Date.now()}`;
+      
+      const title = `Nova mensagem de ${message.senderName}`;
+      const options: NotificationOptions = {
+        body: message.text,
+        icon: message.senderAvatar,
+        tag: notificationId, // Tag única para evitar duplicatas
+        requireInteraction: false,
+        silent: false,
+        data: {
+          chatUserId: showChatWith?.otherUserId,
+          messageId: message.id,
+          timestamp: Date.now(),
+        },
+      };
+
+      if ("serviceWorker" in navigator) {
+        try {
+          const registration = await navigator.serviceWorker.ready;
+          // Usar tag para evitar duplicatas
+          await registration.showNotification(title, options);
+          return;
+        } catch (error) {
+          console.error("Erro ao exibir notificação pelo service worker", error);
+        }
+      }
+
+      try {
+        new Notification(title, options);
+      } catch (error) {
+        console.error("Erro ao exibir notificação direta", error);
+      }
+    },
+    [
+      hasNotificationSupport,
+      isConversationNotificationsEnabled,
+      notificationPermission,
+      showChatWith?.otherUserId,
+      userId,
+    ]
+  );
 
   useEffect(() => {
     setIsOpen(!!showChatWith);
   }, [showChatWith]);
+
+  useEffect(() => {
+    ensureServiceWorker();
+    requestNotificationPermission();
+  }, [ensureServiceWorker, requestNotificationPermission]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      setIsConversationNotificationsEnabled(true);
+      return;
+    }
+
+    const preference = readConversationNotificationPreference(
+      currentConversationId,
+      window.localStorage
+    );
+    setIsConversationNotificationsEnabled(preference);
+  }, [currentConversationId]);
+
+  const handleToggleConversationNotifications = useCallback(
+    (enabled: boolean) => {
+      setIsConversationNotificationsEnabled(enabled);
+
+      if (typeof window !== "undefined") {
+        writeConversationNotificationPreference(
+          currentConversationId,
+          enabled,
+          window.localStorage
+        );
+      }
+
+      if (enabled && notificationPermission === "default") {
+        void requestNotificationPermission();
+      }
+    },
+    [
+      currentConversationId,
+      notificationPermission,
+      requestNotificationPermission,
+    ]
+  );
+
+  useEffect(() => {
+    const previousConversationId = previousConversationIdRef.current;
+    const isSameConversation = previousConversationId === currentConversationId;
+    const previousMessages = isSameConversation ? previousMessagesRef.current ?? [] : [];
+
+    // Só processar se realmente há mensagens novas
+    if (chatMessages.length > 0 && chatMessages.length > previousMessages.length) {
+      const newMessages = chatMessages.slice(previousMessages.length);
+      
+      // Filtrar apenas mensagens que realmente são novas e não são do usuário atual
+      const validNewMessages = newMessages.filter(message => {
+        // Verificar se a mensagem não é do usuário atual
+        const isNotFromCurrentUser = message.senderId !== userId;
+        
+        const hasValidId = message.id || message.createdAt;
+        
+        const isNotEmptyMessage = message.text || message.messageType === 'audio';
+        
+        return isNotFromCurrentUser && hasValidId && isNotEmptyMessage;
+      });
+
+      // Enviar notificação apenas para mensagens válidas
+      validNewMessages.forEach((message) => {
+        void showNotification(message);
+      });
+    }
+
+    // Atualizar referências apenas se houve mudanças reais
+    if (JSON.stringify(previousMessagesRef.current) !== JSON.stringify(chatMessages)) {
+      previousMessagesRef.current = chatMessages;
+    }
+    previousConversationIdRef.current = currentConversationId;
+  }, [chatMessages, currentConversationId, showNotification, userId]);
 
   const filteredConversas = useMemo(() => {
     if (!searchTerm) return conversas;
@@ -133,6 +336,7 @@ const Chat: React.FC<ChatProps> = ({
     { name: "Usuário", uid: "user" },
     { name: "Última Mensagem", uid: "lastMessage" },
     { name: "Não Lida", uid: "unread" },
+    { name: "Ações", uid: "actions" },
   ];
 
   const renderCell = useCallback((c: ChatOverview, columnKey: string) => {
@@ -175,10 +379,24 @@ const Chat: React.FC<ChatProps> = ({
             }}
           />
         ) : null;
+      case "actions":
+        return (
+          <Button
+            isIconOnly
+            size="sm"
+            variant="light"
+            color="danger"
+            aria-label="Excluir conversa"
+            onPress={() => handleDeleteClick(c.id)}
+            style={{ minWidth: "auto" }}
+          >
+            <HiTrash className="w-4 h-4" />
+          </Button>
+        );
       default:
         return null;
     }
-  }, [router]);
+  }, [router, handleDeleteClick]);
 
   return (
     <>
@@ -228,16 +446,34 @@ const Chat: React.FC<ChatProps> = ({
       >
         <DrawerContent>
           <DrawerHeader
-            style={{ display: "flex", alignItems: "center", gap: 8 }}
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 12,
+              justifyContent: "space-between",
+            }}
           >
-            <Avatar
-              alt={showChatWith?.otherUserName}
-              aria-label={`Avatar de ${showChatWith?.otherUserName}`}
-              src={showChatWith?.otherUserAvatar}
-              className="cursor-pointer"
-              onClick={() => showChatWith && router.push(`/perfil/${showChatWith.otherUserId}`)}
-            />
-            <span>{showChatWith?.otherUserName}</span>
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <Avatar
+                alt={showChatWith?.otherUserName}
+                aria-label={`Avatar de ${showChatWith?.otherUserName}`}
+                src={showChatWith?.otherUserAvatar}
+                className="cursor-pointer"
+                onClick={() => showChatWith && router.push(`/perfil/${showChatWith.otherUserId}`)}
+              />
+              <span>{showChatWith?.otherUserName}</span>
+            </div>
+            {hasNotificationSupport && (
+              <Switch
+                size="sm"
+                isSelected={isConversationNotificationsEnabled}
+                isDisabled={!hasNotificationSupport}
+                onValueChange={handleToggleConversationNotifications}
+                aria-label="Alternar notificações desta conversa"
+              >
+                Notificações
+              </Switch>
+            )}
           </DrawerHeader>
 
           <DrawerBody
@@ -389,6 +625,45 @@ const Chat: React.FC<ChatProps> = ({
           </DrawerFooter>
         </DrawerContent>
       </Drawer>
+
+      {/* Modal de Confirmação de Exclusão */}
+      <Modal
+        isOpen={showDeleteModal}
+        onOpenChange={setShowDeleteModal}
+        placement="center"
+      >
+        <ModalContent>
+          {(onClose) => (
+            <>
+              <ModalHeader className="flex flex-col gap-1">
+                Confirmar Exclusão
+              </ModalHeader>
+              <ModalBody>
+                <p>
+                  Tem certeza que deseja excluir esta conversa? Esta ação não pode ser desfeita.
+                </p>
+              </ModalBody>
+              <ModalFooter>
+                <Button
+                  color="default"
+                  variant="light"
+                  onPress={handleCancelDelete}
+                  startContent={<HiX className="w-4 h-4" />}
+                >
+                  Cancelar
+                </Button>
+                <Button
+                  color="danger"
+                  onPress={handleConfirmDelete}
+                  startContent={<HiCheck className="w-4 h-4" />}
+                >
+                  Confirmar
+                </Button>
+              </ModalFooter>
+            </>
+          )}
+        </ModalContent>
+      </Modal>
     </>
   );
 };

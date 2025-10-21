@@ -33,6 +33,8 @@ import {
   getDocs,
   arrayUnion,
   arrayRemove,
+  deleteDoc,
+  writeBatch,
 } from "firebase/firestore";
 import {
   signInWithPopup,
@@ -205,6 +207,19 @@ export default function Home() {
     undefined,
   );
 
+  // Função helper para logs apenas em desenvolvimento
+  function devLog(...args: any[]) {
+    if (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1") {
+      console.log(...args);
+    }
+  }
+
+  function devError(...args: any[]) {
+    if (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1") {
+      console.error(...args);
+    }
+  }
+
   // Pegar a organização selecionada ou a primeira disponível
   const userOrg = selectedOrgId
     ? userOrganizations?.find((org) => org.id === selectedOrgId) || null
@@ -221,7 +236,7 @@ export default function Home() {
   }, [userOrganizations, selectedOrgId]);
 
   useEffect(() => {
-    console.log("Setting up auth listener...");
+    devLog("Setting up auth listener...");
     const unsub = onAuthStateChanged(auth, async (u) => {
       //console.log('Auth state changed:', u ? `User logged in: ${u.uid}` : 'User logged out');
       setUser(u);
@@ -311,17 +326,17 @@ export default function Home() {
 
   const handleGoogleLogin = async () => {
     try {
-      console.log("handleGoogleLogin - Iniciando login com Google...");
+      devLog("handleGoogleLogin - Iniciando login com Google...");
       const result = await signInWithPopup(auth, provider);
       const user = result.user;
 
-      console.log("handleGoogleLogin - Login bem-sucedido, usuário:", user.uid);
+      devLog("handleGoogleLogin - Login bem-sucedido, usuário:", user.uid);
 
       const userRef = doc(db, "Users", user.uid);
       const userSnap = await getDoc(userRef);
 
       if (!userSnap.exists()) {
-        console.log("handleGoogleLogin - Novo usuário, criando documento...");
+        devLog("handleGoogleLogin - Novo usuário, criando documento...");
         // Novo usuário: salva createdAt
         await setDoc(userRef, {
           displayName: user.displayName,
@@ -329,9 +344,9 @@ export default function Home() {
           photoURL: user.photoURL,
           createdAt: serverTimestamp(), // <-- timestamp para 24h
         });
-        console.log("handleGoogleLogin - Documento do usuário criado");
+        devLog("handleGoogleLogin - Documento do usuário criado");
       } else {
-        console.log(
+        devLog(
           "handleGoogleLogin - Usuário existente, atualizando dados...",
         );
         // Usuário já existe: atualiza dados sem alterar createdAt
@@ -340,7 +355,7 @@ export default function Home() {
           email: user.email,
           photoURL: user.photoURL,
         });
-        console.log("handleGoogleLogin - Dados do usuário atualizados");
+        devLog("handleGoogleLogin - Dados do usuário atualizados");
       }
     } catch (error: any) {
       // Tratar erros de popup cancelado pelo usuário sem mostrar erro
@@ -349,13 +364,13 @@ export default function Home() {
         error.code === "auth/cancelled-popup-request"
       ) {
         // Usuário cancelou o login voluntariamente, não mostrar erro
-        console.log("Login cancelado pelo usuário");
+        devLog("Login cancelado pelo usuário");
 
         return;
       }
 
       // Para outros erros, mostrar mensagem
-      console.error("Erro no login:", error);
+      devError("Erro no login:", error);
       addToast({
         title: "Erro no Login",
         description: "Erro ao fazer login. Tente novamente.",
@@ -403,7 +418,7 @@ export default function Home() {
         userTag = userSnap.data().organizationTag || "";
       }
     } catch (error) {
-      console.error("Erro ao buscar tag do usuário:", error);
+      devError("Erro ao buscar tag do usuário:", error);
     }
 
     const newComment = {
@@ -423,9 +438,9 @@ export default function Home() {
       await updateDoc(postRef, {
         comments: arrayUnion(newComment),
       });
-      console.log("Comentário adicionado no post:", postId);
+      devLog("Comentário adicionado no post:", postId);
     } catch (error) {
-      console.error("Erro ao adicionar comentário:", error);
+      devError("Erro ao adicionar comentário:", error);
     }
   };
 
@@ -446,9 +461,9 @@ export default function Home() {
       await updateDoc(postRef, {
         comments: arrayRemove(comment), // remove exatamente o objeto do array
       });
-      console.log("Comentário deletado:", comment);
+      devLog("Comentário deletado:", comment);
     } catch (err) {
-      console.error("Erro ao deletar comentário:", err);
+      devError("Erro ao deletar comentário:", err);
     }
   };
 
@@ -500,7 +515,7 @@ export default function Home() {
         });
       }
     } catch (error) {
-      console.error("Erro ao atualizar status de digitação:", error);
+      devError("Erro ao atualizar status de digitação:", error);
     }
   };
 
@@ -551,7 +566,7 @@ export default function Home() {
     const messagesUnsubscribe = onSnapshot(
       query(chatCol, orderBy("createdAt", "asc")),
       (snap) => {
-        console.log("Mensagens recebidas:", snap.docs.length);
+        devLog("Mensagens recebidas:", snap.docs.length);
         const msgs = snap.docs.map((d) => {
           const data = d.data() as ChatMessage;
 
@@ -562,7 +577,7 @@ export default function Home() {
         setChatMessages(msgs);
       },
       (error) => {
-        console.error("Erro no listener de mensagens:", error);
+        devError("Erro no listener de mensagens:", error);
       },
     );
 
@@ -649,7 +664,7 @@ export default function Home() {
     const chatCol = collection(db, "Chats", chatId, "Messages");
 
     try {
-      console.log("Enviando mensagem para chatId:", chatId);
+      devLog("Enviando mensagem para chatId:", chatId);
 
       // Parar de mostrar "digitando" antes de enviar
       updateTypingStatus(false);
@@ -669,7 +684,7 @@ export default function Home() {
         createdAt: serverTimestamp(),
       });
 
-      console.log("Mensagem enviada com sucesso");
+      devLog("Mensagem enviada com sucesso");
 
       // Atualizar documento principal do chat
       await setDoc(
@@ -691,10 +706,10 @@ export default function Home() {
         { merge: true },
       );
 
-      console.log("Documento do chat atualizado");
+      devLog("Documento do chat atualizado");
       setChatText("");
     } catch (error) {
-      console.error("Erro ao enviar mensagem:", error);
+      devError("Erro ao enviar mensagem:", error);
       addToast({
         title: "Erro",
         description: "Erro ao enviar mensagem. Tente novamente.",
@@ -735,7 +750,7 @@ export default function Home() {
 
       alert("Perfil atualizado com sucesso!");
     } catch (err) {
-      console.error("Erro ao atualizar perfil:", err);
+      devError("Erro ao atualizar perfil:", err);
       alert("Erro ao atualizar perfil.");
     }
   };
@@ -1119,9 +1134,49 @@ export default function Home() {
               unread: c.unread ?? false,
             }))}
             currentUserId={user.uid}
-            deleteConversa={(id: string) => {
-              // Implementar lógica de deletar conversa se necessário
-              console.log("Deletar conversa:", id);
+            deleteConversa={async (id: string) => {
+              if (!user) return;
+              
+              try {
+                // Deletar o documento principal da conversa
+                await deleteDoc(doc(db, "Chats", id));
+                
+                // Deletar todas as mensagens da subcoleção
+                const messagesRef = collection(db, "Chats", id, "Messages");
+                const messagesSnapshot = await getDocs(messagesRef);
+                
+                // Deletar todas as mensagens em lote
+                const batch = writeBatch(db);
+                messagesSnapshot.docs.forEach((messageDoc) => {
+                  batch.delete(messageDoc.ref);
+                });
+                
+                if (messagesSnapshot.docs.length > 0) {
+                  await batch.commit();
+                }
+                
+                // Deletar a subcoleção de typing se existir
+                const typingRef = collection(db, "Chats", id, "Typing");
+                const typingSnapshot = await getDocs(typingRef);
+                
+                if (typingSnapshot.docs.length > 0) {
+                  const typingBatch = writeBatch(db);
+                  typingSnapshot.docs.forEach((typingDoc) => {
+                    typingBatch.delete(typingDoc.ref);
+                  });
+                  await typingBatch.commit();
+                }
+                
+                //console.log("Conversa deletada com sucesso:", id);
+                
+                if (showChatWith && showChatWith.id === id) {
+                  setShowChatWith(null);
+                }
+                
+              } catch (error) {
+                devError("Erro ao deletar conversa:", error);
+                alert("Erro ao deletar conversa. Tente novamente.");
+              }
             }}
             handleComment={handleComment}
             handleDeleteComment={handleDeleteComment}
@@ -1160,9 +1215,50 @@ export default function Home() {
               lastMessage: c.lastMessage ?? "",
               unread: c.unread ?? false,
             }))}
-            deleteConversa={(id: string) => {
-              // Implementar lógica de deletar conversa se necessário
-              console.log("Deletar conversa:", id);
+            deleteConversa={async (id: string) => {
+              if (!user) return;
+              
+              try {
+                //  Deletar o documento principal da conversa
+                await deleteDoc(doc(db, "Chats", id));
+                
+                //  Deletar todas as mensagens da subcoleção
+                const messagesRef = collection(db, "Chats", id, "Messages");
+                const messagesSnapshot = await getDocs(messagesRef);
+                
+                // Deletar todas as mensagens em lote
+                const batch = writeBatch(db);
+                messagesSnapshot.docs.forEach((messageDoc) => {
+                  batch.delete(messageDoc.ref);
+                });
+                
+                if (messagesSnapshot.docs.length > 0) {
+                  await batch.commit();
+                }
+                
+                // Deletar a subcoleção de typing se existir
+                const typingRef = collection(db, "Chats", id, "Typing");
+                const typingSnapshot = await getDocs(typingRef);
+                
+                if (typingSnapshot.docs.length > 0) {
+                  const typingBatch = writeBatch(db);
+                  typingSnapshot.docs.forEach((typingDoc) => {
+                    typingBatch.delete(typingDoc.ref);
+                  });
+                  await typingBatch.commit();
+                }
+                
+                devLog("Conversa deletada com sucesso:", id);
+                
+                // Se a conversa deletada era a atualmente aberta, fechar o chat
+                if (showChatWith && showChatWith.id === id) {
+                  setShowChatWith(null);
+                }
+                
+              } catch (error) {
+                devError("Erro ao deletar conversa:", error);
+                alert("Erro ao deletar conversa. Tente novamente.");
+              }
             }}
             isTyping={
               showChatWith
