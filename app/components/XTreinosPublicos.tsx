@@ -395,11 +395,13 @@ export default function XTreinosPublicos(props?: XTreinosPublicosProps) {
                         size="sm"
                         variant="flat"
                       >
-                        {event.status === "open"
-                          ? "Aberto"
-                          : event.status === "closed"
+                        {event.visibility === "private"
                           ? "Fechado"
-                          : "Finalizado"}
+                          : event.status === "open"
+                            ? "Aberto"
+                            : event.status === "closed"
+                              ? "Fechado"
+                              : "Finalizado"}
                       </Chip>
                       {event.prizePool && (
                         <Chip color="warning" size="sm" variant="flat">

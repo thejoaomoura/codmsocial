@@ -186,9 +186,14 @@ const RoleChangeModal: React.FC<RoleChangeModalProps> = ({
 
                   setSelectedRole(selected || "");
                 }}
+                style={{
+                  // Fix for focus scope accessibility warning
+                  '--focus-scope-end-display': 'inline'
+                } as React.CSSProperties}
+                className="[&_span[data-focus-scope-end='true']]:!inline"
               >
                 {availableRoles.map((role) => (
-                  <SelectItem key={role}>
+                  <SelectItem key={role} textValue={getRoleName(role)}>
                     <div className="flex items-center gap-2">
                       <span>{getRoleEmoji(role)}</span>
                       <span>{getRoleName(role)}</span>

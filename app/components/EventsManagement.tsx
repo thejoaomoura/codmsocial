@@ -29,6 +29,7 @@ import {
   HiOutlineExternalLink,
   HiOutlinePlus,
   HiOutlinePencil,
+  HiOutlineTrash,
 } from "react-icons/hi";
 import {
   collection,
@@ -41,6 +42,7 @@ import {
   Timestamp,
   doc,
   updateDoc,
+  deleteDoc,
 } from "firebase/firestore";
 import { I18nProvider } from "@react-aria/i18n";
 
@@ -79,11 +81,13 @@ const EventsManagement: React.FC<EventsManagementProps> = ({
   const [showRosterModal, setShowRosterModal] = useState(false);
   const [showEventDetailsModal, setShowEventDetailsModal] = useState(false);
   const [showCreateEventModal, setShowCreateEventModal] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [isEditMode, setIsEditMode] = useState(false);
   const [selectedRoster, setSelectedRoster] = useState<string[]>([]);
   const [events, setEvents] = useState<Event[]>([]);
   const [loading, setLoading] = useState(true);
   const [createEventLoading, setCreateEventLoading] = useState(false);
+  const [deleteEventLoading, setDeleteEventLoading] = useState(false);
   const { getRolePermissions } = useRoleManagement();
   const { registerForEvent, loading: registrationLoading } =
     useEventRegistrations();
@@ -397,6 +401,39 @@ const EventsManagement: React.FC<EventsManagementProps> = ({
     }
   };
 
+  // Função para excluir evento
+  const handleDeleteEvent = async () => {
+    if (!selectedEvent) return;
+
+    setDeleteEventLoading(true);
+    try {
+      await deleteDoc(doc(db, "events", selectedEvent.id));
+      
+      addToast({
+        title: "Sucesso",
+        description: "Evento excluído com sucesso!",
+        color: "success",
+      });
+      
+      setShowDeleteModal(false);
+      setSelectedEvent(null);
+    } catch (error) {
+      console.error("Erro ao excluir evento:", error);
+      addToast({
+        title: "Erro",
+        description: "Erro ao excluir evento. Tente novamente.",
+        color: "danger",
+      });
+    } finally {
+      setDeleteEventLoading(false);
+    }
+  };
+
+  const handleConfirmDelete = (event: Event) => {
+    setSelectedEvent(event);
+    setShowDeleteModal(true);
+  };
+
   const handleUpdateEvent = async () => {
     if (
       !selectedEvent ||
@@ -514,27 +551,79 @@ const EventsManagement: React.FC<EventsManagementProps> = ({
     if (events.length === 0) return;
 
     const eventIds = events.map(event => event.id);
-    const registrationsQuery = query(
+    
+    // Buscar registrations da própria organização para os eventos
+    const ownRegistrationsQuery = query(
       collection(db, "eventRegistrations"),
-      where("eventId", "in", eventIds)
+      where("eventId", "in", eventIds),
+      where("orgId", "==", organization.id)
     );
 
-    const unsubscribe = onSnapshot(
-      registrationsQuery,
+    // Buscar registrations de eventos criados pela organização (para ver outras organizações inscritas)
+    const hostedEventsIds = events
+      .filter(event => event.hostOrgId === organization.id)
+      .map(event => event.id);
+    
+    const registrationsData: EventRegistration[] = [];
+    const unsubscribes: (() => void)[] = [];
+
+    // Listener para registrations da própria organização
+    const ownUnsubscribe = onSnapshot(
+      ownRegistrationsQuery,
       (snapshot) => {
-        const registrationsData: EventRegistration[] = [];
+        // Limpar registrations da própria org
+        const filteredData = registrationsData.filter(reg => reg.orgId !== organization.id);
+        
         snapshot.forEach((doc) => {
-          registrationsData.push({ id: doc.id, ...doc.data() } as EventRegistration);
+          filteredData.push({ id: doc.id, ...doc.data() } as EventRegistration);
         });
-        setRegistrations(registrationsData);
+        
+        setRegistrations([...filteredData]);
       },
       (error) => {
-        console.error("Erro ao carregar registrations:", error);
+        console.error("Erro ao carregar registrations da organização:", error);
       }
     );
+    unsubscribes.push(ownUnsubscribe);
 
-    return () => unsubscribe();
-  }, [events]);
+    // Listener para registrations de eventos hospedados pela organização (se houver)
+    if (hostedEventsIds.length > 0) {
+      const hostedRegistrationsQuery = query(
+        collection(db, "eventRegistrations"),
+        where("eventId", "in", hostedEventsIds)
+      );
+
+      const hostedUnsubscribe = onSnapshot(
+        hostedRegistrationsQuery,
+        (snapshot) => {
+          // Limpar registrations de eventos hospedados
+          const filteredData = registrationsData.filter(reg => 
+            !hostedEventsIds.includes(reg.eventId) || reg.orgId === organization.id
+          );
+          
+          snapshot.forEach((doc) => {
+            const regData = { id: doc.id, ...doc.data() } as EventRegistration;
+            // Evitar duplicatas da própria organização
+            if (regData.orgId !== organization.id) {
+              filteredData.push(regData);
+            }
+          });
+          
+          // Adicionar registrations da própria org
+          const ownRegs = registrationsData.filter(reg => reg.orgId === organization.id);
+          setRegistrations([...filteredData, ...ownRegs]);
+        },
+        (error) => {
+          console.error("Erro ao carregar registrations de eventos hospedados:", error);
+        }
+      );
+      unsubscribes.push(hostedUnsubscribe);
+    }
+
+    return () => {
+      unsubscribes.forEach(unsub => unsub());
+    };
+  }, [events, organization.id]);
 
   // Função para verificar se o usuário pode ver um evento
   const canViewEvent = (event: Event): boolean => {
@@ -821,13 +910,15 @@ const EventsManagement: React.FC<EventsManagementProps> = ({
                               size="sm"
                               variant="flat"
                             >
-                              {event.status === "open"
-                                ? "Aberto"
-                                : event.status === "closed"
-                                  ? "Fechado"
-                                  : event.status === "finished"
-                                    ? "Finalizado"
-                                    : "Rascunho"}
+                              {event.visibility === "private"
+                                ? "Fechado"
+                                : event.status === "open"
+                                  ? "Aberto"
+                                  : event.status === "closed"
+                                    ? "Fechado"
+                                    : event.status === "finished"
+                                      ? "Finalizado"
+                                      : "Rascunho"}
                             </Chip>
                             <Chip color="primary" size="sm" variant="dot">
                               {event.type === "tournament"
@@ -858,21 +949,33 @@ const EventsManagement: React.FC<EventsManagementProps> = ({
 
                         {/* Botão de edição - apenas para o criador do evento */}
                         {event.createdBy === currentUserId && (
-                          <Button
-                            isIconOnly
-                            color="primary"
-                            size="sm"
-                            startContent={
-                              <HiOutlinePencil className="w-4 h-4" />
-                            }
-                            variant="flat"
-                            onClick={() => {
-                              setSelectedEvent(event);
-                              populateEventForm(event);
-                              setIsEditMode(true);
-                              setShowCreateEventModal(true);
-                            }}
-                          />
+                          <>
+                            <Button
+                              isIconOnly
+                              color="primary"
+                              size="sm"
+                              startContent={
+                                <HiOutlinePencil className="w-4 h-4" />
+                              }
+                              variant="flat"
+                              onClick={() => {
+                                setSelectedEvent(event);
+                                populateEventForm(event);
+                                setIsEditMode(true);
+                                setShowCreateEventModal(true);
+                              }}
+                            />
+                            <Button
+                              isIconOnly
+                              color="danger"
+                              size="sm"
+                              startContent={
+                                <HiOutlineTrash className="w-4 h-4" />
+                              }
+                              variant="flat"
+                              onClick={() => handleConfirmDelete(event)}
+                            />
+                          </>
                         )}
 
                         {canRegister && !registration && (
@@ -1096,13 +1199,15 @@ const EventsManagement: React.FC<EventsManagementProps> = ({
                     size="sm"
                     variant="flat"
                   >
-                    {selectedEvent?.status === "open"
-                      ? "Aberto"
-                      : selectedEvent?.status === "closed"
-                        ? "Fechado"
-                        : selectedEvent?.status === "finished"
-                          ? "Finalizado"
-                          : "Rascunho"}
+                    {selectedEvent?.visibility === "private"
+                      ? "Fechado"
+                      : selectedEvent?.status === "open"
+                        ? "Aberto"
+                        : selectedEvent?.status === "closed"
+                          ? "Fechado"
+                          : selectedEvent?.status === "finished"
+                            ? "Finalizado"
+                            : "Rascunho"}
                   </Chip>
                   <Chip color="primary" size="sm" variant="dot">
                     {selectedEvent?.type === "tournament" ? "Torneio" : "Scrim"}
@@ -1706,6 +1811,44 @@ const EventsManagement: React.FC<EventsManagementProps> = ({
                   : "Criar Evento"}
             </Button>
           </ModalFooter>
+        </ModalContent>
+      </Modal>
+
+      {/* Modal de Confirmação de Exclusão */}
+      <Modal
+        isOpen={showDeleteModal}
+        onOpenChange={setShowDeleteModal}
+        size="md"
+      >
+        <ModalContent>
+          {(onClose) => (
+            <>
+              <ModalHeader className="flex flex-col gap-1">
+                Confirmar Exclusão
+              </ModalHeader>
+              <ModalBody>
+                 <p>
+                   Tem certeza que deseja excluir o evento{" "}
+                   <strong>{selectedEvent?.name}</strong>?
+                 </p>
+                 <p className="text-danger text-sm">
+                   Esta ação não pode ser desfeita.
+                 </p>
+               </ModalBody>
+              <ModalFooter>
+                <Button color="default" variant="light" onPress={onClose}>
+                  Cancelar
+                </Button>
+                <Button
+                  color="danger"
+                  isLoading={deleteEventLoading}
+                  onPress={handleDeleteEvent}
+                >
+                  {deleteEventLoading ? "Excluindo..." : "Excluir"}
+                </Button>
+              </ModalFooter>
+            </>
+          )}
         </ModalContent>
       </Modal>
     </div>

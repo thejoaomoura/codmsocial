@@ -38,6 +38,7 @@ import {
   serverTimestamp,
   collection,
   deleteField,
+  arrayUnion,
 } from "firebase/firestore";
 import { addToast } from "@heroui/toast";
 
@@ -352,6 +353,19 @@ const PainelOrganizacao: React.FC<PainelOrganizacaoProps> = ({
      setTagValidation({ isValid: true, message: "" });
    };
 
+  // Função helper para logs apenas em desenvolvimento
+  function devLog(...args: any[]) {
+    if (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1") {
+      console.log(...args);
+    }
+  }
+
+  function devError(...args: any[]) {
+    if (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1") {
+      console.error(...args);
+    }
+  }
+
   return (
     <div className="space-y-6">
       {/* Seletor de Organização */}
@@ -571,7 +585,7 @@ const PainelOrganizacao: React.FC<PainelOrganizacaoProps> = ({
                   onRemoveMember={async (userId: string, reason?: string) => {
                     if (!user || !userOrg || !userMembership) return;
 
-                    console.log("🔧 Iniciando remoção de membro:", {
+                    devLog("🔧 Iniciando remoção de membro:", {
                       userId,
                       reason,
                     });
@@ -581,7 +595,7 @@ const PainelOrganizacao: React.FC<PainelOrganizacaoProps> = ({
                     );
 
                     if (!targetMember) {
-                      console.error("❌ Membro não encontrado");
+                      devError("❌ Membro não encontrado");
                       addToast({
                         title: "Erro",
                         description: "Membro não encontrado",
@@ -597,7 +611,7 @@ const PainelOrganizacao: React.FC<PainelOrganizacaoProps> = ({
                     );
 
                     if (!validation.valid) {
-                      console.error("❌ Validação falhou:", validation.reason);
+                      devError("❌ Validação falhou:", validation.reason);
                       addToast({
                         title: "Erro de Permissão",
                         description: validation.reason || "Erro de validação",
@@ -610,7 +624,7 @@ const PainelOrganizacao: React.FC<PainelOrganizacaoProps> = ({
                     try {
                       const batch = writeBatch(db);
 
-                      // 🔹 Remove da subcoleção da organização
+                      // Remove da subcoleção da organização
                       const orgMembershipRef = doc(
                         db,
                         `organizations/${userOrg.id}/memberships`,
@@ -619,7 +633,7 @@ const PainelOrganizacao: React.FC<PainelOrganizacaoProps> = ({
 
                       batch.delete(orgMembershipRef);
 
-                      // 🔹 Remove da coleção global "memberships"
+                      // Remove da coleção global "memberships"
                       const globalMembershipsQuery = query(
                         collection(db, "memberships"),
                         where("userId", "==", userId),
@@ -633,7 +647,7 @@ const PainelOrganizacao: React.FC<PainelOrganizacaoProps> = ({
                         batch.delete(docSnap.ref),
                       );
 
-                      // 🔹 Atualiza contador da organização
+                      // Atualiza contador da organização
                       const orgRef = doc(db, "organizations", userOrg.id);
 
                       batch.update(orgRef, {
@@ -641,7 +655,7 @@ const PainelOrganizacao: React.FC<PainelOrganizacaoProps> = ({
                         updatedAt: serverTimestamp(),
                       });
 
-                      // 🔹 Remove o campo organizationTag do documento do usuário
+                      // Remove o campo organizationTag do documento do usuário
                       const userRef = doc(db, "Users", userId);
 
                       batch.set(
@@ -653,12 +667,9 @@ const PainelOrganizacao: React.FC<PainelOrganizacaoProps> = ({
                         { merge: true }, // garante que não apague outros campos
                       );
 
-                      // 🔹 Executa o batch
                       await batch.commit();
 
-                      console.log(
-                        "✅ Membro removido e organizationTag apagado",
-                      );
+                      devLog("✅ Membro removido e organizationTag apagado");
 
                       addToast({
                         title: "Membro Removido",
@@ -667,7 +678,7 @@ const PainelOrganizacao: React.FC<PainelOrganizacaoProps> = ({
                         color: "success",
                       });
                     } catch (error) {
-                      console.error("❌ Erro ao remover membro:", error);
+                      devError("❌ Erro ao remover membro:", error);
                       addToast({
                         title: "Erro",
                         description:
@@ -683,7 +694,7 @@ const PainelOrganizacao: React.FC<PainelOrganizacaoProps> = ({
                   ) => {
                     if (!user || !userOrg || !userMembership) return;
 
-                    console.log("🔧 Iniciando alteração de cargo:", {
+                    devLog("🔧 Iniciando alteração de cargo:", {
                       userId,
                       newRole,
                       reason,
@@ -695,7 +706,7 @@ const PainelOrganizacao: React.FC<PainelOrganizacaoProps> = ({
                     );
 
                     if (!targetMember) {
-                      console.error("❌ Membro não encontrado");
+                      devError("❌ Membro não encontrado");
                       addToast({
                         title: "Erro",
                         description: "Membro não encontrado",
@@ -713,7 +724,7 @@ const PainelOrganizacao: React.FC<PainelOrganizacaoProps> = ({
                     );
 
                     if (!validation.valid) {
-                      console.error("❌ Validação falhou:", validation.reason);
+                      devError("❌ Validação falhou:", validation.reason);
                       addToast({
                         title: "Erro de Permissão",
                         description: validation.reason || "Erro de validação",
@@ -736,15 +747,13 @@ const PainelOrganizacao: React.FC<PainelOrganizacaoProps> = ({
                       batch.update(orgMembershipRef, {
                         role: newRole,
                         updatedAt: serverTimestamp(),
-                        roleHistory: [
-                          {
-                            previousRole: userMembership.role,
-                            newRole: newRole,
-                            changedBy: user.uid,
-                            changedAt: serverTimestamp(),
-                            reason: reason || "Alteração de cargo",
-                          },
-                        ],
+                        roleHistory: arrayUnion({
+                          previousRole: targetMember.role,
+                          newRole: newRole,
+                          changedBy: user.uid,
+                          changedAt: new Date(),
+                          reason: reason || "Alteração de cargo",
+                        }),
                       });
 
                       // Atualizar na coleção global de memberships
@@ -767,14 +776,14 @@ const PainelOrganizacao: React.FC<PainelOrganizacaoProps> = ({
 
                       await batch.commit();
 
-                      console.log("✅ Cargo alterado com sucesso");
+                      devLog("✅ Cargo alterado com sucesso");
                       addToast({
                         title: "Cargo Alterado",
                         description: `Cargo do membro foi alterado para ${newRole} com sucesso`,
                         color: "success",
                       });
                     } catch (error) {
-                      console.error("❌ Erro ao alterar cargo:", error);
+                      devError("❌ Erro ao alterar cargo:", error);
                       addToast({
                         title: "Erro",
                         description:

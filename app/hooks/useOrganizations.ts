@@ -13,6 +13,19 @@ import {
 import { db } from "../firebase";
 import { Organization, Membership } from "../types";
 
+// Função helper para logs apenas em desenvolvimento
+function devLog(...args: any[]) {
+  if (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1") {
+    console.log(...args);
+  }
+}
+
+function devError(...args: any[]) {
+  if (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1") {
+    console.error(...args);
+  }
+}
+
 export const useOrganizations = () => {
   const [organizations, setOrganizations] = useState<Organization[]>([]);
   const [loading, setLoading] = useState(true);
@@ -57,12 +70,10 @@ export const useUserOrganizations = (userId: string | null) => {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1") {
-    console.log("useUserOrganizations - userId:", userId);
-    }
-
+    devLog("useUserOrganizations - userId:", userId);
+    
     if (!userId) {
-      console.log("useUserOrganizations - No userId, setting empty array");
+      devLog("useUserOrganizations - No userId, setting empty array");
       setUserOrganizations([]);
       setLoading(false);
 
@@ -71,7 +82,7 @@ export const useUserOrganizations = (userId: string | null) => {
 
     const loadUserOrganizations = async () => {
       try {
-        //console.log('useUserOrganizations - Starting to load organizations for userId:', userId);
+        devLog("useUserOrganizations - Starting to load organizations for userId:", userId);
         setLoading(true);
 
         // Buscar organizações onde o usuário é owner
@@ -89,7 +100,7 @@ export const useUserOrganizations = (userId: string | null) => {
         });
 
         // Buscar organizações onde o usuário é membro (via coleção global memberships)
-        //console.log('useUserOrganizations - Searching for memberships where user is member');
+        devLog("useUserOrganizations - Searching for memberships where user is member");
 
         const membershipsQuery = query(
           collection(db, "memberships"),
@@ -99,25 +110,15 @@ export const useUserOrganizations = (userId: string | null) => {
 
         const membershipsSnapshot = await getDocs(membershipsQuery);
 
-        if (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1") 
-          { console.log(
-          "useUserOrganizations - Found memberships:",
-          membershipsSnapshot.size,
-        );
-          }
-
+        devLog("useUserOrganizations - Found memberships:", membershipsSnapshot.size);
+          
         const memberOrgs: Organization[] = [];
 
         // Para cada membership, buscar a organização correspondente
         for (const membershipDoc of membershipsSnapshot.docs) {
           const membershipData = membershipDoc.data() as Membership;
 
-          if (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1") 
-            { console.log(
-            "useUserOrganizations - Processing membership for org:",
-            membershipData.organizationId,
-          );
-            }
+          devLog("useUserOrganizations - Processing membership for org:", membershipData.organizationId);
 
           try {
             const orgDoc = await getDoc(
@@ -131,22 +132,18 @@ export const useUserOrganizations = (userId: string | null) => {
               } as Organization;
 
               memberOrgs.push(orgData);
-              if (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1") 
-                { console.log(
+              devLog(
                 "useUserOrganizations - Added member organization:",
                 orgData.name,
               );
-                }
             } else {
-              if (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1") 
-                { console.warn(
+              devError(
                 "useUserOrganizations - Organization not found:",
                 membershipData.organizationId,
               );
-                }
             }
           } catch (orgError) {
-            console.error(
+            devError(
               "useUserOrganizations - Error fetching organization:",
               membershipData.organizationId,
               orgError,
