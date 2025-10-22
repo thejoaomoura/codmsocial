@@ -202,7 +202,7 @@ export default function Home() {
   const { userOrganizations, loading: userOrgsLoading } = useUserOrganizations(
     user?.uid || null,
   );
-  const { userOrganizations: publicOrganizations, loading: publicOrgsLoading } =
+  const { organizations: publicOrganizations, loading: publicOrgsLoading } =
     useOrganizations();
   const { getRoleName, getRoleEmoji } = useRoleManagement();
 

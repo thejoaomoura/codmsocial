@@ -401,6 +401,7 @@ const ExplorarOrganizacoes: React.FC<ExplorarOrganizacoesProps> = ({
               placeholder="Filtrar por visibilidade"
               selectedKeys={[visibilityFilter]}
               startContent={<HiOutlineFilter className="w-4 h-4" />}
+              aria-label="Filtrar organizações por visibilidade"
               onSelectionChange={(keys) =>
                 setVisibilityFilter(Array.from(keys)[0] as string)
               }

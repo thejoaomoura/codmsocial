@@ -134,7 +134,7 @@ export default function XTreinosPublicos(props?: XTreinosPublicosProps) {
 
   // Carregar registrations em tempo real
   useEffect(() => {
-    if (events.length === 0) return;
+    if (events.length === 0 || !user) return; // Verificar se o usuário está autenticado
 
     const eventIds = events.map(event => event.id);
     const registrationsQuery = query(
@@ -153,11 +153,12 @@ export default function XTreinosPublicos(props?: XTreinosPublicosProps) {
       },
       (error) => {
         console.error("Erro ao carregar registrations:", error);
+        setRegistrations([]);
       }
     );
 
     return () => unsubscribe();
-  }, [events]);
+  }, [events, user]); // Adicionar user como dependência
 
   // Função para obter o status da inscrição da organização
   const getRegistrationStatus = (eventId: string) => {

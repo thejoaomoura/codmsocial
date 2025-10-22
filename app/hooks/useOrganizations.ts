@@ -46,7 +46,7 @@ export const useOrganizations = () => {
     return () => unsubscribe();
   }, []);
 
-  return { userOrganizations: organizations, loading, error };
+  return { organizations, loading, error };
 };
 
 export const useUserOrganizations = (userId: string | null) => {
