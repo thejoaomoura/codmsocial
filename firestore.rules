@@ -5,22 +5,41 @@ service cloud.firestore {
     match /Users/{userId} {
       allow read: if true;
       allow write: if request.auth != null && request.auth.uid == userId;
+      
+      // Permitir que owners de organizações atualizem organizationTag de usuários
+      allow update: if request.auth != null && 
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['organizationTag', 'updatedAt']);
     }
     
     // ===== POSTS =====
     match /Posts/{postId} {
       allow read: if true;
       allow create: if request.auth != null;
-      allow update: if request.auth != null && request.auth.uid == resource.data.authorId;
+      allow update: if request.auth != null && 
+        (request.auth.uid == resource.data.authorId || 
+         request.resource.data.diff(resource.data).affectedKeys().hasOnly(['reactions', 'comments', 'updatedAt']));
       allow delete: if request.auth != null && request.auth.uid == resource.data.authorId;
     }
     
     // ===== ORGANIZATIONS =====
     match /organizations/{orgId} {
-      allow read: if true;
+      // Permitir leitura de organizações públicas para todos (incluindo não autenticados)
+      // Permitir leitura de organizações privadas apenas para membros/owner autenticados
+      allow read: if resource.data.visibility == 'public' || 
+        (request.auth != null && 
+         (request.auth.uid == resource.data.ownerId || 
+          exists(/databases/$(database)/documents/organizations/$(orgId)/memberships/$(request.auth.uid))));
+      
+      // Permitir escrita completa para owner e membros
       allow write: if request.auth != null && 
         (request.auth.uid == resource.data.ownerId || 
          exists(/databases/$(database)/documents/organizations/$(orgId)/memberships/$(request.auth.uid)));
+      
+      // Permitir apenas atualização de pendingRequests para usuários autenticados em organizações públicas
+      allow update: if request.auth != null && 
+        resource.data.visibility == 'public' &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['pendingRequests']) &&
+        request.resource.data.pendingRequests.toSet().difference(resource.data.pendingRequests.toSet()).hasOnly([request.auth.uid]);
     }
     
     // ===== MEMBERSHIPS (Coleção Global) =====
@@ -28,7 +47,13 @@ service cloud.firestore {
       allow read: if request.auth != null && 
         (request.auth.uid == resource.data.userId || 
          exists(/databases/$(database)/documents/organizations/$(resource.data.organizationId)/memberships/$(request.auth.uid)));
-      allow write: if request.auth != null && 
+      
+      // Permitir criação de membership próprio para usuários autenticados
+      allow create: if request.auth != null && 
+        request.auth.uid == request.resource.data.userId;
+      
+      // Permitir atualização/exclusão para o próprio usuário, owner ou membros existentes
+      allow update, delete: if request.auth != null && 
         (request.auth.uid == resource.data.userId || 
          request.auth.uid == resource.data.ownerId ||
          exists(/databases/$(database)/documents/organizations/$(resource.data.organizationId)/memberships/$(request.auth.uid)));
@@ -38,8 +63,18 @@ service cloud.firestore {
     match /organizations/{orgId}/memberships/{userId} {
       allow read: if request.auth != null && 
         (request.auth.uid == userId || 
-         exists(/databases/$(database)/documents/organizations/$(orgId)/memberships/$(request.auth.uid)));
-      allow write: if request.auth != null && 
+         exists(/databases/$(database)/documents/organizations/$(orgId)/memberships/$(request.auth.uid)) ||
+         get(/databases/$(database)/documents/organizations/$(orgId)).data.visibility == 'public');
+      
+      // Permitir criação de membership próprio com status "pending" em organizações públicas
+      allow create: if request.auth != null && 
+        request.auth.uid == userId &&
+        request.auth.uid == request.resource.data.userId &&
+        request.resource.data.status == 'pending' &&
+        get(/databases/$(database)/documents/organizations/$(orgId)).data.visibility == 'public';
+      
+      // Permitir atualização/exclusão para owner e membros existentes
+      allow update, delete: if request.auth != null && 
         (request.auth.uid == resource.data.ownerId || 
          exists(/databases/$(database)/documents/organizations/$(orgId)/memberships/$(request.auth.uid)));
     }
@@ -47,14 +82,27 @@ service cloud.firestore {
     // ===== EVENTS =====
     match /events/{eventId} {
       allow read: if true;
-      allow write: if request.auth != null && 
+      allow create: if request.auth != null && 
+        exists(/databases/$(database)/documents/organizations/$(request.resource.data.hostOrgId)/memberships/$(request.auth.uid));
+      allow update: if request.auth != null && 
         exists(/databases/$(database)/documents/organizations/$(resource.data.hostOrgId)/memberships/$(request.auth.uid));
+      allow delete: if request.auth != null && 
+        request.auth.uid == resource.data.createdBy;
     }
     
     // ===== EVENT REGISTRATIONS =====
     match /eventRegistrations/{registrationId} {
+      // Membros podem ver registrations da própria organização
       allow read: if request.auth != null && 
         exists(/databases/$(database)/documents/organizations/$(resource.data.orgId)/memberships/$(request.auth.uid));
+      
+      // Membros podem ver registrations de eventos hospedados por sua organização
+      allow read: if request.auth != null && 
+        exists(/databases/$(database)/documents/events/$(resource.data.eventId)) &&
+        get(/databases/$(database)/documents/events/$(resource.data.eventId)).data.hostOrgId != null &&
+        exists(/databases/$(database)/documents/organizations/$(get(/databases/$(database)/documents/events/$(resource.data.eventId)).data.hostOrgId)/memberships/$(request.auth.uid));
+      
+      // Membros podem criar/editar registrations da própria organização
       allow write: if request.auth != null && 
         exists(/databases/$(database)/documents/organizations/$(resource.data.orgId)/memberships/$(request.auth.uid));
     }
@@ -93,6 +141,23 @@ service cloud.firestore {
     match /logMercado/{logId} {
       allow read: if true; // Leitura pública para mostrar atividades
       allow write: if request.auth != null; // Escrita apenas para usuários autenticados
+    }
+    
+    // ===== ORGANIZATION INVITES =====
+    match /organizationInvites/{inviteId} {
+      // Permitir leitura apenas para membros da organização ou o convidado
+      allow read: if request.auth != null && 
+        (request.auth.email == resource.data.inviteeEmail || 
+         exists(/databases/$(database)/documents/organizations/$(resource.data.organizationId)/memberships/$(request.auth.uid)));
+      
+      // Permitir criação e exclusão apenas para membros da organização
+      allow create, delete: if request.auth != null && 
+        exists(/databases/$(database)/documents/organizations/$(resource.data.organizationId)/memberships/$(request.auth.uid));
+      
+      // Permitir atualização apenas para o convidado (aceitar/recusar) ou membros da organização
+      allow update: if request.auth != null && 
+        (request.auth.email == resource.data.inviteeEmail || 
+         exists(/databases/$(database)/documents/organizations/$(resource.data.organizationId)/memberships/$(request.auth.uid)));
     }
   }
 }
