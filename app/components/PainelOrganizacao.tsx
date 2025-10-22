@@ -1142,7 +1142,16 @@ const PainelOrganizacao: React.FC<PainelOrganizacaoProps> = ({
                       description="Selecione um membro para transferir a liderança da organização"
                       label="Transferir Liderança"
                       placeholder={members && members.length > 1 ? "Selecione um membro" : "Nenhum membro disponível (não é possível transferir)"}
-                      selectedKeys={orgSettings.ownerId ? [orgSettings.ownerId] : []}
+                      selectedKeys={
+                        orgSettings.ownerId && 
+                        members?.some(member => 
+                          member.userId === orgSettings.ownerId && 
+                          member.userId !== userOrg?.ownerId && 
+                          member.status === 'accepted'
+                        ) 
+                          ? [orgSettings.ownerId] 
+                          : []
+                      }
                       startContent={
                         <HiOutlineSwitchHorizontal className="w-4 h-4 text-pink-500" />
                       }
@@ -1160,6 +1169,7 @@ const PainelOrganizacao: React.FC<PainelOrganizacaoProps> = ({
                          .map((member) => (
                            <SelectItem
                              key={member.userId}
+                             textValue={`${member.userData?.displayName || "Usuário"} (${getRoleName(member.role)})`}
                              startContent={
                                <Avatar
                                  className="w-6 h-6"

@@ -325,10 +325,11 @@ const Chat: React.FC<ChatProps> = ({
   }, [chatMessages, currentConversationId, showNotification, userId]);
 
   const filteredConversas = useMemo(() => {
-    if (!searchTerm) return conversas;
-
-    return conversas.filter((c) =>
-      c.otherUserName.toLowerCase().includes(searchTerm.toLowerCase()),
+    if (!searchTerm) {
+      return conversas;
+    }
+    return conversas.filter((conversa) =>
+      conversa.otherUserName.toLowerCase().includes(searchTerm.toLowerCase())
     );
   }, [conversas, searchTerm]);
 

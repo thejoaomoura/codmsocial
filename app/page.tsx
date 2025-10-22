@@ -240,13 +240,26 @@ export default function Home() {
   }, [userOrganizations, selectedOrgId]);
 
   useEffect(() => {
-    devLog("Setting up auth listener...");
     const unsub = onAuthStateChanged(auth, async (u) => {
-      //console.log('Auth state changed:', u ? `User logged in: ${u.uid}` : 'User logged out');
       setUser(u);
       if (u) {
         const userDocRef = doc(db, "Users", u.uid);
         const userDocSnap = await getDoc(userDocRef);
+
+        if (!userDocSnap.exists()) {
+          await setDoc(userDocRef, {
+            uid: u.uid,
+            displayName: u.displayName || u.email?.split("@")[0] || "Usuário",
+            email: u.email,
+            photoURL: u.photoURL || "",
+            createdAt: serverTimestamp(),
+            lastSeen: serverTimestamp(),
+          });
+        } else {
+          await updateDoc(userDocRef, {
+            lastSeen: serverTimestamp(),
+          });
+        }
 
         if (userDocSnap.exists()) {
           const userData = userDocSnap.data();
@@ -281,7 +294,9 @@ export default function Home() {
 
   // Conversas
   useEffect(() => {
-    if (!user) return;
+    if (!user?.uid) {
+      return;
+    }
 
     const unsub = onSnapshot(collection(db, "Chats"), (snap) => {
       const list: ChatOverview[] = [];
@@ -290,13 +305,17 @@ export default function Home() {
       snap.forEach((docSnap) => {
         const data = docSnap.data() as any;
 
-        if (!data.participants?.includes(user.uid)) return;
+        if (!data.participants?.includes(user.uid)) {
+          return;
+        }
 
         const otherUid = data.participants.find(
           (uid: string) => uid !== user.uid,
         );
 
-        if (!otherUid || seenIds.has(docSnap.id)) return; // Evitar duplicatas
+        if (!otherUid || seenIds.has(docSnap.id)) {
+          return; // Evitar duplicatas
+        }
 
         seenIds.add(docSnap.id);
 
@@ -304,14 +323,16 @@ export default function Home() {
         const otherAvatar = data.avatars?.[otherUid] || "";
         const unread = data.unreadBy?.includes(user.uid) || false;
 
-        list.push({
+        const chatOverview = {
           id: docSnap.id,
           otherUserId: otherUid,
           otherUserName: otherName,
           otherUserAvatar: otherAvatar || "",
           lastMessage: data.lastMessage ?? "",
           unread: unread,
-        });
+        };
+
+        list.push(chatOverview);
       });
 
       // Ordenar por última mensagem (mais recentes primeiro)
@@ -325,22 +346,20 @@ export default function Home() {
       setConversas(list);
     });
 
-    return () => unsub();
-  }, [user]);
+    return () => {
+      unsub();
+    };
+  }, [user?.uid]);
 
   const handleGoogleLogin = async () => {
     try {
-      devLog("handleGoogleLogin - Iniciando login com Google...");
       const result = await signInWithPopup(auth, provider);
       const user = result.user;
-
-      devLog("handleGoogleLogin - Login bem-sucedido, usuário:", user.uid);
 
       const userRef = doc(db, "Users", user.uid);
       const userSnap = await getDoc(userRef);
 
       if (!userSnap.exists()) {
-        devLog("handleGoogleLogin - Novo usuário, criando documento...");
         // Novo usuário: salva createdAt
         await setDoc(userRef, {
           displayName: user.displayName,
@@ -348,18 +367,13 @@ export default function Home() {
           photoURL: user.photoURL,
           createdAt: serverTimestamp(), // <-- timestamp para 24h
         });
-        devLog("handleGoogleLogin - Documento do usuário criado");
       } else {
-        devLog(
-          "handleGoogleLogin - Usuário existente, atualizando dados...",
-        );
         // Usuário já existe: atualiza dados sem alterar createdAt
         await updateDoc(userRef, {
           displayName: user.displayName,
           email: user.email,
           photoURL: user.photoURL,
         });
-        devLog("handleGoogleLogin - Dados do usuário atualizados");
       }
     } catch (error: any) {
       // Tratar erros de popup cancelado pelo usuário sem mostrar erro
@@ -368,13 +382,13 @@ export default function Home() {
         error.code === "auth/cancelled-popup-request"
       ) {
         // Usuário cancelou o login voluntariamente, não mostrar erro
-        devLog("Login cancelado pelo usuário");
+        console.log("Login cancelado pelo usuário");
 
         return;
       }
 
       // Para outros erros, mostrar mensagem
-      devError("Erro no login:", error);
+      console.error("Erro no login:", error);
       addToast({
         title: "Erro no Login",
         description: "Erro ao fazer login. Tente novamente.",
@@ -442,7 +456,7 @@ export default function Home() {
       await updateDoc(postRef, {
         comments: arrayUnion(newComment),
       });
-      devLog("Comentário adicionado no post:", postId);
+      console.log("Comentário adicionado no post:", postId);
     } catch (error) {
       devError("Erro ao adicionar comentário:", error);
     }
@@ -465,9 +479,8 @@ export default function Home() {
       await updateDoc(postRef, {
         comments: arrayRemove(comment), // remove exatamente o objeto do array
       });
-      devLog("Comentário deletado:", comment);
     } catch (err) {
-      devError("Erro ao deletar comentário:", err);
+      console.error("Erro ao deletar comentário:", err);
     }
   };
 
@@ -570,19 +583,13 @@ export default function Home() {
     const messagesUnsubscribe = onSnapshot(
       query(chatCol, orderBy("createdAt", "asc")),
       (snap) => {
-        devLog("Mensagens recebidas:", snap.docs.length);
         const msgs = snap.docs.map((d) => {
           const data = d.data() as ChatMessage;
-
-          //console.log("Mensagem:", data);
           return { ...data, id: d.id }; // Adicionar ID do documento
         });
 
         setChatMessages(msgs);
-      },
-      (error) => {
-        devError("Erro no listener de mensagens:", error);
-      },
+      }
     );
 
     // Configurar listener para status de digitação
@@ -668,8 +675,6 @@ export default function Home() {
     const chatCol = collection(db, "Chats", chatId, "Messages");
 
     try {
-      devLog("Enviando mensagem para chatId:", chatId);
-
       // Parar de mostrar "digitando" antes de enviar
       updateTypingStatus(false);
 
@@ -680,40 +685,37 @@ export default function Home() {
       }
 
       // Adicionar mensagem à subcoleção
-      await addDoc(chatCol, {
+      const messageData = {
         senderId: user.uid,
         senderName: user.displayName || user.email?.split("@")[0],
         senderAvatar: user.photoURL || "",
         text: chatText.trim(),
         createdAt: serverTimestamp(),
-      });
-
-      devLog("Mensagem enviada com sucesso");
+      };
+      
+      const messageRef = await addDoc(chatCol, messageData);
 
       // Atualizar documento principal do chat
-      await setDoc(
-        chatDoc,
-        {
-          participants: [user.uid, showChatWith.otherUserId],
-          names: {
-            [user.uid]: user.displayName || user.email?.split("@")[0],
-            [showChatWith.otherUserId]: showChatWith.otherUserName,
-          },
-          avatars: {
-            [user.uid]: user.photoURL || "",
-            [showChatWith.otherUserId]: showChatWith.otherUserAvatar || "",
-          },
-          lastMessage: chatText.trim(),
-          unreadBy: [showChatWith.otherUserId],
-          updatedAt: serverTimestamp(),
+      const chatUpdateData = {
+        participants: [user.uid, showChatWith.otherUserId],
+        names: {
+          [user.uid]: user.displayName || user.email?.split("@")[0],
+          [showChatWith.otherUserId]: showChatWith.otherUserName,
         },
-        { merge: true },
-      );
+        avatars: {
+          [user.uid]: user.photoURL || "",
+          [showChatWith.otherUserId]: showChatWith.otherUserAvatar || "",
+        },
+        lastMessage: chatText.trim(),
+        unreadBy: [showChatWith.otherUserId],
+        updatedAt: serverTimestamp(),
+      };
 
-      devLog("Documento do chat atualizado");
+      await setDoc(chatDoc, chatUpdateData, { merge: true });
+
       setChatText("");
     } catch (error) {
-      devError("Erro ao enviar mensagem:", error);
+      console.error("Erro ao enviar mensagem:", error);
       addToast({
         title: "Erro",
         description: "Erro ao enviar mensagem. Tente novamente.",
@@ -1252,7 +1254,7 @@ export default function Home() {
                   await typingBatch.commit();
                 }
                 
-                devLog("Conversa deletada com sucesso:", id);
+                //console.log("Conversa deletada com sucesso:", id);
                 
                 // Se a conversa deletada era a atualmente aberta, fechar o chat
                 if (showChatWith && showChatWith.id === id) {

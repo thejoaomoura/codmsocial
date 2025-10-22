@@ -159,5 +159,34 @@ service cloud.firestore {
         (request.auth.email == resource.data.inviteeEmail || 
          exists(/databases/$(database)/documents/organizations/$(resource.data.organizationId)/memberships/$(request.auth.uid)));
     }
+    
+    // ===== CHATS =====
+    match /Chats/{chatId} {
+      // Permitir leitura e escrita apenas para os participantes do chat
+      // O chatId é formado pelos UIDs dos usuários ordenados: "uid1_uid2"
+      allow read, write: if request.auth != null && 
+        (chatId.split('_')[0] == request.auth.uid || chatId.split('_')[1] == request.auth.uid);
+      
+      // Subcoleção de mensagens (case-sensitive: Messages)
+      match /Messages/{messageId} {
+        allow read, write: if request.auth != null && 
+          (chatId.split('_')[0] == request.auth.uid || chatId.split('_')[1] == request.auth.uid);
+      }
+      
+      // Subcoleção de mensagens (case-sensitive: messages) - para compatibilidade
+      match /messages/{messageId} {
+        allow read, write: if request.auth != null && 
+          (chatId.split('_')[0] == request.auth.uid || chatId.split('_')[1] == request.auth.uid);
+      }
+      
+      // Subcoleção de status de digitação
+      match /Typing/{userId} {
+        allow read: if request.auth != null && 
+          (chatId.split('_')[0] == request.auth.uid || chatId.split('_')[1] == request.auth.uid);
+        allow write: if request.auth != null && 
+          request.auth.uid == userId &&
+          (chatId.split('_')[0] == request.auth.uid || chatId.split('_')[1] == request.auth.uid);
+      }
+    }
   }
 }
