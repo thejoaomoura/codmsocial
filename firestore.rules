@@ -25,15 +25,12 @@ service cloud.firestore {
     match /organizations/{orgId} {
       // Permitir leitura de organizações públicas para todos (incluindo não autenticados)
       // Permitir leitura de organizações privadas apenas para membros/owner autenticados
-      // Permitir leitura limitada para validação de tags (apenas campo 'tag')
+      // Permitir leitura para usuários autenticados (necessário para validação de tags)
       allow read: if resource.data.visibility == 'public' || 
         (request.auth != null && 
          (request.auth.uid == resource.data.ownerId || 
           exists(/databases/$(database)/documents/organizations/$(orgId)/memberships/$(request.auth.uid)))) ||
-        (request.auth != null && 
-         request.query.limit <= 1 && 
-         request.query.where.size() == 1 &&
-         request.query.where[0].field == 'tag');
+        request.auth != null;
       
       // Permitir escrita completa para owner e membros
       allow write: if request.auth != null && 

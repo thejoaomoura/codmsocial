@@ -40,6 +40,7 @@ import {
   collection,
   deleteField,
   arrayUnion,
+  limit,
 } from "firebase/firestore";
 import { addToast } from "@heroui/toast";
 
@@ -198,7 +199,12 @@ const PainelOrganizacao: React.FC<PainelOrganizacaoProps> = ({
     if (!tag || tag === userOrg?.tag) return true;
 
     try {
-      const q = query(collection(db, "organizations"), where("tag", "==", tag));
+      // Adicionar limite para otimizar a consulta
+      const q = query(
+        collection(db, "organizations"), 
+        where("tag", "==", tag),
+        limit(1)
+      );
       const querySnapshot = await getDocs(q);
 
       return querySnapshot.empty;
@@ -250,22 +256,24 @@ const PainelOrganizacao: React.FC<PainelOrganizacaoProps> = ({
     setSettingsLoading(true);
 
     try {
-      // Validar unicidade da tag
-      const isTagUnique = await validateTag(orgSettings.tag);
+      // Validar unicidade da tag apenas se for diferente da tag atual
+      if (orgSettings.tag !== userOrg.tag) {
+        const isTagUnique = await validateTag(orgSettings.tag);
 
-      if (!isTagUnique) {
-        setTagValidation({
-          isValid: false,
-          message: "Esta tag já está em uso por outra organização",
-        });
-        addToast({
-          title: "Tag Indisponível",
-          description: "Esta tag já está em uso por outra organização",
-          color: "danger",
-        });
-        setSettingsLoading(false);
+        if (!isTagUnique) {
+          setTagValidation({
+            isValid: false,
+            message: "Esta tag já está em uso por outra organização",
+          });
+          addToast({
+            title: "Tag Indisponível",
+            description: "Esta tag já está em uso por outra organização",
+            color: "danger",
+          });
+          setSettingsLoading(false);
 
-        return;
+          return;
+        }
       }
 
       // Atualizar organização no Firestore
