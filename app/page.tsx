@@ -298,7 +298,13 @@ export default function Home() {
       return;
     }
 
-    const unsub = onSnapshot(collection(db, "Chats"), (snap) => {
+    // Restringe a consulta aos chats onde o usuário é participante
+    const qChats = query(
+      collection(db, "Chats"),
+      where("participants", "array-contains", user.uid)
+    );
+
+    const unsub = onSnapshot(qChats, (snap) => {
       const list: ChatOverview[] = [];
       const seenIds = new Set<string>(); // Prevenir duplicatas
 
@@ -335,15 +341,16 @@ export default function Home() {
         list.push(chatOverview);
       });
 
-      // Ordenar por última mensagem (mais recentes primeiro)
+      // Ordenar por não lidas primeiro
       list.sort((a, b) => {
         if (a.unread && !b.unread) return -1;
         if (!a.unread && b.unread) return 1;
-
         return 0;
       });
 
       setConversas(list);
+    }, (error) => {
+      devError("Erro ao carregar conversas:", error);
     });
 
     return () => {

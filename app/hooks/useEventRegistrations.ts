@@ -27,10 +27,43 @@ export const useEventRegistrations = () => {
     managerId: string,
     roster: string[],
     substitutes: string[] = [],
+    event?: any, // Evento completo para validações
+    currentUserId?: string, // ID do usuário atual
+    userRole?: string, // Role do usuário na organização
   ): Promise<boolean> => {
     setLoading(true);
 
     try {
+      // Validação: Verificar se o usuário é owner da organização hospedeira
+      if (event && event.hostOrgId === orgId) {
+        addToast({
+          title: "Inscrição Não Permitida",
+          description: "A organização hospedeira não pode se inscrever no próprio evento",
+          color: "warning",
+        });
+        return false;
+      }
+
+      // Validação: Verificar se o usuário é o criador do evento
+      if (event && event.createdBy === currentUserId) {
+        addToast({
+          title: "Inscrição Não Permitida", 
+          description: "O criador do evento não pode inscrever sua organização no próprio evento",
+          color: "warning",
+        });
+        return false;
+      }
+
+      // Validação: Verificar se o usuário é owner da organização (não pode se auto-inscrever)
+      if (userRole === "owner") {
+        addToast({
+          title: "Inscrição Não Permitida",
+          description: "Owners não podem inscrever a própria organização em eventos. Apenas membros podem se inscrever.",
+          color: "warning",
+        });
+        return false;
+      }
+
       // Verificar se já existe uma inscrição para esta organização neste evento
       const existingRegistrationQuery = query(
         collection(db, "eventRegistrations"),
@@ -73,11 +106,35 @@ export const useEventRegistrations = () => {
       return true;
     } catch (error) {
       console.error("Erro ao inscrever no evento:", error);
-      addToast({
-        title: "Erro na Inscrição",
-        description: "Erro ao inscrever no evento. Tente novamente.",
-        color: "danger",
-      });
+      
+      // Melhor tratamento de erros para UX
+      if (error instanceof Error) {
+        if (error.message.includes("Missing or insufficient permissions")) {
+          addToast({
+            title: "Erro de Permissão",
+            description: "Você não tem permissão para realizar esta inscrição. Verifique se sua organização está ativa.",
+            color: "danger",
+          });
+        } else if (error.message.includes("network")) {
+          addToast({
+            title: "Erro de Conexão",
+            description: "Verifique sua conexão com a internet e tente novamente.",
+            color: "danger",
+          });
+        } else {
+          addToast({
+            title: "Erro na Inscrição",
+            description: "Ocorreu um erro inesperado. Tente novamente em alguns instantes.",
+            color: "danger",
+          });
+        }
+      } else {
+        addToast({
+          title: "Erro na Inscrição",
+          description: "Ocorreu um erro inesperado. Tente novamente.",
+          color: "danger",
+        });
+      }
 
       return false;
     } finally {

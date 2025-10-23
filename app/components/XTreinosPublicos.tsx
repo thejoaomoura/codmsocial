@@ -24,7 +24,8 @@ import {
   HiOutlineEye, 
   HiOutlineUsers, 
   HiOutlineCheck, 
-  HiOutlineExternalLink 
+  HiOutlineExternalLink,
+  HiOutlinePlus
 } from "react-icons/hi";
 import { FiCalendar, FiUsers, FiMapPin, FiClock } from "react-icons/fi";
 import { collection, query, where, onSnapshot, Timestamp } from "firebase/firestore";
@@ -34,6 +35,9 @@ import { Event, EventRegistration } from "../types";
 import { useAuthState } from "react-firebase-hooks/auth";
 import { useOrganizations } from "../hooks/useOrganizations";
 import { useEventRegistrations } from "../hooks/useEventRegistrations";
+import { useRoleManagement } from "../hooks/useRoleManagement";
+import { useUserMembership } from "../hooks/useMemberships";
+import { addToast } from "@heroui/toast";
 
 interface XTreinosPublicosProps {
   currentUserId?: string;
@@ -53,12 +57,23 @@ export default function XTreinosPublicos(props?: XTreinosPublicosProps) {
   
   const [user] = useAuthState(auth);
   const { registerForEvent, loading: registrationLoading } = useEventRegistrations();
+  const { getRolePermissions } = useRoleManagement();
 
   // Usando props ou valores padrão
   const currentUserId = props?.currentUserId || user?.uid;
   const currentUserRole = props?.currentUserRole || "ranked";
   const membersFromProps = props?.members || [];
   const organization = props?.organization;
+
+  // Obter membership do usuário na organização atual
+  const { membership: userMembership } = useUserMembership(
+    organization?.id || null, 
+    user?.uid || null
+  );
+
+  // Verificar permissões do usuário atual
+  const userPermissions = getRolePermissions(currentUserRole as any);
+  const canCreateEvents = userPermissions.canCreateEvents && organization;
 
   // Mock data para permissões
   const permissions = { canRegisterForEvents: true };
@@ -201,26 +216,57 @@ export default function XTreinosPublicos(props?: XTreinosPublicosProps) {
   };
 
   const handleConfirmRegistration = async () => {
-    if (!selectedEvent || !user) {
+    if (!selectedEvent || !user || !organization) {
+      addToast({
+        title: "Erro de Validação",
+        description: "Você precisa estar logado e fazer parte de uma organização para se inscrever",
+        color: "danger",
+      });
       return;
     }
 
     try {
       const success = await registerForEvent(
         selectedEvent.id,
-        user.uid, // usando userId em vez de orgId
+        organization.id, // usando organizationId em vez de userId
         user.uid,
-        [], // roster vazio por enquanto
-        []  // substitutes vazios por enquanto
+        selectedRoster, // roster selecionado
+        [], // substitutes vazios por enquanto
+        selectedEvent, // evento completo para validações
+        user.uid, // userId atual para validações
+        userMembership?.role // role do usuário na organização
       );
 
       if (success) {
         onClose();
         setSelectedEvent(null);
+        setSelectedRoster([]);
       }
     } catch (error) {
       console.error("Erro ao inscrever no evento:", error);
+      addToast({
+        title: "Erro na Inscrição",
+        description: "Ocorreu um erro inesperado. Tente novamente.",
+        color: "danger",
+      });
     }
+  };
+
+  // Função para navegar para a aba de Eventos no Painel da Organização
+  const handleCreateEvent = () => {
+    // Primeiro, navegar para o Painel da Organização
+    const event = new CustomEvent("changeTab", {
+      detail: "Painel da Organização",
+    });
+    window.dispatchEvent(event);
+    
+    // Depois de um pequeno delay, disparar evento para mudar para a sub-aba de Eventos
+    setTimeout(() => {
+      const eventTab = new CustomEvent("changeSubTab", {
+        detail: "events",
+      });
+      window.dispatchEvent(eventTab);
+    }, 100);
   };
 
   const getEventStatusColor = (status: string) => {
@@ -297,7 +343,7 @@ export default function XTreinosPublicos(props?: XTreinosPublicosProps) {
       <div className="flex justify-center items-center py-8">
         <div className="text-center">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-2" />
-          <p className="text-default-600">Carregando X-Treinos públicos...</p>
+          <p className="text-default-600">Carregando dados...</p>
         </div>
       </div>
     );
@@ -315,10 +361,25 @@ export default function XTreinosPublicos(props?: XTreinosPublicosProps) {
             Eventos públicos criados por organizações da comunidade
           </p>
         </div>
+        
+        {/* Botão Crie seu próprio evento - apenas para usuários com permissão */}
+        {canCreateEvents && (
+          <Chip
+            color="default"
+            variant="flat"
+            className="cursor-pointer hover:bg-default-200 transition-colors"
+            onClick={handleCreateEvent}
+          >
+            <div className="flex items-center gap-2 px-2 py-1">
+              <HiOutlinePlus className="w-4 h-4" />
+              <span className="text-sm font-medium">Crie seu próprio evento</span>
+            </div>
+          </Chip>
+        )}
       </div>
 
-      {/* Informação sobre permissões para Ranked/Pro */}
-      {(currentUserRole === "ranked" || currentUserRole === "pro") && (
+      {/* Informação sobre permissões para Ranked/Pro - apenas se for membro de uma organização */}
+      {(currentUserRole === "ranked" || currentUserRole === "pro") && organization && (
         <Card className="bg-gray-900 border-gray-700">
           <CardBody className="py-3">
             <div className="flex items-center gap-2">
@@ -326,6 +387,32 @@ export default function XTreinosPublicos(props?: XTreinosPublicosProps) {
               <p className="text-sm text-gray-300">
                 <strong>Modo Visualização:</strong> Você pode ver informações
                 dos eventos, mas não pode inscrever a organização.
+              </p>
+            </div>
+          </CardBody>
+        </Card>
+      )}
+
+      {/* Informação para usuários sem organização ou sem permissão para criar eventos */}
+      {!canCreateEvents && user && (
+        <Card 
+          className="bg-gray-900 border-gray-700 hover:bg-gray-800 transition-colors cursor-pointer"
+          isPressable
+          onPress={() => {
+            const event = new CustomEvent("changeTab", {
+              detail: "Painel da Organização",
+            });
+            window.dispatchEvent(event);
+          }}
+        >
+          <CardBody className="py-3">
+            <div className="flex items-center gap-2">
+              <HiOutlinePlus className="w-5 h-5 text-blue-400" />
+              <p className="text-sm text-gray-300">
+                <strong className="text-blue-400 hover:text-blue-300">Quer criar seus próprios eventos?</strong> {!organization 
+                  ? "Crie ou junte-se a uma organização e torne-se Dono, Moderator ou Manager para poder criar eventos públicos ou privados."
+                  : "Você precisa ser Dono, Moderator ou Manager da sua organização para criar eventos."
+                }
               </p>
             </div>
           </CardBody>
@@ -350,7 +437,10 @@ export default function XTreinosPublicos(props?: XTreinosPublicosProps) {
             const canRegister =
               permissions.canRegisterForEvents &&
               event.status === "open" &&
-              !registration;
+              !registration &&
+              userMembership?.role !== "owner" && // Owners não podem se inscrever
+              event.createdBy !== user?.uid && // Criador não pode se inscrever
+              event.hostOrgId !== organization?.id; // Organização hospedeira não pode se inscrever
 
             const EventIcon = getEventTypeIcon(event.type);
 
@@ -465,6 +555,30 @@ export default function XTreinosPublicos(props?: XTreinosPublicosProps) {
                         >
                           Inscrever
                         </Button>
+                      )}
+                      
+                      {/* Mostrar mensagem quando não pode se inscrever */}
+                      {!canRegister && !registration && event.status === "open" && (
+                        <Tooltip
+                          content={
+                            userMembership?.role === "owner"
+                              ? "Owners não podem inscrever a própria organização"
+                              : event.createdBy === user?.uid
+                              ? "Você criou este evento"
+                              : event.hostOrgId === organization?.id
+                              ? "Sua organização hospeda este evento"
+                              : "Inscrições não disponíveis"
+                          }
+                        >
+                          <Button
+                            color="default"
+                            size="sm"
+                            variant="flat"
+                            isDisabled
+                          >
+                            Não Disponível
+                          </Button>
+                        </Tooltip>
                       )}
                     </div>
                   </div>
@@ -700,13 +814,15 @@ export default function XTreinosPublicos(props?: XTreinosPublicosProps) {
             >
               Cancelar
             </Button>
-            <Button
-              color="primary"
-              isLoading={registrationLoading}
-              onClick={handleConfirmRegistration}
-            >
-              Confirmar Inscrição
-            </Button>
+            {canCreateEvents && (
+              <Button
+                color="primary"
+                isLoading={registrationLoading}
+                onClick={handleConfirmRegistration}
+              >
+                Confirmar Inscrição
+              </Button>
+            )}
           </ModalFooter>
         </ModalContent>
       </Modal>
