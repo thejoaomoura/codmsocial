@@ -30,7 +30,7 @@ import { Input } from "@heroui/input";
 import { Modal, ModalContent, ModalHeader, ModalBody, ModalFooter } from "@heroui/modal";
 import { HiArrowRight, HiOutlineSearch, HiTrash, HiCheck, HiX } from "react-icons/hi";
 import { useRouter } from "next/navigation";
-import { addDoc, collection, serverTimestamp } from "firebase/firestore";
+import { addDoc, collection, serverTimestamp, doc, setDoc } from "firebase/firestore";
 import { readConversationNotificationPreference, writeConversationNotificationPreference } from "./chatNotificationPreferences";
 
 import TypingIndicator from "./components/TypingIndicator";
@@ -137,6 +137,26 @@ const Chat: React.FC<ChatProps> = ({
           messageType: 'audio',
           createdAt: serverTimestamp(),
         });
+
+        const chatDocRef = doc(db, "Chats", chatId);
+        await setDoc(
+          chatDocRef,
+          {
+            participants: [userId, showChatWith.otherUserId],
+            names: {
+              [userId]: userName,
+              [showChatWith.otherUserId]: showChatWith.otherUserName,
+            },
+            avatars: {
+              [userId]: userAvatar || "",
+              [showChatWith.otherUserId]: showChatWith.otherUserAvatar || "",
+            },
+            lastMessage: "[Áudio]",
+            unreadBy: [showChatWith.otherUserId],
+            updatedAt: serverTimestamp(),
+          },
+          { merge: true }
+        );
 
         setHasRecordedAudio(false);
       };

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useRef } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import { Card, CardBody, CardHeader } from "@heroui/card";
 import { Chip } from "@heroui/chip";
 import { Avatar } from "@heroui/avatar";
@@ -8,6 +8,7 @@ import { Button } from "@heroui/button";
 import { Spinner } from "@heroui/spinner";
 import { Tabs, Tab } from "@heroui/tabs";
 import { Input } from "@heroui/input";
+import { Textarea } from "@heroui/input";
 import { Select, SelectItem } from "@heroui/select";
 import {
   HiOutlineUsers,
@@ -78,6 +79,18 @@ const PainelOrganizacao: React.FC<PainelOrganizacaoProps> = ({
 }) => {
   const [activeTab, setActiveTab] = useState("overview");
   const { getRoleName, getRoleEmoji, getRolePermissions } = useRoleManagement();
+
+  // Listener para mudanças de sub-aba via eventos customizados
+  useEffect(() => {
+    const handleSubTabChange = (event: CustomEvent) => {
+      setActiveTab(event.detail as string);
+    };
+
+    window.addEventListener("changeSubTab", handleSubTabChange as EventListener);
+
+    return () =>
+      window.removeEventListener("changeSubTab", handleSubTabChange as EventListener);
+  }, []);
 
   // Estados para configurações da organização
   const [orgSettings, setOrgSettings] = useState({
@@ -221,15 +234,15 @@ const PainelOrganizacao: React.FC<PainelOrganizacaoProps> = ({
       return;
     }
 
-    // Validar formato da tag (apenas letras, números e underscore)
-    const tagRegex = /^[a-zA-Z0-9_]+$/;
+    // Validar formato da tag (permite caracteres Unicode, letras, números e underscore)
+    const tagRegex = /^[\p{L}\p{N}_]+$/u;
 
     if (!tagRegex.test(orgSettings.tag)) {
       addToast({
-        title: "Erro de Validação",
-        description: "Tag deve conter apenas letras, números e underscore",
-        color: "danger",
-      });
+          title: "Erro de Validação",
+          description: "Tag deve conter apenas letras, números, underscore e caracteres Unicode",
+          color: "danger",
+        });
 
       return;
     }
@@ -902,7 +915,7 @@ const PainelOrganizacao: React.FC<PainelOrganizacaoProps> = ({
                     {/* Tag da Organização */}
                     <Input
                       isRequired
-                      description="Tag única da organização (letras, números). Ex: 123M, AB0, G4L"
+                      description="Tag única da organização (letras, números, underscore e caracteres Unicode). Ex: 123M, AB0, G4L, ҲƲƧ, ƝҲƧ"
                       endContent={<span className="text-gray-500">]</span>}
                       errorMessage={tagValidation.message}
                       isInvalid={!tagValidation.isValid}
@@ -961,12 +974,18 @@ const PainelOrganizacao: React.FC<PainelOrganizacaoProps> = ({
                     </div>
 
                     {/* Descrição */}
-                    <Input
-                      description="Descrição da organização (máximo 500 caracteres)"
+                    <Textarea
+                      description="Descrição da organização (máximo 1000 caracteres)"
                       label="Descrição"
-                      maxLength={500}
+                      maxLength={1000}
                       placeholder="Descreva sua organização..."
                       value={orgSettings.description}
+                      minRows={3}
+                      maxRows={6}
+                      classNames={{
+                        input: "resize-none",
+                        inputWrapper: "min-h-[80px]"
+                      }}
                       onChange={(e) =>
                         setOrgSettings((prev) => ({
                           ...prev,

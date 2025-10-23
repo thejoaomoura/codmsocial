@@ -25,10 +25,15 @@ service cloud.firestore {
     match /organizations/{orgId} {
       // Permitir leitura de organizações públicas para todos (incluindo não autenticados)
       // Permitir leitura de organizações privadas apenas para membros/owner autenticados
+      // Permitir leitura limitada para validação de tags (apenas campo 'tag')
       allow read: if resource.data.visibility == 'public' || 
         (request.auth != null && 
          (request.auth.uid == resource.data.ownerId || 
-          exists(/databases/$(database)/documents/organizations/$(orgId)/memberships/$(request.auth.uid))));
+          exists(/databases/$(database)/documents/organizations/$(orgId)/memberships/$(request.auth.uid)))) ||
+        (request.auth != null && 
+         request.query.limit <= 1 && 
+         request.query.where.size() == 1 &&
+         request.query.where[0].field == 'tag');
       
       // Permitir escrita completa para owner e membros
       allow write: if request.auth != null && 
@@ -96,14 +101,20 @@ service cloud.firestore {
       allow read: if request.auth != null && 
         exists(/databases/$(database)/documents/organizations/$(resource.data.orgId)/memberships/$(request.auth.uid));
       
-      // Membros podem ver registrations de eventos hospedados por sua organização
+      // Membros de uma organização podem ver TODAS as registrations dos eventos hospedados por sua organização
+      // (permite ver todas as registrations de outros times nos eventos que sua org hospeda)
       allow read: if request.auth != null && 
+        resource.data.eventId != null &&
         exists(/databases/$(database)/documents/events/$(resource.data.eventId)) &&
         get(/databases/$(database)/documents/events/$(resource.data.eventId)).data.hostOrgId != null &&
         exists(/databases/$(database)/documents/organizations/$(get(/databases/$(database)/documents/events/$(resource.data.eventId)).data.hostOrgId)/memberships/$(request.auth.uid));
       
-      // Membros podem criar/editar registrations da própria organização
-      allow write: if request.auth != null && 
+      // Membros podem criar registrations da própria organização
+      allow create: if request.auth != null && 
+        exists(/databases/$(database)/documents/organizations/$(request.resource.data.orgId)/memberships/$(request.auth.uid));
+      
+      // Membros podem editar registrations da própria organização
+      allow update, delete: if request.auth != null && 
         exists(/databases/$(database)/documents/organizations/$(resource.data.orgId)/memberships/$(request.auth.uid));
     }
     
@@ -164,9 +175,13 @@ service cloud.firestore {
     match /Chats/{chatId} {
       // Permitir leitura e escrita apenas para os participantes do chat
       // O chatId é formado pelos UIDs dos usuários ordenados: "uid1_uid2"
-      allow read, write: if request.auth != null && 
-        (chatId.split('_')[0] == request.auth.uid || chatId.split('_')[1] == request.auth.uid);
-      
+      allow read, write: if request.auth != null && (
+        // Autoriza pelo padrão do ID do documento
+        (chatId.split('_')[0] == request.auth.uid || chatId.split('_')[1] == request.auth.uid) ||
+        // Autoriza se o usuário estiver listado em participants (para compatibilidade com chats antigos)
+        (resource.data.participants != null && request.auth.uid in resource.data.participants)
+      );
+
       // Subcoleção de mensagens (case-sensitive: Messages)
       match /Messages/{messageId} {
         allow read, write: if request.auth != null && 

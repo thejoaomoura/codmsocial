@@ -13,7 +13,7 @@ import {
   signOut,
   updateProfile,
 } from "firebase/auth";
-import { collection, doc, getDoc, getDocs, updateDoc } from "firebase/firestore";
+import { collection, doc, getDoc, getDocs, updateDoc, query, where } from "firebase/firestore";
 import { auth, db } from "../firebase";
 import {
   HiOutlineCalendar,
@@ -25,10 +25,13 @@ import {
   HiArrowLeft,
   HiOutlineNewspaper,
   HiOutlineEye,
+  HiOutlineUpload,
+  HiOutlinePhotograph,
 } from "react-icons/hi";
 import { Navbar, NavbarContent, NavbarItem } from "@heroui/navbar";
 import { Tooltip } from "@heroui/tooltip";
 import { Dropdown, DropdownTrigger, DropdownMenu, DropdownItem } from "@heroui/dropdown";
+import { Select, SelectItem } from "@heroui/select";
 import { useRouter } from "next/navigation";
 import { Modal, ModalBody, ModalContent, ModalFooter, ModalHeader } from "@heroui/modal";
 import { Code } from "@heroui/code";
@@ -99,17 +102,28 @@ const [modalMemberFilter, setModalMemberFilter] = useState("");
 
 useEffect(() => {
   const fetchOrganization = async () => {
-    if (!profileUser?.organizationTag) return;
+    if (!profileUser?.organizationTag) {
+      setOrganization(null);
+      return;
+    }
 
     try {
-      const orgQuery = await getDocs(collection(db, "organizations"));
-      let foundOrg: Organization | null = null;
-
-      orgQuery.forEach((docSnap) => {
-        const data = docSnap.data();
-        if (data.tag === profileUser.organizationTag) {
-          foundOrg = {
-            id: docSnap.id,
+      const membershipQuery = query(
+        collection(db, "memberships"),
+        where("userId", "==", profileUser.uid)
+      );
+      
+      const membershipSnapshot = await getDocs(membershipQuery);
+      
+      if (!membershipSnapshot.empty) {
+        const membershipData = membershipSnapshot.docs[0].data();
+        const orgRef = doc(db, "organizations", membershipData.organizationId);
+        const orgSnap = await getDoc(orgRef);
+        
+        if (orgSnap.exists()) {
+          const data = orgSnap.data();
+          const foundOrg: Organization = {
+            id: orgSnap.id,
             name: data.name,
             tag: data.tag,
             slug: data.slug,
@@ -126,17 +140,55 @@ useEffect(() => {
             maxMembers: data.maxMembers,
             settings: data.settings,
           };
+          setOrganization(foundOrg);
+          return;
         }
-      });
-
-      setOrganization(foundOrg);
+      }
+      
+      // Se não encontrou membership, tenta buscar organizações públicas por tag
+      const orgQuery = query(
+        collection(db, "organizations"),
+        where("tag", "==", profileUser.organizationTag),
+        where("visibility", "==", "public")
+      );
+      
+      const orgSnapshot = await getDocs(orgQuery);
+      
+      if (!orgSnapshot.empty) {
+        const docSnap = orgSnapshot.docs[0];
+        const data = docSnap.data();
+        
+        const foundOrg: Organization = {
+          id: docSnap.id,
+          name: data.name,
+          tag: data.tag,
+          slug: data.slug,
+          ownerId: data.ownerId,
+          hasPendingRequest: data.hasPendingRequest,
+          createdAt: data.createdAt,
+          updatedAt: data.updatedAt,
+          logoURL: data.logoURL,
+          region: data.region,
+          game: data.game,
+          visibility: data.visibility,
+          memberCount: data.memberCount,
+          description: data.description,
+          maxMembers: data.maxMembers,
+          settings: data.settings,
+        };
+        
+        setOrganization(foundOrg);
+      } else {
+        setOrganization(null);
+      }
     } catch (err) {
       console.error("Erro ao buscar organização:", err);
+      setOrganization(null);
     }
   };
 
   fetchOrganization();
-}, [profileUser?.organizationTag]);
+}, [profileUser?.organizationTag, profileUser?.uid]);
 
   // --- Carrega usuário logado ---
   useEffect(() => {
@@ -172,10 +224,31 @@ useEffect(() => {
         const snap = await getDoc(doc(db, "Users", uidToFetch));
         const data = snap.exists() ? snap.data() : {};
 
+        // Buscar o role correto da coleção global memberships
+        let correctRole = data.organizationRole || "";
+        if (data.organizationTag) {
+          try {
+            const membershipQuery = query(
+              collection(db, "memberships"),
+              where("userId", "==", uidToFetch),
+              where("organizationTag", "==", data.organizationTag)
+            );
+            const membershipSnapshot = await getDocs(membershipQuery);
+            
+            if (!membershipSnapshot.empty) {
+              const membershipDoc = membershipSnapshot.docs[0];
+              correctRole = membershipDoc.data().role || correctRole;
+            }
+          } catch (membershipError) {
+            console.error("Erro ao buscar role da membership:", membershipError);
+            // Manter o role da coleção Users como fallback
+          }
+        }
+
         const perfil: PerfilUser = {
           uid: uidToFetch,
-          displayName: data.displayName || "",
-          organizationRole: data.organizationRole || "",
+          displayName: data.displayName || "Unknown user",
+          organizationRole: correctRole,
           email: data.email || "",
           photoURL: data.photoURL || "",
           organizationTag: data.organizationTag || "",
@@ -504,7 +577,13 @@ useEffect(() => {
 
       {/* Perfil */}
       <div style={{ maxWidth: 800, margin: "0 auto", padding: 0 }}>
-        <Card className="space-y-6 mr-5 ml-5">
+        <Card className="space-y-6 mr-5 ml-5 bg-gray-900/50 border-gray-700"
+              classNames={{
+                base: "bg-gray-900/50 border border-gray-700",
+                header: "bg-gray-800/30",
+                body: "bg-gray-900/30",
+                footer: "bg-gray-800/30"
+              }}>
 <CardHeader className="flex flex-col items-center gap-3">
   {/* Avatares */}
   <div className="flex items-center gap-2">
@@ -522,29 +601,34 @@ useEffect(() => {
         />
       </div>
     </div>
-    {organization?.logoURL && (
-      <img
-        src={organization.logoURL}
-        alt={organization.name}
-        className="-ml-10 h-20 w-20 rounded-full object-cover border-2 border-white/30 bg-gray-700 z-0"
-      />
-    )}
+    <img
+      src={organization?.logoURL || "https://i.ibb.co/jZJ28pJm/image.png"}
+      alt={organization?.name || "Organização"}
+      className="-ml-10 h-20 w-20 rounded-full object-cover border-2 border-white/30 bg-gray-700 -z-10"
+    />
   </div>
 
   {/* Nome, organização e cargo */}
   {isOwnProfile ? (
     editMode ? (
-      <div className="w-full space-y-3">
+      <div className="w-full space-y-4">
         <Input
           value={name}
           onChange={(e) => setName(e.target.value)}
           placeholder="Nome"
           label="Nome"
+          variant="bordered"
+          classNames={{
+            input: "text-white",
+            inputWrapper: "bg-gray-800/50 border-gray-600 hover:border-gray-500 focus-within:border-blue-500",
+            label: "text-gray-300"
+          }}
         />
-        <div className="space-y-2">
+        
+        <div className="space-y-3">
           <label className="text-sm font-medium text-gray-300">Foto do perfil</label>
-          <div className="flex items-center gap-3">
-            <div className="h-16 w-16 rounded-full overflow-hidden border-2 border-gray-600 bg-gray-700 flex items-center justify-center">
+          <div className="flex items-center gap-4">
+            <div className="h-20 w-20 rounded-full overflow-hidden border-2 border-gray-600 bg-gray-800/50 flex items-center justify-center shadow-lg">
               <img 
                 alt="Avatar preview" 
                 className="h-full w-full object-cover" 
@@ -552,34 +636,69 @@ useEffect(() => {
               />
             </div>
             <div className="flex-1">
+              <Chip
+                as="button"
+                onClick={() => inputRef.current?.click()}
+                startContent={<HiOutlineUpload className="w-4 h-4" />}
+                variant="bordered"
+                className="bg-gray-800/50 border-gray-600 hover:border-blue-500 hover:bg-gray-700/50 transition-all cursor-pointer text-gray-300 hover:text-white"
+              >
+                Escolher arquivo
+              </Chip>
               <input
+                ref={inputRef}
                 type="file"
                 accept="image/*"
                 onChange={handleAvatarChange}
-                className="block w-full text-sm text-gray-300 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-medium file:bg-blue-600 file:text-white hover:file:bg-blue-700 file:cursor-pointer cursor-pointer"
+                className="hidden"
               />
-              <p className="text-xs text-gray-400 mt-1">Formatos aceitos: JPG, PNG, GIF (máx. 5MB)</p>
+              <p className="text-xs text-gray-400 mt-2">Formatos aceitos: JPG, PNG, GIF (máx. 5MB)</p>
             </div>
           </div>
         </div>
+        
         <Input
           value={organizationTag}
           onChange={(e) => setOrganizationTag(e.target.value)}
           placeholder="Tag da organização"
           label="Tag da organização"
+          variant="bordered"
+          classNames={{
+            input: "text-white",
+            inputWrapper: "bg-gray-800/50 border-gray-600 hover:border-gray-500 focus-within:border-blue-500",
+            label: "text-gray-300"
+          }}
         />
-        <div className="space-y-2">
-          <label className="text-sm font-medium text-gray-300">Quem pode ver meu status online</label>
-          <select 
-            value={privacyLastSeen}
-            onChange={(e) => setPrivacyLastSeen(e.target.value as any)}
-            className="w-full p-3 bg-gray-800 border border-gray-600 rounded-md text-gray-200 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+        
+        <div className="space-y-3">
+          <label className="text-sm font-medium text-gray-300">Privacidade do status online</label>
+          <Select
+            selectedKeys={[privacyLastSeen]}
+            onSelectionChange={(keys) => {
+              const selectedKey = Array.from(keys)[0] as string;
+              setPrivacyLastSeen(selectedKey as any);
+            }}
+            variant="bordered"
+            classNames={{
+              trigger: "bg-gray-800/50 border-gray-600 hover:border-gray-500 data-[focus=true]:border-blue-500",
+              value: "text-white",
+              popoverContent: "bg-gray-800 border-gray-600",
+              listboxWrapper: "max-h-[400px]"
+            }}
           >
-            <option value="everyone" className="bg-gray-800 text-gray-200">Todos podem ver quando estou online</option>
-            <option value="contacts" className="bg-gray-800 text-gray-200">Apenas meus contatos</option>
-            <option value="mutual" className="bg-gray-800 text-gray-200">Apenas contatos mútuos</option>
-            <option value="nobody" className="bg-gray-800 text-gray-200">Ninguém pode ver meu status</option>
-          </select>
+            <SelectItem key="everyone" className="text-gray-200 data-[hover=true]:bg-gray-700">
+              Todos podem ver quando estou online
+            </SelectItem>
+            <SelectItem key="contacts" className="text-gray-200 data-[hover=true]:bg-gray-700">
+              Apenas meus contatos
+            </SelectItem>
+            <SelectItem key="mutual" className="text-gray-200 data-[hover=true]:bg-gray-700">
+              Apenas contatos mútuos
+            </SelectItem>
+            <SelectItem key="nobody" className="text-gray-200 data-[hover=true]:bg-gray-700">
+              Ninguém pode ver meu status
+            </SelectItem>
+          </Select>
         </div>
       </div>
     ) : (
@@ -588,26 +707,8 @@ useEffect(() => {
 
         {organization ? (
           <div className="flex flex-col items-center w-full -mt-2">
-            {/* Nome da organização + botão colado */}
-            <div className="flex items-center gap-1">
-              <h3 className="text-lg font-bold text-gray-500">
-                {organization.name}
-              </h3>
-              <Button
-                color="secondary"
-                size="sm"
-                variant="flat"
-                className="ml-1"
-                onClick={() =>
-                  openMembersModal(organization.id, organization.name)
-                }
-              >
-               <HiOutlineEye className="h-4 w-4" />
-              </Button>
-            </div>
-
-            {/* Chip do cargo */}
-            {profileUser.organizationRole && (
+            {/* Nome da organização + role em um único Chip */}
+            <div className="flex items-center gap-2">
               <Chip
                 color={
                   profileUser.organizationRole === "owner"
@@ -618,19 +719,31 @@ useEffect(() => {
                     ? "primary"
                     : "default"
                 }
+                size="md"
+                variant="flat"
+                className="font-semibold"
+              >
+                {organization.name} • {
+                  profileUser.organizationRole === "owner"
+                    ? "👑 Dono"
+                    : profileUser.organizationRole === "manager"
+                    ? "⚡ Manager"
+                    : profileUser.organizationRole === "pro"
+                    ? "🌟 Pro Player"
+                    : "🎮 Ranked"
+                }
+              </Chip>
+              <Button
+                color="secondary"
                 size="sm"
                 variant="flat"
-                className="mt-1"
+                onClick={() =>
+                  openMembersModal(organization.id, organization.name)
+                }
               >
-                {profileUser.organizationRole === "owner"
-                  ? "👑 Dono"
-                  : profileUser.organizationRole === "manager"
-                  ? "⚡ Manager"
-                  : profileUser.organizationRole === "pro"
-                  ? "🌟 Pro Player"
-                  : "🎮 Ranked"}
-              </Chip>
-            )}
+               <HiOutlineEye className="h-4 w-4" />
+              </Button>
+            </div>
           </div>
         ) : (
           <p className="text-center text-gray-400 text-sm">
@@ -645,26 +758,8 @@ useEffect(() => {
 
       {organization ? (
         <div className="flex flex-col items-center w-full -mt-2">
-          {/* Nome da organização + botão colado */}
-          <div className="flex items-center gap-1">
-            <h3 className="text-lg font-bold text-gray-500">
-              {organization.name}
-            </h3>
-            <Button
-              color="secondary"
-              size="sm"
-              variant="flat"
-              className="ml-1"
-              onClick={() =>
-                openMembersModal(organization.id, organization.name)
-              }
-            >
-              <HiOutlineEye className="h-4 w-4" />
-            </Button>
-          </div>
-
-          {/* Chip do cargo */}
-          {profileUser.organizationRole && (
+          {/* Nome da organização + role em um único Chip */}
+          <div className="flex items-center gap-2">
             <Chip
               color={
                 profileUser.organizationRole === "owner"
@@ -675,19 +770,31 @@ useEffect(() => {
                   ? "primary"
                   : "default"
               }
+              size="md"
+              variant="flat"
+              className="font-semibold"
+            >
+              {organization.name} • {
+                profileUser.organizationRole === "owner"
+                  ? "👑 Dono"
+                  : profileUser.organizationRole === "manager"
+                  ? "⚡ Manager"
+                  : profileUser.organizationRole === "pro"
+                  ? "🌟 Pro Player"
+                  : "🎮 Ranked"
+              }
+            </Chip>
+            <Button
+              color="secondary"
               size="sm"
               variant="flat"
-              className="mt-1"
+              onClick={() =>
+                openMembersModal(organization.id, organization.name)
+              }
             >
-              {profileUser.organizationRole === "owner"
-                ? "👑 Dono"
-                : profileUser.organizationRole === "manager"
-                ? "⚡ Manager"
-                : profileUser.organizationRole === "pro"
-                ? "🌟 Pro Player"
-                : "🎮 Ranked"}
-            </Chip>
-          )}
+              <HiOutlineEye className="h-4 w-4" />
+            </Button>
+          </div>
         </div>
       ) : (
         <p className="text-center text-gray-400 text-sm">
@@ -741,16 +848,52 @@ useEffect(() => {
           </CardBody>
 
           {isOwnProfile && (
-            <CardFooter className="flex justify-between">
+            <CardFooter className="flex justify-center gap-3">
               {editMode ? (
                 <>
-                  <Button color="primary" onPress={handleSave} startContent={<HiOutlineCheck />}>Salvar</Button>
-                  <Button color="danger" onPress={() => setEditMode(false)} startContent={<HiOutlineX />}>Cancelar</Button>
+                  <Chip
+                    as="button"
+                    onClick={handleSave}
+                    startContent={<HiOutlineCheck className="w-4 h-4" />}
+                    variant="solid"
+                    color="success"
+                    className="cursor-pointer hover:scale-105 transition-transform"
+                  >
+                    Salvar
+                  </Chip>
+                  <Chip
+                    as="button"
+                    onClick={() => setEditMode(false)}
+                    startContent={<HiOutlineX className="w-4 h-4" />}
+                    variant="bordered"
+                    color="danger"
+                    className="cursor-pointer hover:scale-105 transition-transform"
+                  >
+                    Cancelar
+                  </Chip>
                 </>
               ) : (
                 <>
-                  <Button onPress={() => setEditMode(true)} startContent={<HiOutlinePencil />}>Editar Perfil</Button>
-                  <Button color="danger" onPress={() => signOut(auth)} startContent={<HiOutlineLogout />}>Sair</Button>
+                  <Chip
+                    as="button"
+                    onClick={() => setEditMode(true)}
+                    startContent={<HiOutlinePencil className="w-4 h-4" />}
+                    variant="bordered"
+                    color="primary"
+                    className="cursor-pointer hover:scale-105 transition-transform"
+                  >
+                    Editar Perfil
+                  </Chip>
+                  <Chip
+                    as="button"
+                    onClick={() => signOut(auth)}
+                    startContent={<HiOutlineLogout className="w-4 h-4" />}
+                    variant="bordered"
+                    color="danger"
+                    className="cursor-pointer hover:scale-105 transition-transform"
+                  >
+                    Sair
+                  </Chip>
                 </>
               )}
             </CardFooter>
