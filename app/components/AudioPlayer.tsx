@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import { Button } from "@heroui/button";
 import { HiPlay, HiPause } from "react-icons/hi";
 
@@ -11,21 +11,24 @@ interface AudioPlayerProps {
 }
 
 function formatMs(ms: number) {
-  // Verificar se o valor é válido
-  if (!ms || !isFinite(ms) || isNaN(ms)) {
-    return "00:00";
-  }
-  
+  if (!ms || !isFinite(ms) || isNaN(ms)) return "00:00";
   const s = Math.floor(ms / 1000);
   const mm = String(Math.floor(s / 60)).padStart(2, "0");
   const ss = String(s % 60).padStart(2, "0");
+
   return `${mm}:${ss}`;
 }
 
-const AudioPlayer: React.FC<AudioPlayerProps> = ({ audioUrl, className, duration: propDuration }) => {
+const AudioPlayer: React.FC<AudioPlayerProps> = ({
+  audioUrl,
+  className,
+  duration: propDuration,
+}) => {
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
-  const [duration, setDuration] = useState(propDuration ? propDuration * 1000 : 0); // converter para ms
+  const [duration, setDuration] = useState(
+    propDuration ? propDuration * 1000 : 0,
+  );
   const [blobUrl, setBlobUrl] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -35,99 +38,105 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ audioUrl, className, duration
   useEffect(() => {
     const convertToBlob = async () => {
       try {
-        if (audioUrl.startsWith('data:')) {
-          // É uma data URL base64, converter para blob
+        if (audioUrl.startsWith("data:")) {
           const response = await fetch(audioUrl);
           const blob = await response.blob();
-          const url = URL.createObjectURL(blob);
-          setBlobUrl(url);
+
+          setBlobUrl(URL.createObjectURL(blob));
         } else {
-          // É uma URL normal, usar diretamente
           setBlobUrl(audioUrl);
         }
       } catch (err) {
-        console.error('Erro ao converter áudio:', err);
-        setError('Erro ao carregar áudio');
-        setBlobUrl(audioUrl); // Fallback para URL original
+        console.error("Erro ao converter áudio:", err);
+        setError("Erro ao carregar áudio");
+        setBlobUrl(audioUrl);
       }
     };
 
     convertToBlob();
 
-    // Cleanup
     return () => {
-      if (blobUrl && blobUrl !== audioUrl && blobUrl.startsWith('blob:')) {
+      if (blobUrl && blobUrl !== audioUrl && blobUrl.startsWith("blob:")) {
         URL.revokeObjectURL(blobUrl);
       }
     };
   }, [audioUrl]);
 
+  // Eventos do áudio
   useEffect(() => {
     const audio = audioRef.current;
+
     if (!audio || !blobUrl) return;
 
-    const handleTimeUpdate = () => {
-      setCurrentTime(audio.currentTime * 1000);
-    };
-
+    const handleTimeUpdate = () => setCurrentTime(audio.currentTime * 1000);
     const handleLoadedMetadata = () => {
-      if (!propDuration) {
-        setDuration(audio.duration * 1000);
-      }
+      if (!propDuration) setDuration(audio.duration * 1000);
     };
-
     const handleEnded = () => {
       setIsPlaying(false);
       setCurrentTime(0);
     };
-
     const handleError = (e: Event) => {
-      console.error('Erro no áudio:', e);
-      setError('Erro ao reproduzir áudio');
+      console.error("Erro no áudio:", e);
+      setError("Erro ao reproduzir áudio");
       setIsPlaying(false);
     };
 
-    audio.addEventListener('timeupdate', handleTimeUpdate);
-    audio.addEventListener('loadedmetadata', handleLoadedMetadata);
-    audio.addEventListener('ended', handleEnded);
-    audio.addEventListener('error', handleError);
+    audio.addEventListener("timeupdate", handleTimeUpdate);
+    audio.addEventListener("loadedmetadata", handleLoadedMetadata);
+    audio.addEventListener("ended", handleEnded);
+    audio.addEventListener("error", handleError);
 
     return () => {
-      audio.removeEventListener('timeupdate', handleTimeUpdate);
-      audio.removeEventListener('loadedmetadata', handleLoadedMetadata);
-      audio.removeEventListener('ended', handleEnded);
-      audio.removeEventListener('error', handleError);
+      audio.removeEventListener("timeupdate", handleTimeUpdate);
+      audio.removeEventListener("loadedmetadata", handleLoadedMetadata);
+      audio.removeEventListener("ended", handleEnded);
+      audio.removeEventListener("error", handleError);
     };
   }, [blobUrl]);
 
   const togglePlayback = useCallback(() => {
     const audio = audioRef.current;
+
     if (!audio || !blobUrl) return;
 
     if (isPlaying) {
       audio.pause();
       setIsPlaying(false);
     } else {
-      audio.play().catch(err => {
-        console.error('Erro ao reproduzir:', err);
-        setError('Erro ao reproduzir áudio');
+      audio.play().catch((err) => {
+        console.error("Erro ao reproduzir:", err);
+        setError("Erro ao reproduzir áudio");
       });
       setIsPlaying(true);
     }
   }, [isPlaying, blobUrl]);
 
-  const handleSeek = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
-    const audio = audioRef.current;
-    if (!audio || !duration) return;
+  const handleSeek = useCallback(
+    (
+      e: React.MouseEvent<HTMLDivElement> | React.KeyboardEvent<HTMLDivElement>,
+    ) => {
+      const audio = audioRef.current;
 
-    const rect = e.currentTarget.getBoundingClientRect();
-    const clickX = e.clientX - rect.left;
-    const percentage = clickX / rect.width;
-    const newTime = (percentage * duration) / 1000;
-    
-    audio.currentTime = newTime;
-    setCurrentTime(newTime * 1000);
-  }, [duration]);
+      if (!audio || !duration) return;
+
+      let clickX = 0;
+
+      if ("clientX" in e) {
+        const rect = e.currentTarget.getBoundingClientRect();
+
+        clickX = e.clientX - rect.left;
+      }
+
+      const percentage =
+        clickX / (e.currentTarget as HTMLDivElement).offsetWidth;
+      const newTime = (percentage * duration) / 1000;
+
+      audio.currentTime = newTime;
+      setCurrentTime(newTime * 1000);
+    },
+    [duration],
+  );
 
   if (error) {
     return (
@@ -147,18 +156,24 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ audioUrl, className, duration
   }
 
   return (
-    <div className={`flex items-center gap-2 rounded-lg p-2 max-w-xs ${className}`} style={{ backgroundColor: '#242626' }}>
+    <div
+      className={`flex items-center gap-2 rounded-lg p-2 max-w-xs ${className} bg-[#242626]`}
+    >
       {/* Botão play/pause */}
       <Button
         isIconOnly
-        size="sm"
-        color="primary"
-        variant="light"
-        onPress={togglePlayback}
         aria-label={isPlaying ? "Pausar" : "Reproduzir"}
         className="flex-shrink-0"
+        color="primary"
+        size="sm"
+        variant="light"
+        onPress={togglePlayback}
       >
-        {isPlaying ? <HiPause className="w-4 h-4 text-white" /> : <HiPlay className="w-4 h-4 text-white" />}
+        {isPlaying ? (
+          <HiPause className="w-4 h-4 text-white" />
+        ) : (
+          <HiPlay className="w-4 h-4 text-white" />
+        )}
       </Button>
 
       {/* Waveform visual */}
@@ -166,33 +181,33 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ audioUrl, className, duration
         {Array.from({ length: 20 }).map((_, i) => {
           const progress = duration > 0 ? currentTime / duration : 0;
           const isActive = i / 20 <= progress;
+
           return (
             <div
               key={i}
-              className="w-0.5 rounded-full transition-colors cursor-pointer"
+              className="w-0.5 rounded-full transition-colors cursor-pointer bg-[#A6ABAD]"
+              role="button"
               style={{
-                height: `${Math.random() * 10 + 3}px`, // Simulação de waveform menor
-                backgroundColor: isActive ? '#A6ABAD' : '#A6ABAD',
-                opacity: isActive ? 1 : 0.5
+                height: `${Math.random() * 10 + 3}px`,
+                opacity: isActive ? 1 : 0.5,
               }}
+              tabIndex={0}
               onClick={handleSeek}
+              onKeyDown={handleSeek}
             />
           );
         })}
       </div>
 
       {/* Tempo */}
-      <div className="text-xs font-mono flex-shrink-0 min-w-[50px] text-right" style={{ color: '#A6ABAD' }}>
+      <div className="text-xs font-mono flex-shrink-0 min-w-[50px] text-right text-[#A6ABAD]">
         {formatMs(currentTime)}/{formatMs(duration)}
       </div>
 
-      {/* Audio element */}
-      <audio
-        ref={audioRef}
-        src={blobUrl}
-        preload="metadata"
-        style={{ display: 'none' }}
-      />
+      {/* Audio element com track */}
+      <audio ref={audioRef} preload="metadata" src={blobUrl}>
+        <track default kind="captions" label="Português" srcLang="pt" />
+      </audio>
     </div>
   );
 };

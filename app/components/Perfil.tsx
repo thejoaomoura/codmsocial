@@ -681,20 +681,26 @@ const Perfil: React.FC<PerfilProps> = ({ userId }) => {
       className="absolute h-20 w-20 rounded-full object-cover border-2 border-white/30 bg-gray-700 z-0 ml-12"
     />
   )}
+{/* Avatar principal */}
+<div className="relative z-10">
+  <img
+    alt="Avatar"
+    className="h-20 w-20 rounded-full object-cover border-2 border-white/30 bg-gray-700"
+    src={profileUser.photoURL || "/default-avatar.png"}
+  />
 
-  {/* Avatar principal */}
-  <div className="relative z-10">
-    <img
-      alt="Avatar"
-      className="h-20 w-20 rounded-full object-cover border-2 border-white/30 bg-gray-700"
-      src={profileUser.photoURL || "/default-avatar.png"}
+  {/* Bolinha de status sobreposta */}
+  <div className="absolute bottom-1 right-1 z-20">
+    <StatusIndicator
+      size="md"
+      status={
+        manualStatus === "auto"
+          ? "offline" // ou "online", dependendo do comportamento desejado
+          : (manualStatus as "online" | "away" | "offline")
+      }
     />
-
-    {/* Bolinha de status sobreposta */}
-    <div className="absolute bottom-1 right-1 z-20">
-      <StatusIndicator size="md" status={manualStatus || "offline"} />
-    </div>
   </div>
+</div>
 </div>
             {/* Nome, organização e cargo */}
             {isOwnProfile ? (
@@ -908,16 +914,17 @@ const Perfil: React.FC<PerfilProps> = ({ userId }) => {
               </span>
             </div>
 
-            {user?.lastSeen && user?.privacy?.lastSeen !== "nobody" && (
-              <div className="flex items-center gap-3">
-                <HiOutlineCalendar className="w-5 h-5 text-gray-500" />
-                <span className="-ml-1">
- Visto por último: {userPresence.lastSeen ? 
-                    userPresence.lastSeen.toLocaleString("pt-BR") : 
-                    "Data não disponível"}
-                </span>
-              </div>
-            )}
+{user?.lastSeen && user?.privacy?.lastSeen !== "nobody" && (
+  <div className="flex items-center gap-3">
+    <HiOutlineCalendar className="w-5 h-5 text-gray-500" />
+    <span className="-ml-1">
+      Visto por último:{" "}
+      {userPresence?.lastSeen
+        ? userPresence.lastSeen.toLocaleString("pt-BR")
+        : "Data não disponível"}
+    </span>
+  </div>
+)}
 
 
             <div className="flex justify-center pt-4">

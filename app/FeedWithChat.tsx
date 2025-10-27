@@ -963,23 +963,13 @@ const FeedWithChat: React.FC<FeedProps> = ({
 >
   {likesUsers.map((u) => (
    <ListboxItem key={u.uid} textValue={u.name}>
-  {u.uid !== user.uid ? (
-    <Tooltip content="Visitar perfil" placement="top">
-      <div
-        className="flex items-center gap-2 cursor-pointer hover:bg-gray-700/20 rounded-md p-1 transition-colors"
-        onClick={() => router.push(`/perfil/${u.uid}`)}
-      >
-        <Avatar
-          alt={u.name}
-          className="h-8 w-8 rounded-full"
-          src={u.avatar || "/default-avatar.png"}
-        />
-        <span className="font-medium">{u.name}</span>
-        <span className="ml-2 text-lg">{u.reactionEmoji}</span>
-      </div>
-    </Tooltip>
-  ) : (
-    <div className="flex items-center gap-2">
+ {u.uid !== user.uid ? (
+  <Tooltip content="Visitar perfil" placement="top">
+    <button
+      type="button"
+      className="flex items-center gap-2 cursor-pointer hover:bg-gray-700/20 rounded-md p-1 transition-colors"
+      onClick={() => router.push(`/perfil/${u.uid}`)}
+    >
       <Avatar
         alt={u.name}
         className="h-8 w-8 rounded-full"
@@ -987,8 +977,19 @@ const FeedWithChat: React.FC<FeedProps> = ({
       />
       <span className="font-medium">{u.name}</span>
       <span className="ml-2 text-lg">{u.reactionEmoji}</span>
-    </div>
-  )}
+    </button>
+  </Tooltip>
+) : (
+  <div className="flex items-center gap-2">
+    <Avatar
+      alt={u.name}
+      className="h-8 w-8 rounded-full"
+      src={u.avatar || "/default-avatar.png"}
+    />
+    <span className="font-medium">{u.name}</span>
+    <span className="ml-2 text-lg">{u.reactionEmoji}</span>
+  </div>
+)}
     </ListboxItem>
       ))}
     </Listbox>
