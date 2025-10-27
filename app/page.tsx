@@ -962,14 +962,9 @@ export default function Home() {
 
         {/* Navbar direita */}
         <NavbarContent justify="end">
-          <button 
-            onClick={handleLogout}
-            className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full transition-colors cursor-pointer"
-            title="Sair"
-            aria-label="Sair"
-          >
-            <HiOutlineLogout className="w-5 h-5 text-red-500" />
-          </button>
+     <Button color="danger" onPress={handleLogout}>
+                <HiOutlineLogout className="w-5 h-5" />
+              </Button>
 
           {/* Avatar com dropdown */}
           <Dropdown>
