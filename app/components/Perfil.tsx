@@ -40,7 +40,8 @@ import { BreadcrumbItem, Breadcrumbs } from "@heroui/breadcrumbs";
 import { Organization, Membership} from "../types"; // ajuste o caminho conforme seu projeto
 import StatusIndicator from "./StatusIndicator";
 import { usePresence } from "../hooks/usePresence";
-import { useSafeUserPresence } from "../hooks/useSafeUserPresence";
+import { useUserPresence } from "../hooks/useUserPresence";
+import { useManualPresence } from "../hooks/useManualPresence";
 
 interface PerfilUser {
   uid: string;
@@ -88,8 +89,11 @@ const Perfil: React.FC<PerfilProps> = ({ userId }) => {
   // Inicializa o sistema de presença para o usuário atual
   usePresence();
   
+  // Hook para status manual (apenas para o próprio perfil)
+  const { manualStatus, updateManualStatus } = useManualPresence();
+  
   // Busca dados de presença do usuário do perfil (apenas se userId for válido)
-  const { presence: userPresence, loading: presenceLoading, error: presenceError } = useSafeUserPresence(userId || "");
+  const { presence: userPresence, loading: presenceLoading, error: presenceError } = useUserPresence(userId || "");
 const [organization, setOrganization] = useState<Organization | null>(null);
 // --- Modal de membros ---
 const [modalOpen, setModalOpen] = useState(false);
@@ -850,12 +854,49 @@ useEffect(() => {
               </div>
             </div>
             
+            {/* Seletor de status manual (apenas para o próprio perfil) */}
+            {isOwnProfile && (
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-gray-400">Status:</span>
+                <Select
+                  selectedKeys={[manualStatus]}
+                  onSelectionChange={(keys) => {
+                    const selectedKey = Array.from(keys)[0] as string;
+                    updateManualStatus(selectedKey as "online" | "away" | "offline" | "auto");
+                  }}
+                  size="sm"
+                  variant="bordered"
+                  className="w-40"
+                  aria-label="Selecionar status de presença"
+                  classNames={{
+                    trigger: "bg-gray-800/50 border-gray-600 hover:border-gray-500 data-[focus=true]:border-blue-500 h-8",
+                    value: "text-white text-xs",
+                    popoverContent: "bg-gray-800 border-gray-600",
+                    listboxWrapper: "max-h-[200px]"
+                  }}
+                >
+                  <SelectItem key="auto" className="text-gray-200 data-[hover=true]:bg-gray-700 text-xs">
+                    🤖 Automático
+                  </SelectItem>
+                  <SelectItem key="online" className="text-gray-200 data-[hover=true]:bg-gray-700 text-xs">
+                    🟢 Online
+                  </SelectItem>
+                  <SelectItem key="away" className="text-gray-200 data-[hover=true]:bg-gray-700 text-xs">
+                    🟡 Ausente
+                  </SelectItem>
+                  <SelectItem key="offline" className="text-gray-200 data-[hover=true]:bg-gray-700 text-xs">
+                    ⚫ Offline
+                  </SelectItem>
+                </Select>
+              </div>
+            )}
+            
             {userPresence?.lastSeen && userPresence.privacy?.lastSeen !== "nobody" && (
               <div className="flex items-center gap-2">
                 <HiOutlineCalendar className="w-5 h-5 text-gray-500" />
                 <span>
-                  Visto por último: {userPresence.lastSeen?.toDate ? 
-                    userPresence.lastSeen.toDate().toLocaleString("pt-BR") : 
+                  Visto por último: {userPresence.lastSeen ? 
+                    userPresence.lastSeen.toLocaleString("pt-BR") : 
                     "Data não disponível"}
                 </span>
               </div>

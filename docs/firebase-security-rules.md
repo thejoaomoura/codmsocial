@@ -15,6 +15,12 @@ Aplique estas regras no Firebase Console > Realtime Database > Rules:
         }
       }
     },
+    "manualPresence": {
+      "$uid": {
+        ".read": "auth != null && auth.uid == $uid",
+        ".write": "auth != null && auth.uid == $uid"
+      }
+    },
     ".read": false,
     ".write": false
   }

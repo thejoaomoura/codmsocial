@@ -25,6 +25,42 @@ export function usePresence() {
     const infoRef = ref(rtdb, ".info/connected");
     const connId = crypto.randomUUID();
     const myStatusRef = ref(rtdb, `status/${uid}/${connId}`);
+    const manualStatusRef = ref(rtdb, `manualPresence/${uid}`);
+    
+    let manualStatus: "online" | "away" | "offline" | "auto" = "auto";
+    let isActive = true;
+
+    const updatePresence = () => {
+      if (!auth.currentUser) return;
+
+      let finalState: "online" | "away" | "offline";
+      
+      // Se há um status manual definido (não "auto"), usar ele
+      if (manualStatus !== "auto") {
+        finalState = manualStatus;
+      } else {
+        // Usar a lógica automática baseada no foco da janela
+        finalState = isActive ? "online" : "away";
+      }
+
+      const presenceData = {
+        state: finalState,
+        last_active: serverTimestamp(),
+        platform: "web",
+        ua: navigator.userAgent,
+      };
+
+      set(myStatusRef, presenceData).catch((error) => {
+        console.error("Erro ao atualizar presença:", error);
+      });
+    };
+
+    // Escutar mudanças no status manual
+    const manualStatusUnsubscribe = onValue(manualStatusRef, (snapshot) => {
+      const data = snapshot.val();
+      manualStatus = data?.manualStatus || "auto";
+      updatePresence(); // Atualizar presença quando status manual mudar
+    });
 
     const setupPresence = async () => {
       onValue(infoRef, async (snap) => {
@@ -38,12 +74,7 @@ export function usePresence() {
           });
 
           // Marca online agora
-          await set(myStatusRef, {
-            state: "online",
-            last_active: serverTimestamp(),
-            platform: "web",
-            ua: navigator.userAgent,
-          });
+          updatePresence();
         } catch (error) {
           console.error("Erro ao configurar presença:", error);
         }
@@ -52,7 +83,7 @@ export function usePresence() {
       // Heartbeat periódico (45s)
       intervalRef.current = setInterval(async () => {
         try {
-          await update(myStatusRef, { last_active: serverTimestamp() });
+          updatePresence(); // Usar updatePresence em vez de update direto
         } catch (error) {
           console.error("Erro no heartbeat de presença:", error);
         }
@@ -60,17 +91,15 @@ export function usePresence() {
 
       // "Away" quando aba perde foco
       const onBlur = async () => {
-        try {
-          await update(myStatusRef, { state: "away", last_active: serverTimestamp() });
-        } catch (error) {
-          console.error("Erro ao marcar como away:", error);
+        isActive = false;
+        if (manualStatus === "auto") {
+          updatePresence();
         }
       };
       const onFocus = async () => {
-        try {
-          await update(myStatusRef, { state: "online", last_active: serverTimestamp() });
-        } catch (error) {
-          console.error("Erro ao marcar como online:", error);
+        isActive = true;
+        if (manualStatus === "auto") {
+          updatePresence();
         }
       };
 
@@ -84,6 +113,7 @@ export function usePresence() {
         }
         window.removeEventListener("blur", onBlur);
         window.removeEventListener("focus", onFocus);
+        manualStatusUnsubscribe(); 
         // Ao desmontar, marca offline explicitamente
         update(myStatusRef, { state: "offline", last_active: serverTimestamp() }).catch((error) => {
           console.error("Erro ao marcar como offline no cleanup:", error);

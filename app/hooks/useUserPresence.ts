@@ -1,13 +1,22 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { doc, onSnapshot } from "firebase/firestore";
-import { db } from "../firebase";
+import { getDatabase, ref, onValue, off } from "firebase/database";
+import { auth } from "../firebase";
+
+export type PresenceState = "online" | "away" | "offline";
+
+interface UserPresenceData {
+  state: PresenceState;
+  last_active: any;
+  platform: string;
+  ua?: string;
+}
 
 interface UserPresence {
   isOnline: boolean;
-  presence: "online" | "away" | "offline";
-  lastSeen?: any;
+  presence: PresenceState;
+  lastSeen: Date | null;
   privacy?: {
     lastSeen: "everyone" | "contacts" | "nobody" | "mutual";
   };
@@ -24,49 +33,132 @@ export function useUserPresence(userId: string) {
       setPresence({
         isOnline: false,
         presence: "offline",
+        lastSeen: null,
         privacy: { lastSeen: "everyone" },
       });
       return;
     }
 
-    // Só tenta acessar dados de presença se o usuário estiver autenticado
-    // e se não for o próprio usuário (para evitar loops)
-    const userRef = doc(db, "Users", userId);
-    const unsubscribe = onSnapshot(
-      userRef, 
-      (doc) => {
-        if (doc.exists()) {
-          const data = doc.data();
+    // Só busca dados de presença se o usuário estiver autenticado
+    if (!auth.currentUser) {
+      setLoading(false);
+      setPresence({
+        isOnline: false,
+        presence: "offline",
+        lastSeen: null,
+        privacy: { lastSeen: "everyone" },
+      });
+      return;
+    }
+
+    const rtdb = getDatabase();
+    const userStatusRef = ref(rtdb, `status/${userId}`);
+
+    const unsubscribe = onValue(
+      userStatusRef,
+      (snapshot) => {
+        try {
+          const data = snapshot.val();
+          
+          if (!data) {
+            // Usuário não tem dados de presença
+            setPresence({
+              isOnline: false,
+              presence: "offline",
+              lastSeen: null,
+              privacy: { lastSeen: "everyone" },
+            });
+            setError(null);
+            setLoading(false);
+            return;
+          }
+
+          let connections: UserPresenceData[];
+          
+          if (data.state && data.last_active) {
+            // Single connection object
+            connections = [data as UserPresenceData];
+          } else {
+            // Multiple connections object
+            connections = Object.values(data) as UserPresenceData[];
+          }
+          
+          // Determinar o status geral baseado em todas as conexões
+          let overallState: PresenceState = "offline";
+          let mostRecentActivity: Date | null = null;
+
+          for (const connection of connections) {
+            // Converter timestamp do Firebase para Date
+            let activityDate: Date | null = null;
+            if (connection.last_active) {
+              if (typeof connection.last_active === 'number') {
+                activityDate = new Date(connection.last_active);
+              } else if (connection.last_active && typeof connection.last_active === 'object' && 'toDate' in connection.last_active) {
+                activityDate = connection.last_active.toDate();
+              }
+            }
+
+            // Atualizar a atividade mais recente
+            if (activityDate) {
+              if (!mostRecentActivity || activityDate > mostRecentActivity) {
+                mostRecentActivity = activityDate;
+              }
+            }
+
+            // Determinar o status geral (prioridade: online > away > offline)
+            if (connection.state === "online") {
+              overallState = "online";
+            } else if (connection.state === "away" && overallState === "offline") {
+              overallState = "away";
+            }
+          }
+
+          // Verificar se o usuário está realmente online baseado na última atividade
+          const now = new Date();
+          const fiveMinutesAgo = new Date(now.getTime() - 5 * 60 * 1000);
+          
+          // Se a última atividade foi há mais de 5 minutos, considerar offline
+          if (mostRecentActivity && mostRecentActivity.getTime() < fiveMinutesAgo.getTime()) {
+            overallState = "offline";
+          }
+
           setPresence({
-            isOnline: data.isOnline || false,
-            presence: data.presence || "offline",
-            lastSeen: data.lastSeen,
-            privacy: data.privacy || { lastSeen: "everyone" },
+            isOnline: overallState === "online",
+            presence: overallState,
+            lastSeen: mostRecentActivity,
+            privacy: { lastSeen: "everyone" },
           });
-        } else {
+          
+          setError(null);
+        } catch (err) {
+          console.error("Erro ao processar dados de presença:", err);
+          setError("Erro ao processar dados de presença");
           setPresence({
             isOnline: false,
             presence: "offline",
+            lastSeen: null,
             privacy: { lastSeen: "everyone" },
           });
+        } finally {
+          setLoading(false);
         }
-        setLoading(false);
-        setError(null);
       },
-      (err) => {
-        console.error("Erro ao carregar presença do usuário:", err);
+      (error) => {
+        console.error("Erro ao escutar presença do usuário:", error);
         setError("Erro ao carregar dados de presença");
-        setLoading(false);
-        // Define valores padrão em caso de erro
         setPresence({
           isOnline: false,
           presence: "offline",
+          lastSeen: null,
           privacy: { lastSeen: "everyone" },
         });
+        setLoading(false);
       }
     );
 
-    return () => unsubscribe();
+    return () => {
+      off(userStatusRef, "value", unsubscribe);
+    };
   }, [userId]);
 
   return { presence, loading, error };
