@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import {
   Modal,
   ModalContent,
@@ -19,6 +20,7 @@ import {
   HiOutlineUserGroup,
   HiOutlinePencil,
   HiOutlineTrash,
+  HiOutlineUser,
 } from "react-icons/hi";
 
 import { OrganizationRole, Membership, User } from "../types";
@@ -237,6 +239,7 @@ const RoleManagement: React.FC<RoleManagementProps> = ({
   onRoleChange,
   onRemoveMember,
 }) => {
+  const router = useRouter();
   const [selectedMember, setSelectedMember] = useState<
     (Membership & { userData: User }) | null
   >(null);
@@ -380,6 +383,15 @@ const RoleManagement: React.FC<RoleManagementProps> = ({
 
                   {!isCurrentUser && (
                     <div className="flex gap-2">
+                      <Button
+                        color="default"
+                        size="sm"
+                        startContent={<HiOutlineUser className="w-4 h-4" />}
+                        variant="light"
+                        onPress={() => router.push(`/perfil/${member.userId}`)}
+                      >
+                        Ver Perfil
+                      </Button>
                       {canChange && (
                         <Button
                           color="primary"

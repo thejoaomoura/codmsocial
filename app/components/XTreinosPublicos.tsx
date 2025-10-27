@@ -759,14 +759,22 @@ export default function XTreinosPublicos(props?: XTreinosPublicosProps) {
               <div className="space-y-4">
                 <div className="p-4 bg-default-50 rounded-lg">
                   <h4 className="font-medium mb-2">Requisitos do Roster</h4>
-                  <div className="text-sm text-default-600 space-y-1">
-                    <p>
+                  <div className="text-sm space-y-1">
+                    <p className="text-default-600">
                       • Mínimo: {selectedEvent.rosterMin} jogadores
                     </p>
-                    <p>
+                    <p className="text-default-600">
                       • Máximo: {selectedEvent.rosterMax} jogadores
                     </p>
-                    <p>
+                    <p className={`font-medium ${
+                      selectedRoster.length < selectedEvent.rosterMin 
+                        ? 'text-red-600' // Vermelho: abaixo do mínimo
+                        : selectedRoster.length === selectedEvent.rosterMin
+                        ? 'text-yellow-600' // Amarelo: exatamente no mínimo
+                        : selectedRoster.length <= selectedEvent.rosterMax
+                        ? 'text-green-600' // Verde: entre mínimo e máximo
+                        : 'text-red-600' // Vermelho: acima do máximo
+                    }`}>
                       • Selecionados: {selectedRoster.length} jogadores
                     </p>
                   </div>
@@ -786,7 +794,7 @@ export default function XTreinosPublicos(props?: XTreinosPublicosProps) {
                           name={member.userData.name}
                         />
                         <div>
-                          <p className="font-medium">{member.userData.name}</p>
+                          <p className="font-medium">{member.userData.displayName || member.userData.name}</p>
                           <p className="text-sm text-default-500">
                             {member.role}
                           </p>

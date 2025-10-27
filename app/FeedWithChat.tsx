@@ -161,8 +161,8 @@ const FeedWithChat: React.FC<FeedProps> = ({
   );
 
   // Constantes para o picker
-  const PICKER_W_MOBILE = 260;
-  const PICKER_W_DESKTOP = 360;
+  const PICKER_W_MOBILE = 340; 
+  const PICKER_W_DESKTOP = 460; 
   const PICKER_H = 60; // altura aproximada do picker
   const GAP = 10; // espaço entre botão e picker
   const MARGIN = 16; // margem das bordas
@@ -989,9 +989,9 @@ const FeedWithChat: React.FC<FeedProps> = ({
       <span className="ml-2 text-lg">{u.reactionEmoji}</span>
     </div>
   )}
-</ListboxItem>
-  ))}
-</Listbox>
+    </ListboxItem>
+      ))}
+    </Listbox>
             )}
           </ModalBody>
           <ModalFooter>
@@ -1025,15 +1025,15 @@ const FeedWithChat: React.FC<FeedProps> = ({
         createPortal(
           <div
             data-reaction-picker
-            className="fixed rounded-full px-3 py-2 shadow-2xl border border-gray-600/50 flex z-[9999] backdrop-blur-sm animate-in fade-in-0 zoom-in-0 slide-in-from-bottom-2 duration-300 max-w-[90vw]"
+            className="fixed rounded-full px-4 py-3 shadow-2xl border border-gray-600/50 flex gap-1 z-[9999] backdrop-blur-sm animate-in fade-in-0 zoom-in-0 slide-in-from-bottom-2 duration-300 max-w-[95vw]"
             style={{
               top: pickerPosition.top,
               left: pickerPosition.left,
               width: pickerPosition.width,
               transform: "translateX(-50%)",
               // opcional: respeitar safe area no iOS
-              paddingLeft: "max(12px, env(safe-area-inset-left))",
-              paddingRight: "max(12px, env(safe-area-inset-right))",
+              paddingLeft: "max(16px, env(safe-area-inset-left))",
+              paddingRight: "max(16px, env(safe-area-inset-right))",
             }}
             // no touch não use hover timeouts
             onMouseEnter={() => {
@@ -1056,9 +1056,14 @@ const FeedWithChat: React.FC<FeedProps> = ({
             {feedReactions.map((reaction, index) => (
               <button
                 key={index}
-                className="text-2xl md:text-3xl hover:scale-150 transition-all duration-200 p-1 md:p-2 rounded-full hover:bg-gray-700/50 transform hover:-translate-y-1 cursor-pointer"
+                className="text-2xl md:text-3xl hover:scale-125 transition-all duration-200 p-1.5 md:p-2 rounded-full hover:bg-gray-700/50 transform hover:-translate-y-1 cursor-pointer flex-shrink-0"
                 style={{
                   filter: "drop-shadow(0 4px 8px rgba(0,0,0,0.3))",
+                  minWidth: "40px",
+                  minHeight: "40px",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
                 }}
                 title={reaction.name}
                 onClick={(e) => {

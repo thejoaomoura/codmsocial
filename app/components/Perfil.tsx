@@ -27,6 +27,7 @@ import {
   HiOutlineEye,
   HiOutlineUpload,
   HiOutlinePhotograph,
+  HiOutlineUser,
 } from "react-icons/hi";
 import { Navbar, NavbarContent, NavbarItem } from "@heroui/navbar";
 import { Tooltip } from "@heroui/tooltip";
@@ -902,65 +903,78 @@ useEffect(() => {
       </div>
 
       {/* Modal de membros da organização */}
-<Modal isOpen={modalOpen} onOpenChange={setModalOpen} size="lg">
-  <ModalContent>
-    <ModalHeader>
-      Membros de {modalOrgName}
-    </ModalHeader>
-    <ModalBody>
-      <Input
-        type="text"
-        placeholder="Filtrar membros..."
-        value={modalMemberFilter}
-        onChange={(e) => setModalMemberFilter(e.target.value)}
-        className="mb-3"
-      />
+      <Modal isOpen={modalOpen} onOpenChange={setModalOpen} size="lg">
+        <ModalContent>
+          <ModalHeader>
+            Membros de {modalOrgName}
+          </ModalHeader>
+          <ModalBody>
+            <Input
+              type="text"
+              placeholder="Filtrar membros..."
+              value={modalMemberFilter}
+              onChange={(e) => setModalMemberFilter(e.target.value)}
+              className="mb-3"
+            />
 
-      <div className="max-h-[400px] overflow-y-auto space-y-3">
-        {modalMembersWithUserData
-          .filter((m) =>
-            m.displayName
-              ?.toLowerCase()
-              .includes(modalMemberFilter.toLowerCase()),
-          )
-          .map((m) => (
-            <div
-              key={m.userId}
-              className="flex items-center justify-between bg-gray-800/40 rounded-xl p-2"
-            >
-              <div className="flex items-center gap-3">
-                <Avatar
-                  src={m.photoURL || "/default-avatar.png"}
-                  size="sm"
-                  radius="lg"
-                />
-                <div>
-                  <p className="font-semibold">{m.displayName}</p>
-                  <p className="text-xs text-gray-400">
-                    {m.role === "owner"
-                      ? "👑 Dono"
-                      : m.role === "manager"
-                      ? "⚡ Gerente"
-                      : m.role === "pro"
-                      ? "🌟 Pro Player"
-                      : "🎮 Membro"}
-                  </p>
-                </div>
-              </div>
+            <div className="max-h-[400px] overflow-y-auto space-y-3">
+              {modalMembersWithUserData
+                .filter((m) =>
+                  m.displayName
+                    ?.toLowerCase()
+                    .includes(modalMemberFilter.toLowerCase()),
+                )
+                .map((m) => (
+                  <div
+                    key={m.userId}
+                    className="flex items-center justify-between bg-gray-800/40 rounded-xl p-2"
+                  >
+                    <div className="flex items-center gap-3">
+                      <Avatar
+                        src={m.photoURL || "/default-avatar.png"}
+                        size="sm"
+                        radius="lg"
+                      />
+                      <div>
+                        <p className="font-semibold">{m.displayName}</p>
+                        <p className="text-xs text-gray-400">
+                          {m.role === "owner"
+                            ? "👑 Dono"
+                            : m.role === "manager"
+                            ? "⚡ Gerente"
+                            : m.role === "pro"
+                            ? "🌟 Pro Player"
+                            : "🎮 Membro"}
+                        </p>
+                      </div>
+                    </div>
+                    
+                    {/* Botão Ver Perfil */}
+                    {m.userId !== authUser?.uid && (
+                      <Button
+                        size="sm"
+                        variant="flat"
+                        color="primary"
+                        startContent={<HiOutlineUser className="w-4 h-4" />}
+                        onClick={() => router.push(`/perfil/${m.userId}`)}
+                      >
+                        Ver Perfil
+                      </Button>
+                    )}
+                  </div>
+                ))}
+              {modalMembersWithUserData.length === 0 && (
+                <p className="text-center text-gray-500">Nenhum membro encontrado.</p>
+              )}
             </div>
-          ))}
-        {modalMembersWithUserData.length === 0 && (
-          <p className="text-center text-gray-500">Nenhum membro encontrado.</p>
-        )}
-      </div>
-    </ModalBody>
-    <ModalFooter>
-      <Button color="danger" variant="flat" onPress={() => setModalOpen(false)}>
-        Fechar
-      </Button>
-    </ModalFooter>
-  </ModalContent>
-</Modal>
+          </ModalBody>
+          <ModalFooter>
+            <Button color="danger" variant="flat" onPress={() => setModalOpen(false)}>
+              Fechar
+            </Button>
+          </ModalFooter>
+        </ModalContent>
+      </Modal>
     </div>
   );
 };

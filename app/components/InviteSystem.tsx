@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import {
   Modal,
   ModalContent,
@@ -22,6 +23,7 @@ import {
   HiOutlineX,
   HiOutlineClock,
   HiOutlineUsers,
+  HiOutlineUser,
 } from "react-icons/hi";
 import {
   collection,
@@ -469,6 +471,7 @@ const PendingRequests: React.FC<PendingRequestsProps> = ({
   currentUserId,
   onRequestProcessed,
 }) => {
+  const router = useRouter();
   const [requests, setRequests] = useState<(Membership & { userData: User })[]>(
     [],
   );
@@ -781,6 +784,15 @@ const PendingRequests: React.FC<PendingRequestsProps> = ({
 
               {canInviteMembers(currentUserRole) && (
                 <div className="flex items-center gap-2">
+                  <Button
+                    color="default"
+                    size="sm"
+                    startContent={<HiOutlineUser className="w-4 h-4" />}
+                    variant="light"
+                    onPress={() => router.push(`/perfil/${request.userId}`)}
+                  >
+                    Ver Perfil
+                  </Button>
                   <Button
                     color="success"
                     isLoading={processing === request.userId}

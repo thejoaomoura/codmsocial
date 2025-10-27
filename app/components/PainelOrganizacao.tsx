@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useRef, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { Card, CardBody, CardHeader } from "@heroui/card";
 import { Chip } from "@heroui/chip";
 import { Avatar } from "@heroui/avatar";
@@ -78,6 +79,7 @@ const PainelOrganizacao: React.FC<PainelOrganizacaoProps> = ({
   selectedOrgId,
   onSelectOrganization,
 }) => {
+  const router = useRouter();
   const [activeTab, setActiveTab] = useState("overview");
   const { getRoleName, getRoleEmoji, getRolePermissions } = useRoleManagement();
 
@@ -122,6 +124,24 @@ const PainelOrganizacao: React.FC<PainelOrganizacaoProps> = ({
   const { pendingMemberships, loading: pendingLoading } = usePendingMemberships(
     userOrg?.id || "",
   );
+
+  // Atualizar orgSettings quando userOrg mudar
+  useEffect(() => {
+    if (userOrg) {
+      setOrgSettings({
+        name: userOrg.name || "",
+        tag: userOrg.tag || "",
+        description: userOrg.description || "",
+        logoURL: userOrg.logoURL || "",
+        visibility: userOrg.visibility || "public",
+        game: userOrg.game || "CODM",
+        maxMembers: userOrg.maxMembers || 50,
+        region: userOrg.region || "BR",
+        slug: userOrg.slug || "",
+        ownerId: userOrg.ownerId || "",
+      });
+    }
+  }, [userOrg]);
 
   if (!user) {
     return (
@@ -550,6 +570,8 @@ const PainelOrganizacao: React.FC<PainelOrganizacaoProps> = ({
                           name={member.userData.displayName}
                           size="sm"
                           src={member.userData.photoURL}
+                          className="cursor-pointer hover:scale-105 transition-transform"
+                          onClick={() => router.push(`/perfil/${member.userId}`)}
                         />
                         <div className="flex-1">
                           <div className="font-medium">

@@ -70,7 +70,7 @@ import {
   useUserOrganizations,
   useOrganizations,
 } from "./hooks/useOrganizations";
-import { useUserMembership } from "./hooks/useMemberships";
+import { useUserMembership, useMembersWithUserData } from "./hooks/useMemberships";
 import { useRoleManagement } from "./hooks/useRoleManagement";
 
 // Componentes para as novas funcionalidades
@@ -231,6 +231,9 @@ export default function Home() {
 
   const { membership: userMembership, loading: membershipLoading } =
     useUserMembership(userOrg?.id || null, user?.uid || null);
+
+  const { membersWithData: orgMembers, loading: orgMembersLoading } = 
+    useMembersWithUserData(userOrg?.id || null);
 
   // Atualizar organização selecionada quando as organizações carregarem
   useEffect(() => {
@@ -1304,7 +1307,14 @@ export default function Home() {
           />
         )}
 
-        {activeTab === "Treinos/Campeonatos" && <XTreinosPublicos />}
+        {activeTab === "Treinos/Campeonatos" && (
+          <XTreinosPublicos 
+            currentUserId={user?.uid}
+            currentUserRole={userMembership?.role}
+            members={orgMembers}
+            organization={userOrg}
+          />
+        )}
 
         {activeTab === "Ranking" && <RankingSystem user={user} />}
 
