@@ -227,18 +227,32 @@ useEffect(() => {
 
         // Buscar o role correto da coleção global memberships
         let correctRole = data.organizationRole || "";
+        let organizationId = "";
+        
         if (data.organizationTag) {
           try {
-            const membershipQuery = query(
-              collection(db, "memberships"),
-              where("userId", "==", uidToFetch),
-              where("organizationTag", "==", data.organizationTag)
+            // Primeiro buscar a organização pelo tag para obter o ID correto
+            const orgQuery = query(
+              collection(db, "organizations"),
+              where("tag", "==", data.organizationTag)
             );
-            const membershipSnapshot = await getDocs(membershipQuery);
+            const orgSnapshot = await getDocs(orgQuery);
             
-            if (!membershipSnapshot.empty) {
-              const membershipDoc = membershipSnapshot.docs[0];
-              correctRole = membershipDoc.data().role || correctRole;
+            if (!orgSnapshot.empty) {
+              organizationId = orgSnapshot.docs[0].id;
+              
+              // Agora buscar o membership usando o organizationId correto
+              const membershipQuery = query(
+                collection(db, "memberships"),
+                where("userId", "==", uidToFetch),
+                where("organizationId", "==", organizationId)
+              );
+              const membershipSnapshot = await getDocs(membershipQuery);
+              
+              if (!membershipSnapshot.empty) {
+                const membershipDoc = membershipSnapshot.docs[0];
+                correctRole = membershipDoc.data().role || correctRole;
+              }
             }
           } catch (membershipError) {
             console.error("Erro ao buscar role da membership:", membershipError);
