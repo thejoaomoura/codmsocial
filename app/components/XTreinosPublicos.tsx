@@ -790,13 +790,36 @@ export default function XTreinosPublicos(props?: XTreinosPublicosProps) {
                       <div className="flex items-center gap-3">
                         <Avatar
                           size="sm"
-                          src={member.userData.avatar}
+                          src={member.userData.photoURL}
                           name={member.userData.name}
                         />
                         <div>
                           <p className="font-medium">{member.userData.displayName || member.userData.name}</p>
                           <p className="text-sm text-default-500">
-                            {member.role}
+
+                              <Chip
+                                                    className="mt-1"
+                                                    color={
+                                                     member.role === "owner"
+                                                        ? "warning"
+                                                        : member.role === "manager"
+                                                          ? "secondary"
+                                                          : member.role === "pro"
+                                                            ? "primary"
+                                                            : "default"
+                                                    }
+                                                    size="sm"
+                                                    variant="flat"
+                                                  >
+                                                    {member.role === "owner"
+                                                      ? "👑 Dono"
+                                                      : member.role === "manager"
+                                                        ? "⚡ Manager"
+                                                        : member.role === "pro"
+                                                          ? "🌟 Pro Player"
+                                                          : "🎮 Ranked"}
+                                                  </Chip>
+
                           </p>
                         </div>
                       </div>

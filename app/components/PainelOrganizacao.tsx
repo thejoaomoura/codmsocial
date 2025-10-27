@@ -28,6 +28,7 @@ import {
   HiOutlineUserGroup,
   HiOutlineLink,
   HiOutlineSwitchHorizontal,
+  HiOutlineUser,
 } from "react-icons/hi";
 import { User } from "firebase/auth";
 import {
@@ -581,6 +582,15 @@ const PainelOrganizacao: React.FC<PainelOrganizacaoProps> = ({
                             {getRoleName(member.role)}
                           </div>
                         </div>
+                          <Button
+                                                color="default"
+                                                size="sm"
+                                                startContent={<HiOutlineUser className="w-4 h-4" />}
+                                                variant="light"
+                                                onPress={() => router.push(`/perfil/${member.userId}`)}
+                                              >
+                                                Ver Perfil
+                                              </Button>
                         <Chip size="sm" variant="flat">
                           {getRoleEmoji(member.role)}
                         </Chip>
