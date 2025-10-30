@@ -914,18 +914,58 @@ const Perfil: React.FC<PerfilProps> = ({ userId }) => {
               </span>
             </div>
 
-{user?.lastSeen && user?.privacy?.lastSeen !== "nobody" && (
-  <div className="flex items-center gap-3">
-    <HiOutlineCalendar className="w-5 h-5 text-gray-500" />
-    <span className="-ml-1">
-      Visto por último:{" "}
-      {userPresence?.lastSeen
-        ? userPresence.lastSeen.toLocaleString("pt-BR")
-        : "Data não disponível"}
-    </span>
-  </div>
-)}
-
+          {(userPresence?.lastSeen || user?.lastSeen) && user?.privacy?.lastSeen !== "nobody" && (
+            <div className="flex items-center gap-3">
+              <HiOutlineCalendar className="w-5 h-5 text-gray-500" />
+              <span className="-ml-1">
+                Visto por último:{" "}
+                {(() => {
+                  const lastSeenDate = userPresence?.lastSeen || user?.lastSeen;
+                  if (!lastSeenDate) return "Nunca";
+                  
+                  try {
+                    // Se for um timestamp do Firebase
+                    if (lastSeenDate && typeof lastSeenDate === 'object' && 'toDate' in lastSeenDate) {
+                      return lastSeenDate.toDate().toLocaleString("pt-BR", {
+                        day: "2-digit",
+                        month: "2-digit", 
+                        year: "numeric",
+                        hour: "2-digit",
+                        minute: "2-digit"
+                      });
+                    }
+                    
+                    // Se for uma instância de Date
+                    if (lastSeenDate instanceof Date) {
+                      return lastSeenDate.toLocaleString("pt-BR", {
+                        day: "2-digit",
+                        month: "2-digit",
+                        year: "numeric", 
+                        hour: "2-digit",
+                        minute: "2-digit"
+                      });
+                    }
+                    
+                    // Se for um timestamp numérico
+                    if (typeof lastSeenDate === 'number') {
+                      return new Date(lastSeenDate).toLocaleString("pt-BR", {
+                        day: "2-digit",
+                        month: "2-digit",
+                        year: "numeric",
+                        hour: "2-digit", 
+                        minute: "2-digit"
+                      });
+                    }
+                    
+                    return "Data inválida";
+                  } catch (error) {
+                    console.error("Erro ao formatar data:", error);
+                    return "Erro na formatação";
+                  }
+                })()}
+              </span>
+            </div>
+          )}
 
             <div className="flex justify-center pt-4">
               <Button
