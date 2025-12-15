@@ -20,6 +20,8 @@ import {
   DEFAULT_SEASON_CONFIG,
   EventTier,
 } from "../app/types";
+import { formatDateForScore } from "../app/utils/scoreCalculation";
+import { recordDailyInteraction } from "../app/hooks/useRanking";
 
 // Configuração do Firebase (use suas credenciais reais)
 const firebaseConfig = {
@@ -97,18 +99,12 @@ function randomBool(probability: number = 0.5): boolean {
   return Math.random() < probability;
 }
 
-function getDateString(date: Date): string {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const day = String(date.getDate()).padStart(2, "0");
-
-  return `${year}-${month}-${day}`;
-}
-
 // ===== FUNÇÕES DE SEED =====
 
 async function createSeason(): Promise<string> {
-  console.log("📅 Criando temporada...");
+  if (window.location.hostname !== "localhost" || window.location.port !== "3000") {
+      console.log("📅 Criando temporada...");
+  }
 
   const now = new Date();
   const endDate = new Date(now);
@@ -129,7 +125,9 @@ async function createSeason(): Promise<string> {
 
   const docRef = await addDoc(collection(db, "seasons"), seasonData);
 
-  console.log(`✅ Temporada criada com ID: ${docRef.id}`);
+  if (window.location.hostname === "localhost" && window.location.port === "3000") {
+    console.log(`✅ Temporada criada com ID: ${docRef.id}`);
+  }
 
   return docRef.id;
 }
@@ -138,56 +136,44 @@ async function createDailyInteractions(
   seasonId: string,
   config: SeasonConfig,
 ): Promise<void> {
-  console.log("💬 Criando interações diárias...");
+  if (window.location.hostname !== "localhost" || window.location.port !== "3000") {
+      console.log("💬 Criando interações diárias...");
+  }
 
   // Criar apenas 1 interação por usuário para simplificar
   for (const user of mockUsers) {
     const today = new Date();
-    const dateString = getDateString(today);
-
     const postsCreated = 2;
     const commentsMade = 5;
     const reactionsReceived = 10;
     const reactionsGiven = 8;
 
-    // Calcular pontos
-    const rawPoints =
-      postsCreated * config.weights.postCreated +
-      commentsMade * config.weights.commentMade +
-      reactionsReceived * config.weights.reactionReceived +
-      reactionsGiven * config.weights.reactionGiven;
-
-    const cappedPoints = Math.min(rawPoints, config.dailyInteractionCap);
-    const weightedPoints = cappedPoints * config.interactionWeight;
-
-    const interactionData = {
-      userId: user.id,
+    await recordDailyInteraction(
+      user.id,
       seasonId,
-      date: dateString,
-      interactions: {
+      today,
+      {
         postsCreated,
         commentsMade,
         reactionsReceived,
         reactionsGiven,
       },
-      rawPoints,
-      cappedPoints,
-      weightedPoints,
-      createdAt: serverTimestamp(),
-      updatedAt: serverTimestamp(),
-    };
-
-    await addDoc(collection(db, "dailyInteractions"), interactionData);
+      config,
+    );
   }
 
-  console.log(`✅ ${mockUsers.length} interações diárias criadas`);
+  if (window.location.hostname === "localhost" && window.location.port === "3000") {
+    console.log(`✅ ${mockUsers.length} interações diárias criadas`);
+  }
 }
 
 async function createEventParticipations(
   seasonId: string,
   config: SeasonConfig,
 ): Promise<void> {
-  console.log("🏆 Criando participações em eventos...");
+  if (window.location.hostname !== "localhost" || window.location.port !== "3000") {
+      console.log("🏆 Criando participações em eventos...");
+  }
 
   // Criar apenas 1 participação por usuário para simplificar
   for (let i = 0; i < mockUsers.length; i++) {
@@ -225,11 +211,15 @@ async function createEventParticipations(
     await addDoc(collection(db, "externalEventParticipations"), participationData);
   }
 
-  console.log(`✅ ${mockUsers.length} participações em eventos criadas`);
+  if (window.location.hostname === "localhost" && window.location.port === "3000") {
+    console.log(`✅ ${mockUsers.length} participações em eventos criadas`);
+  }
 }
 
 async function calculateUserScores(seasonId: string): Promise<void> {
-  console.log("🔢 Calculando scores dos usuários...");
+  if (window.location.hostname !== "localhost" || window.location.port !== "3000") {
+      console.log("🔢 Calculando scores dos usuários...");
+  }
 
   for (let i = 0; i < mockUsers.length; i++) {
     const user = mockUsers[i];
@@ -269,11 +259,15 @@ async function calculateUserScores(seasonId: string): Promise<void> {
     await addDoc(collection(db, "userSeasonScores"), userScoreData);
   }
 
-  console.log(`✅ Scores calculados para ${mockUsers.length} usuários`);
+  if (window.location.hostname === "localhost" && window.location.port === "3000") {
+    console.log(`✅ Scores calculados para ${mockUsers.length} usuários`);
+  }
 }
 
 async function calculateRanks(seasonId: string): Promise<void> {
-  console.log("🏅 Calculando ranks...");
+  if (window.location.hostname !== "localhost" || window.location.port !== "3000") {
+      console.log("🏅 Calculando ranks...");
+  }
 
   // Buscar todos os scores
   const scoresQuery = query(
@@ -293,17 +287,23 @@ async function calculateRanks(seasonId: string): Promise<void> {
   });
 
   await batch.commit();
-  console.log(`✅ Ranks calculados para ${scoresSnapshot.size} usuários`);
+  if (window.location.hostname === "localhost" && window.location.port === "3000") {
+    console.log(`✅ Ranks calculados para ${scoresSnapshot.size} usuários`);
+  }
 }
 
 // ===== FUNÇÃO PRINCIPAL =====
 
 async function seed() {
   try {
-    console.log("\n🌱 Iniciando seed do sistema de ranking...\n");
-
+    if (window.location.hostname === "localhost" && window.location.port === "3000") {
+      console.log("\n🌱 Iniciando seed do sistema de ranking...\n");
+    }
+    
     // Criar apenas uma temporada simples
-    console.log("📅 Criando temporada...");
+    if (window.location.hostname === "localhost" && window.location.port === "3000") {
+      console.log("📅 Criando temporada...");
+    }
     const now = new Date();
     const endDate = new Date(Date.now() + 90 * 24 * 60 * 60 * 1000); // 90 dias
     
@@ -321,10 +321,14 @@ async function seed() {
 
     const seasonRef = await addDoc(collection(db, "seasons"), seasonData);
     const seasonId = seasonRef.id;
-    console.log(`✅ Temporada criada com ID: ${seasonId}`);
+    if (window.location.hostname === "localhost" && window.location.port === "3000") {
+      console.log(`✅ Temporada criada com ID: ${seasonId}`);
+    }
 
     // Criar apenas scores simples sem interações complexas
-    console.log("🔢 Criando scores dos usuários...");
+    if (window.location.hostname === "localhost" && window.location.port === "3000") {
+      console.log("🔢 Criando scores dos usuários...");
+    }
     for (let i = 0; i < mockUsers.length; i++) {
       const user = mockUsers[i];
       const score = 100 - (i * 10); // Score decrescente
@@ -356,9 +360,11 @@ async function seed() {
       await addDoc(collection(db, "userSeasonScores"), userScoreData);
     }
 
+    if (window.location.hostname === "localhost" && window.location.port === "3000") {
     console.log(`✅ ${mockUsers.length} usuários com scores criados`);
     console.log("\n✨ Seed concluído com sucesso!\n");
     console.log("🎮 Acesse a aba 'Ranking' no sistema para ver os resultados!\n");
+    }
   } catch (error) {
     console.error("\n❌ Erro durante o seed:", error);
     throw error;

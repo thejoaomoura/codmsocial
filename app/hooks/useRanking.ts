@@ -25,6 +25,7 @@ import {
   calculateUserSeasonScore,
   createDailyInteraction,
   createEventParticipation,
+  formatDateForScore,
 } from "../utils/scoreCalculation";
 
 /**
@@ -349,7 +350,7 @@ async function fallbackBuildRankingNoSeason(
 export async function recordDailyInteraction(
   userId: string,
   seasonId: string,
-  date: string,
+  date: Date | string,
   interactions: {
     postsCreated: number;
     commentsMade: number;
@@ -358,10 +359,21 @@ export async function recordDailyInteraction(
   },
   config: SeasonConfig,
 ): Promise<void> {
+  const normalizedDate =
+    typeof date === "string"
+      ? /^\d{4}-\d{2}-\d{2}$/.test(date)
+        ? date
+        : (() => {
+            const d = new Date(date);
+            return isNaN(d.getTime())
+              ? (date as string)
+              : (formatDateForScore(d) as string);
+          })()
+      : formatDateForScore(date);
   const dailyInteractionData = createDailyInteraction(
     userId,
     seasonId,
-    date,
+    normalizedDate,
     interactions,
     config,
   );
@@ -371,7 +383,7 @@ export async function recordDailyInteraction(
     collection(db, "dailyInteractions"),
     where("userId", "==", userId),
     where("seasonId", "==", seasonId),
-    where("date", "==", date),
+    where("date", "==", normalizedDate),
   );
 
   const snapshot = await getDocs(q);
