@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Card, CardBody, CardHeader } from "@heroui/card";
 import { Chip } from "@heroui/chip";
 import { Avatar } from "@heroui/avatar";
@@ -22,6 +22,8 @@ import { useActiveSeason } from "../hooks/useSeasons";
 import { useSeasonRanking, useUserScore } from "../hooks/useRanking";
 import { UserSeasonScore } from "../types";
 import { getDaysRemaining } from "../utils/scoreCalculation";
+import { useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 
 interface RankingSystemProps {
   user: User | null;
@@ -29,6 +31,19 @@ interface RankingSystemProps {
 
 const RankingSystem: React.FC<RankingSystemProps> = ({ user }) => {
   const [activeTab, setActiveTab] = useState("ranking");
+  const searchParams = useSearchParams();
+  const router = useRouter();
+  useEffect(() => {
+    const tab = searchParams.get("tab");
+    const highlightUser = searchParams.get("highlightUser");
+    if (!tab) {
+      const extra = highlightUser ? `&highlightUser=${highlightUser}` : "";
+      router.replace(`/?tab=ranking${extra}`);
+      setActiveTab("ranking");
+    } else {
+      setActiveTab(tab);
+    }
+  }, [searchParams, router]);
 
   // Buscar temporada ativa
   const { season, loading: seasonLoading } = useActiveSeason();
@@ -53,67 +68,50 @@ const RankingSystem: React.FC<RankingSystemProps> = ({ user }) => {
     );
   }
 
-  if (!season) {
-    return (
-      <Card>
-        <CardBody className="text-center py-12">
-          <div className="text-6xl mb-4">⚠️</div>
-          <h3 className="text-xl font-semibold mb-2">
-            Sistema em Implementação
-          </h3>
-          <p className="text-gray-500 mb-4">
-            O sistema de ranking ainda está sendo desenvolvido.
-          </p>
-          <p className="text-gray-400 text-sm">
-            Não há dados de temporada disponíveis no momento.
-          </p>
-        </CardBody>
-      </Card>
-    );
-  }
-
-  const daysRemaining = getDaysRemaining(season);
-  const progressPercentage =
-    ((season.durationDays - daysRemaining) / season.durationDays) * 100;
+  const daysRemaining = season ? getDaysRemaining(season) : 0;
+  const progressPercentage = season
+    ? ((season.durationDays - daysRemaining) / season.durationDays) * 100
+    : 0;
 
   return (
     <div className="space-y-6">
-      {/* Header da Temporada */}
-      <Card>
-        <CardBody>
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center gap-3">
-              <div className="p-3 bg-primary-100 rounded-lg">
-                <HiOutlineTrophy className="w-8 h-8 text-primary-600" />
+      {season && (
+        <Card>
+          <CardBody>
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-3">
+                <div className="p-3 bg-primary-100 rounded-lg">
+                  <HiOutlineTrophy className="w-8 h-8 text-primary-600" />
+                </div>
+                <div>
+                  <h2 className="text-2xl font-bold">{season.name}</h2>
+                  <p className="text-gray-600">
+                    Temporada {season.seasonNumber} • Sistema de Ranking v1
+                  </p>
+                </div>
               </div>
-              <div>
-                <h2 className="text-2xl font-bold">{season.name}</h2>
-                <p className="text-gray-600">
-                  Temporada {season.seasonNumber} • Sistema de Ranking v1
-                </p>
-              </div>
+              <Chip color="success" size="lg" variant="flat">
+                ATIVA
+              </Chip>
             </div>
-            <Chip color="success" size="lg" variant="flat">
-              ATIVA
-            </Chip>
-          </div>
 
-          <div className="space-y-2">
-            <div className="flex justify-between text-sm">
-              <span className="text-gray-600">Progresso da Temporada</span>
-              <span className="font-medium">
-                {daysRemaining} dias restantes
-              </span>
+            <div className="space-y-2">
+              <div className="flex justify-between text-sm">
+                <span className="text-gray-600">Progresso da Temporada</span>
+                <span className="font-medium">
+                  {daysRemaining} dias restantes
+                </span>
+              </div>
+              <Progress
+                aria-label="Progresso da temporada"
+                color="primary"
+                size="md"
+                value={progressPercentage}
+              />
             </div>
-            <Progress
-              aria-label="Progresso da temporada"
-              color="primary"
-              size="md"
-              value={progressPercentage}
-            />
-          </div>
-        </CardBody>
-      </Card>
+          </CardBody>
+        </Card>
+      )}
 
       {/* Score do Usuário (se logado) */}
       {user && userScore && (
@@ -243,17 +241,19 @@ const RankingSystem: React.FC<RankingSystemProps> = ({ user }) => {
           )}
         </Tab>
 
-        <Tab
-          key="rules"
-          title={
-            <div className="flex items-center gap-2">
-              <HiOutlineStar className="w-4 h-4" />
-              Regras
-            </div>
-          }
-        >
-          <RulesPanel config={season.config} />
-        </Tab>
+        {season && (
+          <Tab
+            key="rules"
+            title={
+              <div className="flex items-center gap-2">
+                <HiOutlineStar className="w-4 h-4" />
+                Regras
+              </div>
+            }
+          >
+            <RulesPanel config={season.config} />
+          </Tab>
+        )}
       </Tabs>
     </div>
   );
@@ -307,7 +307,7 @@ const RankingTable: React.FC<RankingTableProps> = ({
 
         return (
           <Card
-            key={score.id}
+            key={score.id || `${score.userId}-${score.seasonId}`}
             className={`${isCurrentUser ? "ring-2 ring-primary border-primary" : ""}`}
           >
             <CardBody className="py-3">

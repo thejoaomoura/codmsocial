@@ -36,7 +36,7 @@ import {
   DropdownMenu,
   DropdownItem,
 } from "@heroui/dropdown";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import {
   Modal,
   ModalBody,
@@ -99,6 +99,7 @@ const Perfil: React.FC<PerfilProps> = ({ userId }) => {
   const [showNameModal, setShowNameModal] = useState(false);
   const [newName, setNewName] = useState("");
   const router = useRouter();
+  const searchParams = useSearchParams();
   const inputRef = useRef<HTMLInputElement>(null);
   const handleLogout = async () => await signOut(auth);
   const isOwnProfile = !userId || userId === auth.currentUser?.uid;
@@ -161,6 +162,14 @@ const Perfil: React.FC<PerfilProps> = ({ userId }) => {
 
     fetchUser();
   }, [userId, auth.currentUser]);
+
+  useEffect(() => {
+    const tab = searchParams.get("tab");
+    const uidToFetch = userId || auth.currentUser?.uid;
+    if (tab === "ranking" && uidToFetch) {
+      router.push(`/?tab=ranking&highlightUser=${uidToFetch}`);
+    }
+  }, [searchParams, userId]);
 
   useEffect(() => {
     const fetchOrganization = async () => {

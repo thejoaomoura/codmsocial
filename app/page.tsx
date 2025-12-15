@@ -87,6 +87,7 @@ import RankingSystem from "./components/RankingSystem";
 import Perfil from "./components/Perfil"; // importa o componente
 import SplashScreen from "./components/SplashScreen";
 import { usePresence } from "./hooks/usePresence";
+import { useSearchParams } from "next/navigation";
 
 const navigation = [
   { label: "Feed", icon: <HiOutlineNewspaper className="w-5 h-5" /> },
@@ -121,6 +122,7 @@ const navigation = [
 export default function Home() {
   const [user, setUser] = useState<User | null>(null);
   const [isAuthLoading, setIsAuthLoading] = useState(true);
+  const searchParams = useSearchParams();
 
   // Inicializa o sistema de presença
   usePresence();
@@ -174,6 +176,19 @@ export default function Home() {
       }
     };
   }, []);
+
+  // Selecionar aba baseada em query string (?tab=ranking)
+  useEffect(() => {
+    const tabParam = searchParams.get("tab");
+    if (!tabParam) return;
+    if (tabParam.toLowerCase() === "ranking") {
+      setActiveTab("Ranking");
+    } else if (tabParam.toLowerCase() === "feed") {
+      setActiveTab("Feed");
+    } else if (tabParam.toLowerCase() === "conversas") {
+      setActiveTab("Conversas");
+    }
+  }, [searchParams]);
 
   // Evento externo para abrir conversas
   useEffect(() => {

@@ -22,6 +22,7 @@ import {
 } from "../types";
 import {
   calculateRanks,
+  calculateUserSeasonScore,
   createDailyInteraction,
   createEventParticipation,
 } from "../utils/scoreCalculation";
@@ -36,8 +37,16 @@ export function useSeasonRanking(seasonId: string | null, limit: number = 100) {
 
   useEffect(() => {
     if (!seasonId) {
-      setLoading(false);
-
+      fallbackBuildRankingNoSeason(limit)
+        .then((built) => {
+          setRanking(built);
+          setLoading(false);
+        })
+        .catch((err) => {
+          console.error("Erro ao montar ranking sem temporada:", err);
+          setError(err.message);
+          setLoading(false);
+        });
       return;
     }
 
@@ -54,15 +63,26 @@ export function useSeasonRanking(seasonId: string | null, limit: number = 100) {
           ...doc.data(),
         })) as UserSeasonScore[];
 
-        // Ordenar no lado do cliente por totalScore (desc)
         scores.sort((a, b) => (b.totalScore || 0) - (a.totalScore || 0));
 
-        // Recalcular ranks para garantir consistência
         const rankedScores = calculateRanks(scores);
 
-        // Limitar ao número especificado
-        setRanking(rankedScores.slice(0, limit));
-        setLoading(false);
+        if (rankedScores.length > 0) {
+          setRanking(rankedScores.slice(0, limit));
+          setLoading(false);
+        } else {
+          setLoading(true);
+          fallbackBuildRankingFromUsers(seasonId, limit)
+            .then((built) => {
+              setRanking(built);
+              setLoading(false);
+            })
+            .catch((err) => {
+              console.error("Erro ao montar ranking inicial:", err);
+              setError(err.message);
+              setLoading(false);
+            });
+        }
       },
       (err) => {
         console.error("Erro ao carregar ranking:", err);
@@ -217,6 +237,111 @@ export function useUserEventParticipations(
 }
 
 // ===== FUNÇÕES AUXILIARES =====
+
+async function fallbackBuildRankingFromUsers(
+  seasonId: string,
+  limit: number,
+): Promise<UserSeasonScore[]> {
+  const usersSnap = await getDocs(query(collection(db, "Users")));
+  const users = usersSnap.docs.map((d) => ({
+    uid: d.id,
+    displayName: (d.data() as any).displayName || d.id,
+    photoURL: (d.data() as any).photoURL || "",
+    organizationTag: (d.data() as any).organizationTag || undefined,
+  }));
+
+  const scoresPromises = users.map(async (u) => {
+    const dailyQ = query(
+      collection(db, "dailyInteractions"),
+      where("userId", "==", u.uid),
+      where("seasonId", "==", seasonId),
+    );
+    const eventsQ = query(
+      collection(db, "externalEventParticipations"),
+      where("userId", "==", u.uid),
+      where("seasonId", "==", seasonId),
+    );
+
+    const [dailySnap, eventsSnap] = await Promise.all([
+      getDocs(dailyQ),
+      getDocs(eventsQ),
+    ]);
+
+    const dailyInteractions = dailySnap.docs.map((doc) => ({
+      id: doc.id,
+      ...doc.data(),
+    })) as DailyInteraction[];
+
+    const eventParticipations = eventsSnap.docs.map((doc) => ({
+      id: doc.id,
+      ...doc.data(),
+    })) as ExternalEventParticipation[];
+
+    const base = calculateUserSeasonScore(
+      u.uid,
+      seasonId,
+      u.displayName,
+      u.photoURL,
+      u.organizationTag,
+      dailyInteractions,
+      eventParticipations,
+    );
+
+    const score: UserSeasonScore = {
+      id: `${u.uid}-${seasonId}`,
+      ...base,
+      rank: 0,
+      previousRank: 0,
+      lastUpdated: new Date(),
+      createdAt: new Date(),
+    };
+
+    return score;
+  });
+
+  const allScores = await Promise.all(scoresPromises);
+  const ranked = calculateRanks(allScores).slice(0, limit);
+
+  return ranked;
+}
+
+async function fallbackBuildRankingNoSeason(
+  limit: number,
+): Promise<UserSeasonScore[]> {
+  const usersSnap = await getDocs(query(collection(db, "Users")));
+  const users = usersSnap.docs.map((d) => ({
+    uid: d.id,
+    displayName: (d.data() as any).displayName || d.id,
+    photoURL: (d.data() as any).photoURL || "",
+    organizationTag: (d.data() as any).organizationTag || undefined,
+  }));
+
+  const allScores = users.map((u) => {
+    const base = calculateUserSeasonScore(
+      u.uid,
+      "none",
+      u.displayName,
+      u.photoURL,
+      u.organizationTag,
+      [],
+      [],
+    );
+
+    const score: UserSeasonScore = {
+      id: `${u.uid}-none`,
+      ...base,
+      rank: 0,
+      previousRank: 0,
+      lastUpdated: new Date(),
+      createdAt: new Date(),
+    };
+
+    return score;
+  });
+
+  const ranked = calculateRanks(allScores).slice(0, limit);
+  return ranked;
+}
 
 /**
  * Registra uma interação diária para um usuário

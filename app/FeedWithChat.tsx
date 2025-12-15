@@ -50,6 +50,9 @@ import { Post, PostReaction, ChatOverview, ChatMessage } from "./types";
 import Chat from "./Chat";
 import { useRouter } from "next/navigation";
 import { usePresence } from "./hooks/usePresence";
+import { useActiveSeason } from "./hooks/useSeasons";
+import { useUserScore } from "./hooks/useRanking";
+import { HiOutlineTrophy } from "react-icons/hi2";
 
 interface FeedProps {
   posts: Post[];
@@ -119,6 +122,8 @@ const FeedWithChat: React.FC<FeedProps> = ({
   usePresence();
 
   const router = useRouter();
+  const { season } = useActiveSeason();
+  const { score: currentUserScore } = useUserScore(user?.uid || null, season?.id || null);
 
   // Lista de reações do Feed
   const feedReactions = [
@@ -599,6 +604,15 @@ const FeedWithChat: React.FC<FeedProps> = ({
               >
                 <HiOutlineArrowRight className="w-4 h-4" />
               </Button>
+              <Button
+                className="h-10 flex items-center justify-center"
+                size="sm"
+                variant="flat"
+                onClick={() => router.push(`/perfil/${user.uid}?tab=ranking`)}
+              >
+                <HiOutlineTrophy className="w-4 h-4 mr-1" />
+                Meu Ranking
+              </Button>
             </div>
           </CardBody>
         </Card>
@@ -647,6 +661,9 @@ const FeedWithChat: React.FC<FeedProps> = ({
 </span>
                         )}
                         {p.authorName}
+                        {p.authorId === user.uid && currentUserScore?.rank ? (
+                          <span className="text-[11px] text-gray-400 ml-1">#{currentUserScore.rank}</span>
+                        ) : null}
                       </span>
                       <span className="text-xs text-gray-400">
                         {p.createdAt?.toDate
