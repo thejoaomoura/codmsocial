@@ -338,6 +338,18 @@ export default function XTreinosPublicos(props?: XTreinosPublicosProps) {
     }
   };
 
+  const isPastStartsAt = (dateString?: string) => {
+    if (!dateString) return false;
+    try {
+      const cleanedString = dateString.replace(/\[.*\]$/, "");
+      const jsDate = new Date(cleanedString);
+      if (isNaN(jsDate.getTime())) return false;
+      return jsDate.getTime() < Date.now();
+    } catch {
+      return false;
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex justify-center items-center py-8">
@@ -447,14 +459,14 @@ export default function XTreinosPublicos(props?: XTreinosPublicosProps) {
             return (
               <Card key={event.id} className="hover:shadow-md transition-shadow">
                 <CardHeader className="pb-2">
-                  <div className="flex justify-between items-start w-full">
-                    <div className="flex items-start gap-3">
+                  <div className="flex flex-col md:flex-row md:justify-between md:items-start w-full gap-2">
+                    <div className="flex items-start gap-3 flex-1 min-w-0">
                       <div className="p-2 bg-primary-100 rounded-lg">
                         <EventIcon className="w-5 h-5 text-primary-600" />
                       </div>
-                      <div className="flex-1">
+                      <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 mb-1">
-                          <h4 className="font-semibold text-lg">{event.name}</h4>
+                          <h4 className="font-semibold text-lg truncate break-words">{event.name}</h4>
                           <Chip
                             color="primary"
                             size="sm"
@@ -464,14 +476,19 @@ export default function XTreinosPublicos(props?: XTreinosPublicosProps) {
                             Público
                           </Chip>
                         </div>
-                        <p className="text-default-600 text-sm mb-2">
+                        <p className="text-default-600 text-sm mb-2 break-words">
                           {event.description}
                         </p>
-                        <div className="flex items-center gap-4 text-sm text-default-500">
+                        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-default-500">
                           <span className="flex items-center gap-1">
                             <HiOutlineCalendar className="w-4 h-4" />
                             {formatEventDate(event.startsAt)}
                           </span>
+                          {(event.status === "finished" || isPastStartsAt(event.startsAt)) && (
+                            <Chip color="danger" size="sm" variant="flat">
+                              {event.status === "finished" ? "Finalizado" : "Expirado"}
+                            </Chip>
+                          )}
                           <span className="flex items-center gap-1">
                             <HiOutlineUsers className="w-4 h-4" />
                             {event.teamSize} jogadores ({event.gameMode})
@@ -479,7 +496,7 @@ export default function XTreinosPublicos(props?: XTreinosPublicosProps) {
                         </div>
                       </div>
                     </div>
-                    <div className="flex flex-col items-end gap-2">
+                    <div className="flex items-start md:flex-col md:items-end gap-2 flex-wrap">
                       <Chip
                         color={getEventStatusColor(event.status)}
                         size="sm"
@@ -503,8 +520,8 @@ export default function XTreinosPublicos(props?: XTreinosPublicosProps) {
                 </CardHeader>
 
                 <CardBody className="pt-0">
-                  <div className="flex justify-between items-center">
-                    <div className="flex items-center gap-2">
+                  <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3">
+                    <div className="flex items-center gap-2 flex-wrap">
                       {registration && (
                         <Badge
                           color={getRegistrationStatusColor(registration.state)}
@@ -536,7 +553,7 @@ export default function XTreinosPublicos(props?: XTreinosPublicosProps) {
                       )}
                     </div>
 
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 flex-wrap">
                       <Button
                         color="default"
                         size="sm"
