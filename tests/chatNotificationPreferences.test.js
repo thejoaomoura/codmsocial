@@ -1,11 +1,11 @@
-const test = require("node:test");
-const assert = require("node:assert/strict");
+import test from "node:test";
+import assert from "node:assert/strict";
 
-const {
+import {
   NOTIFICATION_STORAGE_KEY_PREFIX,
   readConversationNotificationPreference,
   writeConversationNotificationPreference,
-} = require("../app/chatNotificationPreferences");
+} from "../app/chatNotificationPreferences.js";
 
 const createMockStorage = (initial = {}) => {
   const data = { ...initial };
