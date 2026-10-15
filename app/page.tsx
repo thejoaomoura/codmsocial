@@ -80,6 +80,7 @@ import PainelOrganizacao from "./components/PainelOrganizacao";
 import XTreinosPublicos from "./components/XTreinosPublicos";
 import { Post, ChatOverview, ChatMessage } from "./types";
 import Login from "./Login";
+import { getAuthErrorMessage, isAuthCancelledByUser } from "../lib/firebase-auth-errors";
 import Chat from "./Chat";
 import FeedWithChat from "./FeedWithChat";
 import MercadoOrganizacao from "./components/MercadoOrganizacao";
@@ -402,10 +403,7 @@ export default function Home() {
       }
     } catch (error: any) {
       // Tratar erros de popup cancelado pelo usuário sem mostrar erro
-      if (
-        error.code === "auth/popup-closed-by-user" ||
-        error.code === "auth/cancelled-popup-request"
-      ) {
+      if (isAuthCancelledByUser(error)) {
         // Usuário cancelou o login voluntariamente, não mostrar erro
         console.log("Login cancelado pelo usuário");
 
@@ -416,7 +414,10 @@ export default function Home() {
       console.error("Erro no login:", error);
       addToast({
         title: "Erro no Login",
-        description: "Erro ao fazer login. Tente novamente.",
+        description: getAuthErrorMessage(
+          error,
+          "Erro ao fazer login. Tente novamente.",
+        ),
         color: "danger",
       });
     }

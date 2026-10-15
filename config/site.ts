@@ -1,9 +1,9 @@
 export type SiteConfig = typeof siteConfig;
 
 export const siteConfig = {
-  name: "Gaming Social Network",
+  name: "CODM Arena",
   description:
-    "Conecte-se com gamers, organize eventos e construa sua comunidade gaming.",
+    "A rede social do cenário competitivo de CODM: conecte-se com jogadores, times e organizações, acompanhe rankings e organize eventos.",
   navItems: [
     {
       label: "Home",

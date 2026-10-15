@@ -6,6 +6,7 @@ import { isSignInWithEmailLink, signInWithEmailLink } from "firebase/auth";
 import { addToast } from "@heroui/toast";
 
 import { auth } from "../firebase";
+import { getAuthErrorMessage } from "../../lib/firebase-auth-errors";
 
 export default function LoginPage() {
   const [isLoading, setIsLoading] = useState(true);
@@ -70,7 +71,7 @@ export default function LoginPage() {
           console.error("Erro no login por email link:", error);
           addToast({
             title: "Erro no login",
-            description: error.message,
+            description: getAuthErrorMessage(error),
             color: "danger",
           });
           setIsLoading(false);

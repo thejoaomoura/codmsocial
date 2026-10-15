@@ -5,12 +5,13 @@ import { Button } from "@heroui/button";
 import { Card, CardBody, CardHeader } from "@heroui/card";
 import { Input } from "@heroui/input";
 import { Tabs, Tab } from "@heroui/tabs";
-import { SiGoogle } from "react-icons/si";
+import { FcGoogle } from "react-icons/fc";
 import { addToast } from "@heroui/toast";
 import {
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
   sendSignInLinkToEmail,
+  sendPasswordResetEmail,
   isSignInWithEmailLink,
   signInWithEmailLink,
 } from "firebase/auth";
@@ -20,8 +21,30 @@ import {
   serverTimestamp,
 } from "firebase/firestore";
 
+import DotMatrixBackground from "../components/ui/dot-matrix-background";
+import { siteConfig } from "../config/site";
+import { fontLogo } from "../config/fonts";
+import { getAuthErrorMessage } from "../lib/firebase-auth-errors";
+
 import { auth, db } from "./firebase";
 
+// "CODM Arena" vira o logotipo CODM/ARENA
+const [brandFirstWord, ...brandOtherWords] = siteConfig.name.split(" ");
+const brandFirst = brandFirstWord.toUpperCase();
+const brandRest = brandOtherWords.join(" ").toUpperCase();
+
+// Estilo monocromático, no padrão do fundo de pontos
+const inputClassNames = {
+  input: "bg-transparent text-sm text-white placeholder:text-neutral-500",
+  inputWrapper:
+    "bg-black border border-[#333] rounded-md shadow-none hover:border-neutral-500 focus-within:!border-neutral-300 transition-colors",
+  label: "text-neutral-400",
+};
+const primaryButton =
+  "w-full rounded-md bg-[#ededed] text-sm font-medium text-black hover:bg-white transition-colors";
+const secondaryButton =
+  "w-full rounded-md border border-[#333] bg-transparent text-sm font-medium text-white hover:bg-white/5 transition-colors";
+const ghostButton = "w-full text-neutral-500 hover:text-white";
 interface LoginProps {
   handleGoogleLogin: () => void;
 }
@@ -67,7 +90,7 @@ const Login: React.FC<LoginProps> = ({ handleGoogleLogin }) => {
     } catch (error: any) {
       addToast({
         title: "Erro no login",
-        description: error.message || "Erro ao fazer login",
+        description: getAuthErrorMessage(error, "Não foi possível entrar. Tente novamente."),
         color: "danger",
       });
     } finally {
@@ -118,7 +141,7 @@ const Login: React.FC<LoginProps> = ({ handleGoogleLogin }) => {
     } catch (error: any) {
       addToast({
         title: "Erro no cadastro",
-        description: error.message || "Erro ao criar conta",
+        description: getAuthErrorMessage(error, "Não foi possível criar a conta. Tente novamente."),
         color: "danger",
       });
     } finally {
@@ -149,9 +172,56 @@ const Login: React.FC<LoginProps> = ({ handleGoogleLogin }) => {
     } catch (error: any) {
       addToast({
         title: "Erro ao enviar link",
-        description: error.message || "Erro ao enviar link de login",
+        description: getAuthErrorMessage(error, "Não foi possível enviar o link. Tente novamente."),
         color: "danger",
       });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handlePasswordReset = async () => {
+    if (!email) {
+      addToast({
+        title: "Email obrigatório",
+        description: "Por favor, digite seu email",
+        color: "warning",
+      });
+
+      return;
+    }
+
+    setIsLoading(true);
+    try {
+      await sendPasswordResetEmail(auth, email);
+      addToast({
+        title: "Email enviado",
+        description:
+          "Se existir uma conta com esse email, você receberá um link para redefinir a senha",
+        color: "success",
+      });
+    } catch (error: any) {
+      // Não revela se o email existe: só informa erros de formato ou limite de envios
+      const showableErrors = [
+        "auth/invalid-email",
+        "auth/too-many-requests",
+        "auth/network-request-failed",
+      ];
+
+      if (showableErrors.includes(error?.code)) {
+        addToast({
+          title: "Erro ao enviar email",
+          description: getAuthErrorMessage(error),
+          color: "danger",
+        });
+      } else {
+        addToast({
+          title: "Email enviado",
+          description:
+            "Se existir uma conta com esse email, você receberá um link para redefinir a senha",
+          color: "success",
+        });
+      }
     } finally {
       setIsLoading(false);
     }
@@ -204,9 +274,10 @@ const Login: React.FC<LoginProps> = ({ handleGoogleLogin }) => {
             console.error("Erro no login via email link:", error);
             addToast({
               title: "Erro na autenticação",
-              description:
-                error.message ||
-                "Erro ao confirmar login via email. Tente novamente.",
+              description: getAuthErrorMessage(
+                error,
+                "Não foi possível confirmar o login pelo link. Tente novamente.",
+              ),
               color: "danger",
             });
           })
@@ -226,24 +297,28 @@ const Login: React.FC<LoginProps> = ({ handleGoogleLogin }) => {
   }, [mounted]);
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-4 bg-gradient-to-br from-gray-900 via-gray-800 to-black">
-      {/* Efeito de fundo com partículas */}
-      <div className="absolute inset-0 overflow-hidden">
-        <div className="absolute -top-40 -right-40 w-80 h-80 bg-purple-500/10 rounded-full blur-3xl animate-pulse" />
-        <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-blue-500/10 rounded-full blur-3xl animate-pulse delay-1000" />
-        <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-indigo-500/5 rounded-full blur-3xl animate-pulse delay-500" />
-      </div>
+    <div className="relative min-h-screen flex items-center justify-center overflow-hidden p-4 bg-black">
+      {/* Fundo de pontos animado (WebGL) com vinheta para dar foco ao card */}
+      <DotMatrixBackground className="absolute inset-0 z-0 h-full w-full" />
+      <div className="pointer-events-none absolute inset-0 z-[1] bg-[radial-gradient(circle_at_center,rgba(0,0,0,0.75)_0%,rgba(0,0,0,0)_100%)]" />
 
-      <Card className="w-full max-w-md bg-gray-900/80 backdrop-blur-xl border border-gray-700/50 shadow-2xl relative z-10">
+      <Card className="w-full max-w-md bg-[#121212] border border-[#222] shadow-[0_10px_40px_rgba(0,0,0,0.8)] relative z-10">
         <CardHeader className="flex flex-col items-center gap-4 pb-6">
-          <div className="w-16 h-16 bg-gradient-to-r from-purple-500 to-blue-500 rounded-full flex items-center justify-center mb-2">
-            <span className="text-2xl font-bold text-white">G</span>
-          </div>
           <div className="text-center">
-            <h4 className="font-bold text-2xl text-white mb-2">
-              Gaming Social Network
-            </h4>
-            <p className="text-sm text-gray-400">
+            <h1
+              aria-label={siteConfig.name}
+              className={`${fontLogo.className} mb-3 -skew-x-6 select-none text-7xl font-black leading-none tracking-tight text-white`}
+            >
+              <span aria-hidden="true">{brandFirst}</span>
+              <span
+                aria-hidden="true"
+                className="mx-1.5 text-neutral-500"
+              >
+                /
+              </span>
+              <span aria-hidden="true">{brandRest}</span>
+            </h1>
+            <p className="text-sm text-neutral-500">
               Entre com sua conta para continuar
             </p>
           </div>
@@ -251,28 +326,28 @@ const Login: React.FC<LoginProps> = ({ handleGoogleLogin }) => {
 
         <CardBody className="flex flex-col gap-6 pt-0">
           <Button
-            className="w-full bg-white text-gray-900 hover:bg-gray-100 font-semibold transition-all duration-200 transform hover:scale-105"
-            size="lg"
-            startContent={<SiGoogle className="w-5 h-5" />}
+            className={secondaryButton}
+            size="md"
+            startContent={<FcGoogle className="w-4 h-4" />}
             onPress={handleGoogleLogin}
           >
             Entrar com Google
           </Button>
 
           <div className="flex items-center gap-4">
-            <div className="flex-1 h-px bg-gradient-to-r from-transparent via-gray-600 to-transparent" />
-            <span className="text-sm text-gray-400 font-medium">ou</span>
-            <div className="flex-1 h-px bg-gradient-to-r from-transparent via-gray-600 to-transparent" />
+            <div className="h-px flex-1 bg-[#222]" />
+            <span className="text-sm text-neutral-500">ou</span>
+            <div className="h-px flex-1 bg-[#222]" />
           </div>
 
           <Tabs
             className="w-full flex flex-col items-center"
             classNames={{
-              tabList:
-                "bg-gray-800/50 backdrop-blur-sm border border-gray-700/50 flex justify-center",
-              tab: "text-gray-400 data-[selected=true]:text-white",
-              tabContent: "text-gray-400 data-[selected=true]:text-white",
-              cursor: "bg-gradient-to-r from-purple-500 to-blue-500",
+              tabList: "bg-black border border-[#333] rounded-md flex justify-center",
+              tab: "rounded-md",
+              tabContent:
+                "text-neutral-500 group-data-[selected=true]:text-black font-medium",
+              cursor: "!bg-[#ededed] rounded-md shadow-none",
               panel: "pt-6 w-full",
             }}
             selectedKey={activeTab}
@@ -282,13 +357,7 @@ const Login: React.FC<LoginProps> = ({ handleGoogleLogin }) => {
               <div className="flex flex-col gap-4">
                 <Input
                   isRequired
-                  classNames={{
-                    input:
-                      "bg-transparent text-white placeholder:text-gray-500",
-                    inputWrapper:
-                      "bg-gray-800/50 border border-gray-700/50 hover:border-gray-600 focus-within:border-purple-500 transition-colors",
-                    label: "text-gray-300",
-                  }}
+                  classNames={inputClassNames}
                   label="Email"
                   placeholder="Digite seu email"
                   type="email"
@@ -297,13 +366,7 @@ const Login: React.FC<LoginProps> = ({ handleGoogleLogin }) => {
                 />
                 <Input
                   isRequired
-                  classNames={{
-                    input:
-                      "bg-transparent text-white placeholder:text-gray-500",
-                    inputWrapper:
-                      "bg-gray-800/50 border border-gray-700/50 hover:border-gray-600 focus-within:border-purple-500 transition-colors",
-                    label: "text-gray-300",
-                  }}
+                  classNames={inputClassNames}
                   label="Senha"
                   placeholder="Digite sua senha"
                   type="password"
@@ -311,12 +374,20 @@ const Login: React.FC<LoginProps> = ({ handleGoogleLogin }) => {
                   onChange={(e) => setPassword(e.target.value)}
                 />
                 <Button
-                  className="w-full bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white font-semibold transition-all duration-200 transform hover:scale-105"
+                  className={primaryButton}
                   isLoading={isLoading}
-                  size="lg"
+                  size="md"
                   onPress={handleEmailPasswordLogin}
                 >
                   Entrar
+                </Button>
+                <Button
+                  className={ghostButton}
+                  size="sm"
+                  variant="light"
+                  onPress={() => setActiveTab("reset")}
+                >
+                  Esqueci minha senha
                 </Button>
               </div>
             </Tab>
@@ -325,13 +396,7 @@ const Login: React.FC<LoginProps> = ({ handleGoogleLogin }) => {
               <div className="flex flex-col gap-4">
                 <Input
                   isRequired
-                  classNames={{
-                    input:
-                      "bg-transparent text-white placeholder:text-gray-500",
-                    inputWrapper:
-                      "bg-gray-800/50 border border-gray-700/50 hover:border-gray-600 focus-within:border-green-500 transition-colors",
-                    label: "text-gray-300",
-                  }}
+                  classNames={inputClassNames}
                   label="Email"
                   placeholder="Digite seu email"
                   type="email"
@@ -340,13 +405,7 @@ const Login: React.FC<LoginProps> = ({ handleGoogleLogin }) => {
                 />
                 <Input
                   isRequired
-                  classNames={{
-                    input:
-                      "bg-transparent text-white placeholder:text-gray-500",
-                    inputWrapper:
-                      "bg-gray-800/50 border border-gray-700/50 hover:border-gray-600 focus-within:border-green-500 transition-colors",
-                    label: "text-gray-300",
-                  }}
+                  classNames={inputClassNames}
                   label="Senha"
                   placeholder="Digite sua senha (mín. 6 caracteres)"
                   type="password"
@@ -354,9 +413,9 @@ const Login: React.FC<LoginProps> = ({ handleGoogleLogin }) => {
                   onChange={(e) => setPassword(e.target.value)}
                 />
                 <Button
-                  className="w-full bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white font-semibold transition-all duration-200 transform hover:scale-105"
+                  className={primaryButton}
                   isLoading={isLoading}
-                  size="lg"
+                  size="md"
                   onPress={handleEmailPasswordRegister}
                 >
                   Criar Conta
@@ -368,13 +427,7 @@ const Login: React.FC<LoginProps> = ({ handleGoogleLogin }) => {
               <div className="flex flex-col gap-4">
                 <Input
                   isRequired
-                  classNames={{
-                    input:
-                      "bg-transparent text-white placeholder:text-gray-500",
-                    inputWrapper:
-                      "bg-gray-800/50 border border-gray-700/50 hover:border-gray-600 focus-within:border-indigo-500 transition-colors",
-                    label: "text-gray-300",
-                  }}
+                  classNames={inputClassNames}
                   label="Email"
                   placeholder="Digite seu email"
                   type="email"
@@ -382,9 +435,9 @@ const Login: React.FC<LoginProps> = ({ handleGoogleLogin }) => {
                   onChange={(e) => setEmail(e.target.value)}
                 />
                 <Button
-                  className="w-full bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white font-semibold transition-all duration-200 transform hover:scale-105"
+                  className={primaryButton}
                   isLoading={isLoading}
-                  size="lg"
+                  size="md"
                   onPress={handleEmailLinkLogin}
                 >
                   Enviar Link de Login
@@ -392,6 +445,39 @@ const Login: React.FC<LoginProps> = ({ handleGoogleLogin }) => {
                 <p className="text-xs text-gray-400 text-center leading-relaxed">
                   Você receberá um link por email para fazer login sem senha
                 </p>
+              </div>
+            </Tab>
+
+            <Tab key="reset" title="Recuperar Senha">
+              <div className="flex flex-col gap-4">
+                <Input
+                  isRequired
+                  classNames={inputClassNames}
+                  label="Email"
+                  placeholder="Digite o email da sua conta"
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                />
+                <Button
+                  className={primaryButton}
+                  isLoading={isLoading}
+                  size="md"
+                  onPress={handlePasswordReset}
+                >
+                  Enviar Link de Recuperação
+                </Button>
+                <p className="text-xs text-gray-400 text-center leading-relaxed">
+                  Você receberá um email com um link para criar uma nova senha
+                </p>
+                <Button
+                  className={ghostButton}
+                  size="sm"
+                  variant="light"
+                  onPress={() => setActiveTab("login")}
+                >
+                  Voltar para o login
+                </Button>
               </div>
             </Tab>
           </Tabs>
